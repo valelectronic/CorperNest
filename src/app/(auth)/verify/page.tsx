@@ -13,9 +13,10 @@ function VerifyForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resending, setResending] = useState(false);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(30);
   const [canResend, setCanResend] = useState(false);
   const [email, setEmail] = useState("");
+  const [inputsLocked, setInputsLocked] = useState(false);
 
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const hasAttempted = useRef(false);
@@ -25,15 +26,20 @@ function VerifyForm() {
     setEmail(localStorage.getItem("pending_email") ?? "");
   }, []);
 
-  // Countdown timer
+  // Countdown — only ticks when inputs are locked after a wrong attempt
   useEffect(() => {
+    if (!inputsLocked) return;
     if (countdown <= 0) {
       setCanResend(true);
+      setInputsLocked(false);
+      setOtp(["", "", "", "", "", ""]);
+      hasAttempted.current = false;
+      setTimeout(() => inputs.current[0]?.focus(), 50);
       return;
     }
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
-  }, [countdown]);
+  }, [countdown, inputsLocked]);
 
   const handleVerify = useCallback(async (code: string) => {
     if (code.length < 6) {
@@ -55,6 +61,9 @@ function VerifyForm() {
       if (error) {
         setError(error.message ?? "Invalid or expired code.");
         setLoading(false);
+        setInputsLocked(true);
+        setCountdown(30);
+        setCanResend(false);
         return;
       }
 
@@ -74,6 +83,9 @@ function VerifyForm() {
       if (error) {
         setError(error.message ?? "Invalid or expired code.");
         setLoading(false);
+        setInputsLocked(true);
+        setCountdown(30);
+        setCanResend(false);
         return;
       }
 
@@ -83,18 +95,19 @@ function VerifyForm() {
     }
   }, [email, type, router]);
 
-  // Auto-verify when all 6 digits are filled — fires once per attempt
+  // Auto-verify when all 6 digits filled — once per attempt
   useEffect(() => {
     const code = otp.join("");
-    if (code.length === 6 && !loading && !hasAttempted.current) {
+    if (code.length === 6 && !loading && !hasAttempted.current && !inputsLocked) {
       hasAttempted.current = true;
       handleVerify(code);
     }
-  }, [otp, loading, handleVerify]);
+  }, [otp, loading, handleVerify, inputsLocked]);
 
   function handleChange(index: number, value: string) {
+    if (inputsLocked || loading) return;
     if (!/^\d*$/.test(value)) return;
-    hasAttempted.current = false; // reset so user can retry after wrong code
+    hasAttempted.current = false;
     const newOtp = [...otp];
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
@@ -104,12 +117,14 @@ function VerifyForm() {
   }
 
   function handleKeyDown(index: number, e: React.KeyboardEvent) {
+    if (inputsLocked || loading) return;
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputs.current[index - 1]?.focus();
     }
   }
 
   function handlePaste(e: React.ClipboardEvent) {
+    if (inputsLocked || loading) return;
     e.preventDefault();
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     if (pasted.length === 6) {
@@ -120,11 +135,12 @@ function VerifyForm() {
   }
 
   async function handleResend() {
-    hasAttempted.current = false; // reset for fresh attempt
+    hasAttempted.current = false;
     setResending(true);
     setError("");
+    setInputsLocked(false);
     setOtp(["", "", "", "", "", ""]);
-    inputs.current[0]?.focus();
+    setTimeout(() => inputs.current[0]?.focus(), 50);
 
     const otpType = type === "signup" ? "email-verification" : "sign-in";
 
@@ -133,27 +149,29 @@ function VerifyForm() {
       type: otpType,
     });
 
-    setCountdown(60);
+    setCountdown(30);
     setCanResend(false);
     setResending(false);
   }
 
+  const isDisabled = loading || inputsLocked;
+
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
+      className="min-h-screen flex items-center justify-center px-4 py-8"
       style={{ backgroundColor: "var(--color-bg)" }}
     >
       <div
-        className="w-full max-w-md rounded-2xl p-8"
+        className="w-full max-w-sm rounded-2xl p-6"
         style={{
           backgroundColor: "var(--color-card)",
           border: "1px solid var(--color-border)",
         }}
       >
         {/* Logo */}
-        <div className="mb-8">
+        <div className="mb-6">
           <span
-            className="text-2xl font-bold"
+            className="text-xl font-bold"
             style={{
               fontFamily: "var(--font-heading)",
               color: "var(--color-primary)",
@@ -164,7 +182,7 @@ function VerifyForm() {
         </div>
 
         <h1
-          className="text-2xl font-bold mb-1"
+          className="text-xl font-bold mb-1"
           style={{
             fontFamily: "var(--font-heading)",
             color: "var(--color-text)",
@@ -172,15 +190,22 @@ function VerifyForm() {
         >
           Enter your code
         </h1>
-        <p className="text-sm mb-8" style={{ color: "var(--color-text-muted)" }}>
+
+        <p
+          className="text-sm mb-6 leading-relaxed"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           We sent a 6-digit code to{" "}
-          <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>
+          <span
+            className="break-all"
+            style={{ color: "var(--color-primary)", fontWeight: 600 }}
+          >
             {email || "your email"}
           </span>
         </p>
 
-        {/* OTP Boxes */}
-        <div className="flex gap-3 justify-between mb-6">
+        {/* OTP Boxes — grid so they never overflow */}
+        <div className="grid grid-cols-6 gap-2 mb-5">
           {otp.map((digit, index) => (
             <input
               key={index}
@@ -189,37 +214,60 @@ function VerifyForm() {
               inputMode="numeric"
               maxLength={1}
               value={digit}
-              disabled={loading}
+              disabled={isDisabled}
               onChange={(e) => handleChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
               onPaste={handlePaste}
-              className="w-12 h-14 text-center text-xl font-bold rounded-xl focus:outline-none disabled:opacity-50 transition-opacity"
+              className="aspect-square w-full text-center text-lg font-bold rounded-xl focus:outline-none transition-all"
               style={{
-                border: digit
+                border: inputsLocked
+                  ? "1.5px solid #E53935"
+                  : digit
                   ? "2px solid var(--color-primary)"
                   : "1px solid var(--color-border)",
-                backgroundColor: "var(--color-bg)",
+                backgroundColor: inputsLocked
+                  ? "#FFF5F5"
+                  : loading
+                  ? "var(--color-light)"
+                  : "var(--color-bg)",
                 color: "var(--color-text)",
                 fontFamily: "var(--font-mono)",
+                cursor: isDisabled ? "not-allowed" : "text",
               }}
             />
           ))}
         </div>
 
-        {/* Error */}
-        {error && (
+        {/* Wrong code lock notice with countdown */}
+        {inputsLocked && (
+          <div
+            className="rounded-xl px-4 py-3 mb-4 text-sm text-center"
+            style={{
+              backgroundColor: "#FFF5F5",
+              border: "1px solid #FFCDD2",
+              color: "#C62828",
+            }}
+          >
+            Wrong code. Try again in{" "}
+            <span className="font-bold">{countdown}s</span>
+          </div>
+        )}
+
+        {/* General error (non-lock) */}
+        {error && !inputsLocked && (
           <p className="text-sm mb-4" style={{ color: "#E53935" }}>
             {error}
           </p>
         )}
 
-        {/* Verify Button — manual fallback */}
+        {/* Verify Button */}
         <button
           onClick={() => {
+            if (isDisabled) return;
             hasAttempted.current = false;
             handleVerify(otp.join(""));
           }}
-          disabled={loading || otp.join("").length < 6}
+          disabled={isDisabled || otp.join("").length < 6}
           className="w-full font-semibold py-3 rounded-xl transition-opacity disabled:opacity-50 mb-4 flex items-center justify-center gap-2"
           style={{
             backgroundColor: "var(--color-action)",
@@ -238,7 +286,10 @@ function VerifyForm() {
         </button>
 
         {/* Resend */}
-        <p className="text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
+        <p
+          className="text-center text-sm"
+          style={{ color: "var(--color-text-muted)" }}
+        >
           {canResend ? (
             <button
               onClick={handleResend}
@@ -248,14 +299,14 @@ function VerifyForm() {
             >
               {resending ? "Resending..." : "Resend code"}
             </button>
-          ) : (
+          ) : !inputsLocked ? (
             <>
               Resend code in{" "}
               <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>
                 {countdown}s
               </span>
             </>
-          )}
+          ) : null}
         </p>
       </div>
     </div>

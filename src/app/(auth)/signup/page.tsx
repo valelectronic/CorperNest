@@ -12,25 +12,49 @@ export default function SignupPage() {
   const [error, setError] = useState("");
 
   async function handleSubmit(e: { preventDefault: () => void }) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    const { error } = await authClient.emailOtp.sendVerificationOtp({
-      email,
-      type: "email-verification",
+  // Check if email already registered
+  try {
+    const checkRes = await fetch("/api/auth/check-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.toLowerCase().trim() }),
     });
 
-    if (error) {
-      setError(error.message ?? "Something went wrong. Try again.");
+    if (!checkRes.ok) throw new Error("Check failed");
+
+    const { exists } = await checkRes.json();
+
+    if (exists) {
+      setError("An account with this email already exists. Sign in instead.");
       setLoading(false);
       return;
     }
-
-    localStorage.setItem("pending_email", email);
-    localStorage.setItem("pending_name", name);
-    router.push("/verify?type=signup");
+  } catch {
+    setError("Could not verify email. Check your connection and try again.");
+    setLoading(false);
+    return;
   }
+
+  // Send OTP — renamed to otpError to avoid clash with state variable
+  const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
+    email,
+    type: "email-verification",
+  });
+
+  if (otpError) {
+    setError(otpError.message ?? "Something went wrong. Try again.");
+    setLoading(false);
+    return;
+  }
+
+  localStorage.setItem("pending_email", email);
+  localStorage.setItem("pending_name", name);
+  router.push("/verify?type=signup");
+}
 
   return (
     <div

@@ -4,7 +4,7 @@ import { getSessionCookie } from "better-auth/cookies";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const publicRoutes = ["/signin", "/signup", "/verify", "/role", "/properties"];
+  const publicRoutes = ["/signin", "/signup", "/verify", "/role", "/properties", "/"];
   const isPublicRoute = publicRoutes.some((route) =>
     pathname.startsWith(route)
   );

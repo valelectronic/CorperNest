@@ -9,6 +9,7 @@ export default function HomePageMain() {
         }}
       >
         Welcome to CorperNest
+        <h3>how do I get started?</h3>
       </h1>
     </div>
   );

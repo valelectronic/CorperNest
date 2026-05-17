@@ -179,7 +179,7 @@ export default function RolePage() {
                   className="text-sm mt-0.5"
                   style={{ color: "var(--color-text-muted)" }}
                 >
-                  I list and manage properties for Corpers
+                  I list and manage properties for Corpers and Nigerians
                 </p>
               </div>
               {/* Selection indicator */}

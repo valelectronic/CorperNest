@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
-export default function VerifyPage() {
+function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const type = searchParams.get("type");
@@ -15,13 +15,15 @@ export default function VerifyPage() {
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [email, setEmail] = useState("");
 
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const hasAttempted = useRef(false);
 
-  const email =
-    typeof window !== "undefined"
-      ? localStorage.getItem("pending_email") ?? ""
-      : "";
+  // Read localStorage safely on client
+  useEffect(() => {
+    setEmail(localStorage.getItem("pending_email") ?? "");
+  }, []);
 
   // Countdown timer
   useEffect(() => {
@@ -33,33 +35,7 @@ export default function VerifyPage() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  function handleChange(index: number, value: string) {
-    if (!/^\d*$/.test(value)) return;
-    const newOtp = [...otp];
-    newOtp[index] = value.slice(-1);
-    setOtp(newOtp);
-    if (value && index < 5) {
-      inputs.current[index + 1]?.focus();
-    }
-  }
-
-  function handleKeyDown(index: number, e: React.KeyboardEvent) {
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      inputs.current[index - 1]?.focus();
-    }
-  }
-
-  function handlePaste(e: React.ClipboardEvent) {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (pasted.length === 6) {
-      setOtp(pasted.split(""));
-      inputs.current[5]?.focus();
-    }
-  }
-
-  async function handleVerify() {
-    const code = otp.join("");
+  const handleVerify = useCallback(async (code: string) => {
     if (code.length < 6) {
       setError("Enter the full 6-digit code.");
       return;
@@ -82,9 +58,7 @@ export default function VerifyPage() {
         return;
       }
 
-      // Update name after verification
       await authClient.updateUser({ name });
-
       localStorage.removeItem("pending_email");
       localStorage.removeItem("pending_name");
       router.push("/role");
@@ -104,14 +78,53 @@ export default function VerifyPage() {
       }
 
       localStorage.removeItem("pending_email");
-      router.push("/");
+      router.push("/home");
       return;
+    }
+  }, [email, type, router]);
+
+  // Auto-verify when all 6 digits are filled — fires once per attempt
+  useEffect(() => {
+    const code = otp.join("");
+    if (code.length === 6 && !loading && !hasAttempted.current) {
+      hasAttempted.current = true;
+      handleVerify(code);
+    }
+  }, [otp, loading, handleVerify]);
+
+  function handleChange(index: number, value: string) {
+    if (!/^\d*$/.test(value)) return;
+    hasAttempted.current = false; // reset so user can retry after wrong code
+    const newOtp = [...otp];
+    newOtp[index] = value.slice(-1);
+    setOtp(newOtp);
+    if (value && index < 5) {
+      inputs.current[index + 1]?.focus();
+    }
+  }
+
+  function handleKeyDown(index: number, e: React.KeyboardEvent) {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pasted.length === 6) {
+      hasAttempted.current = false;
+      setOtp(pasted.split(""));
+      inputs.current[5]?.focus();
     }
   }
 
   async function handleResend() {
+    hasAttempted.current = false; // reset for fresh attempt
     setResending(true);
     setError("");
+    setOtp(["", "", "", "", "", ""]);
+    inputs.current[0]?.focus();
 
     const otpType = type === "signup" ? "email-verification" : "sign-in";
 
@@ -159,13 +172,10 @@ export default function VerifyPage() {
         >
           Enter your code
         </h1>
-        <p
-          className="text-sm mb-8"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+        <p className="text-sm mb-8" style={{ color: "var(--color-text-muted)" }}>
           We sent a 6-digit code to{" "}
           <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>
-            {email}
+            {email || "your email"}
           </span>
         </p>
 
@@ -174,17 +184,16 @@ export default function VerifyPage() {
           {otp.map((digit, index) => (
             <input
               key={index}
-              ref={(el) => {
-                inputs.current[index] = el;
-              }}
+              ref={(el) => { inputs.current[index] = el; }}
               type="text"
               inputMode="numeric"
               maxLength={1}
               value={digit}
+              disabled={loading}
               onChange={(e) => handleChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(index, e)}
               onPaste={handlePaste}
-              className="w-12 h-14 text-center text-xl font-bold rounded-xl focus:outline-none"
+              className="w-12 h-14 text-center text-xl font-bold rounded-xl focus:outline-none disabled:opacity-50 transition-opacity"
               style={{
                 border: digit
                   ? "2px solid var(--color-primary)"
@@ -197,31 +206,39 @@ export default function VerifyPage() {
           ))}
         </div>
 
+        {/* Error */}
         {error && (
           <p className="text-sm mb-4" style={{ color: "#E53935" }}>
             {error}
           </p>
         )}
 
-        {/* Verify Button */}
+        {/* Verify Button — manual fallback */}
         <button
-          onClick={handleVerify}
-          disabled={loading}
-          className="w-full font-semibold py-3 rounded-xl transition-opacity disabled:opacity-50 mb-4"
+          onClick={() => {
+            hasAttempted.current = false;
+            handleVerify(otp.join(""));
+          }}
+          disabled={loading || otp.join("").length < 6}
+          className="w-full font-semibold py-3 rounded-xl transition-opacity disabled:opacity-50 mb-4 flex items-center justify-center gap-2"
           style={{
             backgroundColor: "var(--color-action)",
             color: "#FFFFFF",
             fontFamily: "var(--font-heading)",
           }}
         >
-          {loading ? "Verifying..." : "Verify code"}
+          {loading ? (
+            <>
+              <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              Verifying...
+            </>
+          ) : (
+            "Verify code"
+          )}
         </button>
 
         {/* Resend */}
-        <p
-          className="text-center text-sm"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+        <p className="text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
           {canResend ? (
             <button
               onClick={handleResend}
@@ -242,5 +259,28 @@ export default function VerifyPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="min-h-screen flex items-center justify-center"
+          style={{ backgroundColor: "var(--color-bg)" }}
+        >
+          <div
+            className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+            style={{
+              borderColor: "var(--color-primary)",
+              borderTopColor: "transparent",
+            }}
+          />
+        </div>
+      }
+    >
+      <VerifyForm />
+    </Suspense>
   );
 }

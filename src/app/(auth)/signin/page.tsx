@@ -10,25 +10,49 @@ export default function SigninPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: { preventDefault: () => void }) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+ async function handleSubmit(e: { preventDefault: () => void }) {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-    const { error } = await authClient.emailOtp.sendVerificationOtp({
-      email,
-      type: "sign-in",
+  // Check if email exists — must exist for signin
+  try {
+    const checkRes = await fetch("/api/auth/check-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.toLowerCase().trim() }),
     });
 
-    if (error) {
-      setError(error.message ?? "Something went wrong. Try again.");
+    if (!checkRes.ok) throw new Error("Check failed");
+
+    const { exists } = await checkRes.json();
+
+    if (!exists) {
+      setError("No account found with this email. Create one instead.");
       setLoading(false);
       return;
     }
-
-    localStorage.setItem("pending_email", email);
-    router.push("/verify?type=signin");
+  } catch {
+    setError("Could not verify email. Check your connection and try again.");
+    setLoading(false);
+    return;
   }
+
+  // Send OTP
+  const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
+    email,
+    type: "sign-in",
+  });
+
+  if (otpError) {
+    setError(otpError.message ?? "Something went wrong. Try again.");
+    setLoading(false);
+    return;
+  }
+
+  localStorage.setItem("pending_email", email);
+  router.push("/verify?type=signin");
+}
 
   return (
     <div

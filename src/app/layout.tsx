@@ -37,7 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-    suppressContentEditableWarning
+    suppressHydrationWarning
       lang="en"
       className={`${plusJakarta.variable} ${dmSans.variable} ${dmMono.variable} antialiased`}
     >

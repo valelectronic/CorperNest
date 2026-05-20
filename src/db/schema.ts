@@ -82,6 +82,7 @@ export const verification = pgTable(
 );
 
 
+
 export const listing = pgTable(
   "listing",
   {
@@ -116,6 +117,26 @@ export const listing = pgTable(
   ],
 );
 
+
+export const visitVerification = pgTable(
+  "visit_verification",
+  {
+    id: text("id").primaryKey(),
+    bookingId: text("booking_id")
+      .notNull()
+      .references(() => booking.id, { onDelete: "cascade" }),
+    code: text("code").notNull(), // e.g. CNV-4F8K2M
+    expiresAt: timestamp("expires_at").notNull(),
+    used: boolean("used").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("visit_verification_bookingId_idx").on(table.bookingId),
+    index("visit_verification_code_idx").on(table.code),
+  ],
+);
+
+
 export const booking = pgTable(
   "booking",
   {
@@ -130,6 +151,9 @@ export const booking = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     bookingCode: text("booking_code").notNull().unique(),
+    // Add to booking table
+renterContact: text("renter_contact"),      // phone or email used at payment
+renterContactType: text("renter_contact_type"), // "email" | "phone"
     status: text("status").default("pending").notNull(), // pending | verified | completed | cancelled
     visitDate: timestamp("visit_date"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -145,10 +169,19 @@ export const booking = pgTable(
   ],
 );
 
-export const bookingRelations = relations(booking, ({ one }) => ({
+export const bookingRelations = relations(booking, ({ one, many }) => ({
   listing: one(listing, { fields: [booking.listingId], references: [listing.id] }),
   renter: one(user, { fields: [booking.renterId], references: [user.id] }),
   agent: one(user, { fields: [booking.agentId], references: [user.id] }),
+  visitVerifications: many(visitVerification),
+}));
+
+
+export const visitVerificationRelations = relations(visitVerification, ({ one }) => ({
+  booking: one(booking, {
+    fields: [visitVerification.bookingId],
+    references: [booking.id],
+  }),
 }));
 
 export const userRelations = relations(user, ({ many }) => ({

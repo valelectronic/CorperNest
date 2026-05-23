@@ -39,8 +39,6 @@ export const session = pgTable(
   (table) => [index("session_userId_idx").on(table.userId)],
 );
 
-
-
 export const account = pgTable(
   "account",
   {
@@ -81,8 +79,6 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-
-
 export const listing = pgTable(
   "listing",
   {
@@ -90,18 +86,40 @@ export const listing = pgTable(
     agentId: text("agent_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+
+    // Auto-generated from type + lga e.g. "Self Contained in Uyo"
+    // Agent never types this — computed in the create route
     title: text("title").notNull(),
+
     description: text("description").notNull(),
     address: text("address").notNull(),
     lga: text("lga").notNull(),
     state: text("state").notNull(),
-    price: integer("price").notNull(), // annual rent in naira
-    type: text("type").notNull(), // self-con | mini-flat | 1-bed | 2-bed | room
-    status: text("status").default("available").notNull(), // available | reserved | occupied | temp-unavailable
+    price: integer("price").notNull(),
+
+    // rent | sale
+    // Default is "rent" — most listings are rentals for corpers
+    listingPurpose: text("listing_purpose").default("rent").notNull(),
+
+    // self-con | mini-flat | 1-bed | 2-bed | room
+    type: text("type").notNull(),
+
+    // available | reserved | occupied | temp-unavailable | under-review | flagged
+    status: text("status").default("under-review").notNull(),
+
     landlordName: text("landlord_name"),
     landlordPhone: text("landlord_phone"),
     landlordOtpVerified: boolean("landlord_otp_verified").default(false),
     images: text("images").array().default([]),
+
+    // Standard amenities agent ticks — stored as slugs
+    // e.g. ["running-water", "prepaid-meter"]
+    amenities: text("amenities").array().default([]),
+
+    // Extra amenities agent types manually
+    // e.g. ["Boys quarters", "Swimming pool"]
+    customAmenities: text("custom_amenities").array().default([]),
+
     isActive: boolean("is_active").default(true).notNull(),
     lastStatusUpdate: timestamp("last_status_update").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -114,28 +132,9 @@ export const listing = pgTable(
     index("listing_agentId_idx").on(table.agentId),
     index("listing_status_idx").on(table.status),
     index("listing_state_idx").on(table.state),
+    index("listing_purpose_idx").on(table.listingPurpose),
   ],
 );
-
-
-export const visitVerification = pgTable(
-  "visit_verification",
-  {
-    id: text("id").primaryKey(),
-    bookingId: text("booking_id")
-      .notNull()
-      .references(() => booking.id, { onDelete: "cascade" }),
-    code: text("code").notNull(), // e.g. CNV-4F8K2M
-    expiresAt: timestamp("expires_at").notNull(),
-    used: boolean("used").default(false).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("visit_verification_bookingId_idx").on(table.bookingId),
-    index("visit_verification_code_idx").on(table.code),
-  ],
-);
-
 
 export const booking = pgTable(
   "booking",
@@ -151,11 +150,14 @@ export const booking = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     bookingCode: text("booking_code").notNull().unique(),
-    // Add to booking table
-renterContact: text("renter_contact"),      // phone or email used at payment
-renterContactType: text("renter_contact_type"), // "email" | "phone"
-    status: text("status").default("pending").notNull(), // pending | verified | completed | cancelled
+    renterContact: text("renter_contact"),
+    renterContactType: text("renter_contact_type"),
+    // pending | confirmed | verified | completed | cancelled
+    status: text("status").default("pending").notNull(),
     visitDate: timestamp("visit_date"),
+    // "this-week" | "next-week" | "flexible"
+    preferredPeriod: text("preferred_period"),
+    visitNote: text("visit_note"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -169,13 +171,73 @@ renterContactType: text("renter_contact_type"), // "email" | "phone"
   ],
 );
 
+export const visitVerification = pgTable(
+  "visit_verification",
+  {
+    id: text("id").primaryKey(),
+    bookingId: text("booking_id")
+      .notNull()
+      .references(() => booking.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    used: boolean("used").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("visit_verification_bookingId_idx").on(table.bookingId),
+    index("visit_verification_code_idx").on(table.code),
+  ],
+);
+
+export const watchlist = pgTable(
+  "watchlist",
+  {
+    id: text("id").primaryKey(),
+    renterId: text("renter_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    listingId: text("listing_id")
+      .notNull()
+      .references(() => listing.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("watchlist_renterId_idx").on(table.renterId),
+    index("watchlist_listingId_idx").on(table.listingId),
+  ],
+);
+
+// ─── RELATIONS ───────────────────────────────────────────────────────────────
+
+export const userRelations = relations(user, ({ many }) => ({
+  sessions: many(session),
+  accounts: many(account),
+  listings: many(listing),
+  bookingsAsAgent: many(booking, { relationName: "agentBookings" }),
+  bookingsAsRenter: many(booking, { relationName: "renterBookings" }),
+  watchlist: many(watchlist),
+}));
+
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, { fields: [session.userId], references: [user.id] }),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, { fields: [account.userId], references: [user.id] }),
+}));
+
+export const listingRelations = relations(listing, ({ one, many }) => ({
+  agent: one(user, { fields: [listing.agentId], references: [user.id] }),
+  bookings: many(booking),
+  watchlistEntries: many(watchlist),
+}));
+
 export const bookingRelations = relations(booking, ({ one, many }) => ({
   listing: one(listing, { fields: [booking.listingId], references: [listing.id] }),
   renter: one(user, { fields: [booking.renterId], references: [user.id] }),
   agent: one(user, { fields: [booking.agentId], references: [user.id] }),
   visitVerifications: many(visitVerification),
 }));
-
 
 export const visitVerificationRelations = relations(visitVerification, ({ one }) => ({
   booking: one(booking, {
@@ -184,25 +246,7 @@ export const visitVerificationRelations = relations(visitVerification, ({ one })
   }),
 }));
 
-export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
-  listings: many(listing),
-  bookingsAsAgent: many(booking, { relationName: "agentBookings" }),
-  bookingsAsRenter: many(booking, { relationName: "renterBookings" }),
-}));
-
-
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, {
-    fields: [session.userId],
-    references: [user.id],
-  }),
-}));
-
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, {
-    fields: [account.userId],
-    references: [user.id],
-  }),
+export const watchlistRelations = relations(watchlist, ({ one }) => ({
+  renter: one(user, { fields: [watchlist.renterId], references: [user.id] }),
+  listing: one(listing, { fields: [watchlist.listingId], references: [listing.id] }),
 }));

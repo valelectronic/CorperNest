@@ -3,8 +3,12 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { listing, booking } from "@/db/schema";
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import AgentDashboardClient from "./dashboard-client";
+
+// Force Next.js to always fetch fresh data on every request
+// Without this, Vercel caches the page and listings appear stale
+export const dynamic = "force-dynamic";
 
 export default async function AgentPage() {
   const session = await auth.api.getSession({

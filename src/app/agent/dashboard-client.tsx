@@ -39,14 +39,12 @@ type Props = {
 
 const STATUS_OPTIONS = [
   { value: "available", label: "Available" },
-  { value: "reserved", label: "Reserved" },
   { value: "occupied", label: "Occupied" },
   { value: "temp-unavailable", label: "Temp unavailable" },
 ];
 
 const statusStyle: Record<string, { bg: string; color: string; dot: string }> = {
   available:        { bg: "#EAF3DE", color: "#27500A", dot: "#43A047" },
-  reserved:         { bg: "#FAEEDA", color: "#633806", dot: "#F59E0B" },
   occupied:         { bg: "#FCEBEB", color: "#791F1F", dot: "#E53935" },
   "temp-unavailable": { bg: "#F3F4F6", color: "#4B5563", dot: "#9CA3AF" },
   "under-review":   { bg: "#EEF2FF", color: "#3730A3", dot: "#6366F1" },

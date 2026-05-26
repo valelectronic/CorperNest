@@ -568,7 +568,7 @@ export default function NewListingPage() {
             <div>
               <label className="block text-sm font-medium mb-1.5"
                 style={{ color: "var(--color-text-secondary)" }}>
-                Landlord full name
+                Landlord/Caretaker full name
               </label>
               <input name="landlordName" type="text" value={form.landlordName}
                 onChange={handleChange} placeholder="e.g. Chief Udo Bassey"
@@ -579,7 +579,7 @@ export default function NewListingPage() {
             <div>
               <label className="block text-sm font-medium mb-1.5"
                 style={{ color: "var(--color-text-secondary)" }}>
-                Landlord phone number
+                Landlord/Caretaker phone number
               </label>
               <input name="landlordPhone" type="tel" value={form.landlordPhone}
                 onChange={handleChange} placeholder="e.g. 08012345678"

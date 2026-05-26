@@ -86,40 +86,27 @@ export const listing = pgTable(
     agentId: text("agent_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-
     // Auto-generated from type + lga e.g. "Self Contained in Uyo"
-    // Agent never types this — computed in the create route
     title: text("title").notNull(),
-
     description: text("description").notNull(),
     address: text("address").notNull(),
     lga: text("lga").notNull(),
     state: text("state").notNull(),
     price: integer("price").notNull(),
-
     // rent | sale
-    // Default is "rent" — most listings are rentals for corpers
     listingPurpose: text("listing_purpose").default("rent").notNull(),
-
     // self-con | mini-flat | 1-bed | 2-bed | room
     type: text("type").notNull(),
-
     // available | reserved | occupied | temp-unavailable | under-review | flagged
     status: text("status").default("under-review").notNull(),
-
     landlordName: text("landlord_name"),
     landlordPhone: text("landlord_phone"),
     landlordOtpVerified: boolean("landlord_otp_verified").default(false),
     images: text("images").array().default([]),
-
-    // Standard amenities agent ticks — stored as slugs
-    // e.g. ["running-water", "prepaid-meter"]
+    // Standard amenities stored as slugs e.g. ["running-water", "prepaid-meter"]
     amenities: text("amenities").array().default([]),
-
-    // Extra amenities agent types manually
-    // e.g. ["Boys quarters", "Swimming pool"]
+    // Extra amenities agent types manually e.g. ["Boys quarters"]
     customAmenities: text("custom_amenities").array().default([]),
-
     isActive: boolean("is_active").default(true).notNull(),
     lastStatusUpdate: timestamp("last_status_update").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -136,6 +123,127 @@ export const listing = pgTable(
   ],
 );
 
+// ─── INSPECTION PAYMENT ──────────────────────────────────────────────────────
+// One payment per corper-agent pair
+// Covers inspection of ALL listings by that agent
+// Expires after CNV code is successfully verified
+export const inspectionPayment = pgTable(
+  "inspection_payment",
+  {
+    id: text("id").primaryKey(),
+    renterId: text("renter_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Paystack payment reference — null until Phase 5 payment is built
+    paystackRef: text("paystack_ref"),
+    // Fixed platform fee in kobo (500000 = ₦5,000)
+    amount: integer("amount").default(500000).notNull(),
+    // pending | paid | expired
+    // pending: payment initiated but not confirmed
+    // paid: Paystack confirmed payment
+    // expired: CNV code verified, inspection session closed
+    status: text("status").default("pending").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("inspection_payment_renterId_idx").on(table.renterId),
+    index("inspection_payment_agentId_idx").on(table.agentId),
+    index("inspection_payment_status_idx").on(table.status),
+  ],
+);
+
+// ─── REFERRAL ────────────────────────────────────────────────────────────────
+// Created when Agent A refers a corper to Agent B (both must be on platform)
+// Referral links to the original inspection payment
+// On acceptance, corper's inspection unlocks Agent B's listings too
+export const referral = pgTable(
+  "referral",
+  {
+    id: text("id").primaryKey(),
+    // The original inspection payment being extended via referral
+    inspectionPaymentId: text("inspection_payment_id")
+      .notNull()
+      .references(() => inspectionPayment.id, { onDelete: "cascade" }),
+    // Agent A — the one who refers and earns 20%
+    referringAgentId: text("referring_agent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Agent B — the one who receives the corper and earns 60%
+    receivingAgentId: text("receiving_agent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // pending | accepted | declined
+    // pending: Agent A sent referral, waiting for Agent B
+    // accepted: Agent B accepted, corper can now see Agent B's listings
+    // declined: Agent B declined, corper stays with Agent A only
+    status: text("status").default("pending").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("referral_inspectionPaymentId_idx").on(table.inspectionPaymentId),
+    index("referral_referringAgentId_idx").on(table.referringAgentId),
+    index("referral_receivingAgentId_idx").on(table.receivingAgentId),
+  ],
+);
+
+// ─── PAYOUT SPLIT ────────────────────────────────────────────────────────────
+// Records how each inspection payment is split between platform and agent(s)
+// Created when payment is confirmed (Phase 5)
+// One inspection_payment creates 2 rows (no referral) or 3 rows (with referral)
+//
+// WITHOUT REFERRAL (2 rows):
+//   platform     20%  ₦1,000
+//   agent        80%  ₦4,000
+//
+// WITH REFERRAL (3 rows):
+//   platform          20%  ₦1,000
+//   referring-agent   20%  ₦1,000
+//   receiving-agent   60%  ₦3,000
+export const payoutSplit = pgTable(
+  "payout_split",
+  {
+    id: text("id").primaryKey(),
+    inspectionPaymentId: text("inspection_payment_id")
+      .notNull()
+      .references(() => inspectionPayment.id, { onDelete: "cascade" }),
+    // platform | referring-agent | receiving-agent | sole-agent
+    recipientType: text("recipient_type").notNull(),
+    // null for platform, userId for agents
+    recipientId: text("recipient_id")
+      .references(() => user.id, { onDelete: "set null" }),
+    // Actual naira amount in kobo e.g. 100000 = ₦1,000
+    amount: integer("amount").notNull(),
+    // Percentage e.g. 20, 60, 80
+    percentage: integer("percentage").notNull(),
+    // pending | paid
+    // pending: payment confirmed, payout not yet sent
+    // paid: manually transferred to agent's bank account
+    status: text("status").default("pending").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("payout_split_inspectionPaymentId_idx").on(table.inspectionPaymentId),
+    index("payout_split_recipientId_idx").on(table.recipientId),
+    index("payout_split_status_idx").on(table.status),
+  ],
+);
+
+// ─── BOOKING ─────────────────────────────────────────────────────────────────
 export const booking = pgTable(
   "booking",
   {
@@ -149,14 +257,38 @@ export const booking = pgTable(
     agentId: text("agent_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    // Links booking to the inspection payment that unlocked it
+    // null until Phase 5 payment is built
+    inspectionPaymentId: text("inspection_payment_id")
+      .references(() => inspectionPayment.id, { onDelete: "set null" }),
     bookingCode: text("booking_code").notNull().unique(),
+    // Phone or email used at payment — null until Phase 5
     renterContact: text("renter_contact"),
     renterContactType: text("renter_contact_type"),
-    // pending | confirmed | verified | completed | cancelled
+    // pending | corper-confirmed | both-confirmed | verified | completed | cancelled
+    // pending: booking created, corper hasn't set date yet
+    // corper-confirmed: corper set date+time, waiting for agent
+    //                   agent phone still hidden from corper
+    // both-confirmed: agent confirmed, contacts revealed to both
+    //                 CNV verification now unlocked
+    // verified: CNV code confirmed on visit day
+    // completed: visit done, booking closed
+    // cancelled: either party cancelled
     status: text("status").default("pending").notNull(),
+    // Confirmation tracking — separate from status for clarity
+    // pending | corper-confirmed | both-confirmed
+    confirmationStatus: text("confirmation_status").default("pending").notNull(),
+    // Set by corper when they confirm their preferred visit date
+    agreedDate: timestamp("agreed_date"),
+    // Set by corper as text e.g. "2:00 PM" — agent sees this and confirms
+    agreedTime: text("agreed_time"),
+    // Tracks when admin was last notified of unconfirmed booking
+    // Admin uses this to manually follow up with agent
+    lastAdminAlert: timestamp("last_admin_alert"),
     visitDate: timestamp("visit_date"),
     // "this-week" | "next-week" | "flexible"
     preferredPeriod: text("preferred_period"),
+    // Optional note from corper to agent at booking time
     visitNote: text("visit_note"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -168,9 +300,12 @@ export const booking = pgTable(
     index("booking_agentId_idx").on(table.agentId),
     index("booking_renterId_idx").on(table.renterId),
     index("booking_code_idx").on(table.bookingCode),
+    index("booking_confirmationStatus_idx").on(table.confirmationStatus),
+    index("booking_inspectionPaymentId_idx").on(table.inspectionPaymentId),
   ],
 );
 
+// ─── VISIT VERIFICATION ──────────────────────────────────────────────────────
 export const visitVerification = pgTable(
   "visit_verification",
   {
@@ -189,6 +324,7 @@ export const visitVerification = pgTable(
   ],
 );
 
+// ─── WATCHLIST ───────────────────────────────────────────────────────────────
 export const watchlist = pgTable(
   "watchlist",
   {
@@ -216,6 +352,11 @@ export const userRelations = relations(user, ({ many }) => ({
   bookingsAsAgent: many(booking, { relationName: "agentBookings" }),
   bookingsAsRenter: many(booking, { relationName: "renterBookings" }),
   watchlist: many(watchlist),
+  inspectionPaymentsAsRenter: many(inspectionPayment, { relationName: "renterPayments" }),
+  inspectionPaymentsAsAgent: many(inspectionPayment, { relationName: "agentPayments" }),
+  referralsAsReferring: many(referral, { relationName: "referringAgent" }),
+  referralsAsReceiving: many(referral, { relationName: "receivingAgent" }),
+  payoutSplits: many(payoutSplit),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -232,10 +373,69 @@ export const listingRelations = relations(listing, ({ one, many }) => ({
   watchlistEntries: many(watchlist),
 }));
 
+export const inspectionPaymentRelations = relations(inspectionPayment, ({ one, many }) => ({
+  renter: one(user, {
+    fields: [inspectionPayment.renterId],
+    references: [user.id],
+    relationName: "renterPayments",
+  }),
+  agent: one(user, {
+    fields: [inspectionPayment.agentId],
+    references: [user.id],
+    relationName: "agentPayments",
+  }),
+  bookings: many(booking),
+  referral: one(referral, {
+    fields: [inspectionPayment.id],
+    references: [referral.inspectionPaymentId],
+  }),
+  payoutSplits: many(payoutSplit),
+}));
+
+export const referralRelations = relations(referral, ({ one }) => ({
+  inspectionPayment: one(inspectionPayment, {
+    fields: [referral.inspectionPaymentId],
+    references: [inspectionPayment.id],
+  }),
+  referringAgent: one(user, {
+    fields: [referral.referringAgentId],
+    references: [user.id],
+    relationName: "referringAgent",
+  }),
+  receivingAgent: one(user, {
+    fields: [referral.receivingAgentId],
+    references: [user.id],
+    relationName: "receivingAgent",
+  }),
+}));
+
+export const payoutSplitRelations = relations(payoutSplit, ({ one }) => ({
+  inspectionPayment: one(inspectionPayment, {
+    fields: [payoutSplit.inspectionPaymentId],
+    references: [inspectionPayment.id],
+  }),
+  recipient: one(user, {
+    fields: [payoutSplit.recipientId],
+    references: [user.id],
+  }),
+}));
+
 export const bookingRelations = relations(booking, ({ one, many }) => ({
   listing: one(listing, { fields: [booking.listingId], references: [listing.id] }),
-  renter: one(user, { fields: [booking.renterId], references: [user.id] }),
-  agent: one(user, { fields: [booking.agentId], references: [user.id] }),
+  renter: one(user, {
+    fields: [booking.renterId],
+    references: [user.id],
+    relationName: "renterBookings",
+  }),
+  agent: one(user, {
+    fields: [booking.agentId],
+    references: [user.id],
+    relationName: "agentBookings",
+  }),
+  inspectionPayment: one(inspectionPayment, {
+    fields: [booking.inspectionPaymentId],
+    references: [inspectionPayment.id],
+  }),
   visitVerifications: many(visitVerification),
 }));
 

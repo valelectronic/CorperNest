@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
-
+import { Toaster } from "sonner";
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
@@ -41,7 +41,21 @@ export default function RootLayout({
       lang="en"
       className={`${plusJakarta.variable} ${dmSans.variable} ${dmMono.variable} antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Toaster
+          position="bottom-center"
+          richColors
+          toastOptions={{
+            style: {
+              fontFamily: "var(--font-dm-sans)",
+              fontSize: "14px",
+              borderRadius: "16px",
+            },
+          }}
+        />
+
+      </body>
     </html>
   );
 }

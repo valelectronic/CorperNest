@@ -6,7 +6,7 @@ import { listing } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
-const VALID_STATUSES = ["available", "reserved", "occupied", "temp-unavailable"];
+const VALID_STATUSES = ["available", "occupied", "temp-unavailable"];
 
 export async function POST(req: NextRequest) {
   // 1. Auth check

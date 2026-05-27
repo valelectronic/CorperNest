@@ -60,6 +60,12 @@ export const auth = betterAuth({
         required: false,
         returned: true,
       },
+      agentVerified: {
+      type: "boolean",
+      required: false,
+      defaultValue: false,
+      returned: true,
+    },
     },
   },
 

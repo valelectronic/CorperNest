@@ -72,9 +72,9 @@ type PropertyCardProps = {
 
 export default function PropertyCard({
   listing,
-  isWatchlisted = true,
+  isWatchlisted = false,
   onWatchlistChange,
-  isLoggedIn = true,
+  isLoggedIn = false,
 }: PropertyCardProps) {
   const router = useRouter();
   const [watching, setWatching] = useState(isWatchlisted);

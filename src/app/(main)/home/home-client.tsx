@@ -1,7 +1,20 @@
+// src/app/(main)/home/home-client.tsx
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import PropertyCard, { type PropertyCardData } from "@/components/property-card";
+import { getLGAs } from "@/lib/nigeria-location";
+
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+
+const PROPERTY_TYPES = [
+  { value: "",          label: "All types"     },
+  { value: "self-con",  label: "Self Contained" },
+  { value: "mini-flat", label: "Mini Flat"      },
+  { value: "1-bed",     label: "1 Bedroom"      },
+  { value: "2-bed",     label: "2 Bedroom"      },
+  { value: "room",      label: "Single Room"    },
+];
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -13,44 +26,24 @@ type Props = {
   watchlistedIds: string[];
 };
 
-type PurposeFilter = "all" | "rent" | "sale";
-
-// ─── SKELETON CARD ───────────────────────────────────────────────────────────
-// Shown while "Load more" is fetching next page
+// ─── SKELETON ────────────────────────────────────────────────────────────────
 
 function SkeletonCard() {
   return (
     <div
       className="rounded-2xl overflow-hidden animate-pulse"
-      style={{
-        backgroundColor: "var(--color-card)",
-        border: "1px solid var(--color-border)",
-      }}
+      style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}
     >
-      {/* Image placeholder */}
-      <div
-        className="w-full"
-        style={{ height: "200px", backgroundColor: "#E8F5E9" }}
-      />
-      {/* Text placeholders */}
+      <div style={{ height: 210, backgroundColor: "#E8F5E9" }} />
       <div className="px-4 pt-3 pb-4 space-y-2">
-        <div
-          className="h-4 rounded-lg w-3/4"
-          style={{ backgroundColor: "#E8F5E9" }}
-        />
-        <div
-          className="h-3 rounded-lg w-1/2"
-          style={{ backgroundColor: "#E8F5E9" }}
-        />
+        <div className="h-4 rounded-lg w-3/4" style={{ backgroundColor: "#E8F5E9" }} />
+        <div className="h-3 rounded-lg w-1/2" style={{ backgroundColor: "#E8F5E9" }} />
         <div className="flex gap-2 mt-3">
           {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-6 rounded-lg w-16"
-              style={{ backgroundColor: "#E8F5E9" }}
-            />
+            <div key={i} className="h-6 rounded-lg w-16" style={{ backgroundColor: "#E8F5E9" }} />
           ))}
         </div>
+        <div className="h-10 rounded-xl mt-4" style={{ backgroundColor: "#E8F5E9" }} />
       </div>
     </div>
   );
@@ -62,202 +55,419 @@ export default function HomeClient({
   userName,
   initialListings,
   totalCount,
-  pageSize,
   watchlistedIds,
 }: Props) {
-  const [listings, setListings] = useState<PropertyCardData[]>(initialListings);
-  const [watchedIds, setWatchedIds] = useState<Set<string>>(
-    new Set(watchlistedIds)
-  );
-  const [purposeFilter, setPurposeFilter] = useState<PurposeFilter>("all");
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-
-  // First name only for the greeting — "Welcome, Chidi" not "Welcome, Chidi Okeke"
   const firstName = userName?.split(" ")[0] ?? "Corper";
 
-  // Total pages based on server count
-  const hasMore = listings.length < totalCount;
+  // ── Listings state ────────────────────────────────────────────────────────
+  const [listings, setListings]       = useState<PropertyCardData[]>(initialListings);
+  const [watchedIds, setWatchedIds]   = useState<Set<string>>(new Set(watchlistedIds));
+  const [hasMore, setHasMore]         = useState(listings.length < totalCount);
+  const [page, setPage]               = useState(1);
+  const [loading, setLoading]         = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // true after user explicitly searches — hides initial server-fetched listings
+  // while a new query runs
+  const [hasSearched, setHasSearched] = useState(false);
 
-  // Filter listings by purpose on the client — no extra API call needed
-  // since we already have the data
-  const filteredListings = listings.filter((l) => {
-    if (purposeFilter === "all") return true;
-    return l.listingPurpose === purposeFilter;
-  });
+  // ── Filter state ──────────────────────────────────────────────────────────
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [lga, setLga]                 = useState("");
+  const [type, setType]               = useState("");
+  const [purpose, setPurpose]         = useState("");
+  const [minPriceRaw, setMinPriceRaw] = useState("");
+  const [maxPriceRaw, setMaxPriceRaw] = useState("");
+  const [minPrice, setMinPrice]       = useState("");
+  const [maxPrice, setMaxPrice]       = useState("");
+  const [searchInput, setSearchInput] = useState("");
 
-  // Called by PropertyCard after a successful watchlist toggle
-  const handleWatchlistChange = useCallback(
-    (listingId: string, watching: boolean) => {
-      setWatchedIds((prev) => {
-        const next = new Set(prev);
-        if (watching) {
-          next.add(listingId);
-        } else {
-          next.delete(listingId);
-        }
-        return next;
-      });
-    },
-    []
-  );
+  // Always Akwa Ibom on the home page — state filter not exposed
+  const STATE = "Akwa Ibom";
+  const lgaOptions = getLGAs(STATE);
 
-  // Load next page from /api/properties/feed
-  async function loadMore() {
-    if (loadingMore) return;
-    setLoadingMore(true);
+  const activeFilterCount = [lga, type, purpose, minPrice, maxPrice].filter(Boolean).length;
+
+  // ── filtersRef — avoids stale closures inside fetch ───────────────────────
+  const filtersRef = useRef({ lga, type, purpose, minPrice, maxPrice });
+  useEffect(() => {
+    filtersRef.current = { lga, type, purpose, minPrice, maxPrice };
+  }, [lga, type, purpose, minPrice, maxPrice]);
+
+  // ── Debounce price inputs ─────────────────────────────────────────────────
+  useEffect(() => {
+    const t = setTimeout(() => setMinPrice(minPriceRaw), 800);
+    return () => clearTimeout(t);
+  }, [minPriceRaw]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMaxPrice(maxPriceRaw), 800);
+    return () => clearTimeout(t);
+  }, [maxPriceRaw]);
+
+  // ── Build query string ────────────────────────────────────────────────────
+  function buildQuery(pageNum: number, keyword: string) {
+    const f = filtersRef.current;
+    const params = new URLSearchParams();
+    params.set("page", String(pageNum));
+    params.set("state", STATE);
+    if (f.lga)      params.set("lga", f.lga);
+    if (f.type)     params.set("type", f.type);
+    if (f.purpose)  params.set("purpose", f.purpose);
+    if (f.minPrice) params.set("minPrice", f.minPrice.replace(/,/g, ""));
+    if (f.maxPrice) params.set("maxPrice", f.maxPrice.replace(/,/g, ""));
+    if (keyword)    params.set("keyword", keyword);
+    return params.toString();
+  }
+
+  // ── Core fetch ────────────────────────────────────────────────────────────
+  async function fetchListings(keyword = "", isLoadMore = false, currentPage = 1) {
+    if (isLoadMore) setLoadingMore(true);
+    else            setLoading(true);
 
     try {
-      const nextPage = page + 1;
-      const res = await fetch(
-        `/api/properties/feed?page=${nextPage}&state=Akwa Ibom`
-      );
+      const pageNum = isLoadMore ? currentPage + 1 : 1;
+      const res  = await fetch(`/api/properties/feed?${buildQuery(pageNum, keyword)}`);
       const data = await res.json();
 
-      if (res.ok && data.listings?.length > 0) {
-        setListings((prev) => [...prev, ...data.listings]);
-        setPage(nextPage);
+      if (res.ok) {
+        if (isLoadMore) {
+          setListings((prev) => [...prev, ...(data.listings ?? [])]);
+          setPage(pageNum);
+        } else {
+          setListings(data.listings ?? []);
+          setPage(1);
+        }
+        setHasMore(data.hasMore ?? false);
+        setHasSearched(true);
       }
     } catch {
-      // Silent fail — user can tap again
+      // silent — user can retry
     } finally {
+      setLoading(false);
       setLoadingMore(false);
     }
   }
 
+  // ── Search handler ────────────────────────────────────────────────────────
+  function handleSearch() {
+    fetchListings(searchInput.trim());
+  }
+
+  // ── Re-fetch when select filters change (only after first search) ─────────
+  useEffect(() => {
+    if (hasSearched) fetchListings(searchInput.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lga, type, purpose]);
+
+  useEffect(() => {
+    if (hasSearched) fetchListings(searchInput.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minPrice, maxPrice]);
+
+  // ── Clear all ─────────────────────────────────────────────────────────────
+  function clearFilters() {
+    setLga(""); setType(""); setPurpose("");
+    setMinPriceRaw(""); setMaxPriceRaw("");
+    setMinPrice(""); setMaxPrice("");
+    setSearchInput("");
+    setHasSearched(false);
+    setListings(initialListings);
+    setHasMore(initialListings.length < totalCount);
+    setPage(1);
+  }
+
+  // ── Watchlist toggle callback (passed to PropertyCard) ────────────────────
+  const handleWatchlistChange = useCallback((listingId: string, watching: boolean) => {
+    setWatchedIds((prev) => {
+      const next = new Set(prev);
+      watching ? next.add(listingId) : next.delete(listingId);
+      return next;
+    });
+  }, []);
+
+  // Which listings to render — filtered set after a search, initial set otherwise
+  const displayedListings = hasSearched ? listings : initialListings;
+
   return (
-    <div
-      className="min-h-screen pb-24"
-      style={{ backgroundColor: "var(--color-bg)" }}
-    >
-      <div className="max-w-2xl mx-auto px-4 pt-5 space-y-5">
+    <div className="min-h-screen pb-24" style={{ backgroundColor: "var(--color-bg)" }}>
 
-        {/* ── WELCOME BANNER ── */}
-        <div
-          className="rounded-2xl px-4 py-4"
-          style={{
-            background: "linear-gradient(135deg, #1B2E1B 0%, #2E7D32 100%)",
-          }}
-        >
-          <p
-            className="text-xs mb-0.5"
-            style={{ color: "#7A9A7A", letterSpacing: "0.5px" }}
-          >
-            FIND YOUR HOME
-          </p>
-          <p
-            className="text-lg font-bold"
-            style={{ color: "#E8F5E9", fontFamily: "var(--font-heading)" }}
-          >
-            Welcome, {firstName} 👋
-          </p>
-          <p className="text-xs mt-1" style={{ color: "#A5C8A5" }}>
-            Verified properties in Akwa Ibom — inspect before you pay rent.
-          </p>
-        </div>
-
-        {/* ── FILTER BAR ── */}
-        <div className="flex items-center gap-2">
-          {(["all", "rent", "sale"] as PurposeFilter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setPurposeFilter(f)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold transition-all"
-              style={{
-                backgroundColor:
-                  purposeFilter === f
-                    ? "var(--color-primary)"
-                    : "var(--color-card)",
-                color:
-                  purposeFilter === f ? "#fff" : "var(--color-text-secondary)",
-                border:
-                  purposeFilter === f
-                    ? "1.5px solid var(--color-primary)"
-                    : "1.5px solid var(--color-border)",
-              }}
-            >
-              {f === "all" ? "All" : f === "rent" ? "For Rent" : "For Sale"}
-            </button>
-          ))}
-
-          {/* Listing count */}
-          <p
-            className="text-xs ml-auto"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            {filteredListings.length} propert{filteredListings.length === 1 ? "y" : "ies"}
-          </p>
-        </div>
-
-        {/* ── LISTINGS ── */}
-        {filteredListings.length === 0 ? (
-          // Empty state
+      {/* ── STICKY SEARCH + FILTER BAR ── */}
+      <div
+        className="sticky top-0 z-30 px-4 py-3 space-y-3"
+        style={{ backgroundColor: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}
+      >
+        {/* Search row — input flex-1, search icon btn 44px, filter icon btn 44px */}
+        <div className="flex gap-2">
           <div
-            className="rounded-2xl p-10 flex flex-col items-center justify-center text-center"
+            className="flex items-center gap-2 flex-1 min-w-0 px-3 py-2.5 rounded-xl"
+            style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+              <circle cx="11" cy="11" r="8" stroke="var(--color-text-muted)" strokeWidth="1.8" />
+              <path d="M21 21l-4.35-4.35" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              placeholder="Search area, keyword..."
+              className="flex-1 min-w-0 text-sm bg-transparent focus:outline-none"
+              style={{ color: "var(--color-text)" }}
+            />
+            {searchInput && (
+              <button
+                onClick={() => { setSearchInput(""); if (hasSearched) fetchListings(""); }}
+                className="shrink-0"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Search — icon only, fixed 44x44, same size as filter btn */}
+          <button
+            onClick={handleSearch}
+            className="flex items-center justify-center rounded-xl shrink-0"
             style={{
-              backgroundColor: "var(--color-card)",
+              width: 44,
+              height: 44,
+              backgroundColor: "var(--color-primary)",
+              border: "none",
+            }}
+            aria-label="Search"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="8" stroke="white" strokeWidth="2.2" />
+              <path d="M21 21l-4.35-4.35" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          {/* Filter toggle — fixed 44x44 */}
+          <button
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className="relative flex items-center justify-center rounded-xl shrink-0"
+            style={{
+              width: 44,
+              height: 44,
+              backgroundColor: filtersOpen ? "var(--color-primary)" : "var(--color-card)",
               border: "1px solid var(--color-border)",
             }}
+            aria-label="Filters"
           >
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
-              style={{ backgroundColor: "#E8F5E9" }}
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-                  stroke="#2E7D32"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <polyline
-                  points="9 22 9 12 15 12 15 22"
-                  stroke="#2E7D32"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <line x1="4"  y1="6"  x2="20" y2="6"
+                stroke={filtersOpen ? "white" : "var(--color-text-secondary)"}
+                strokeWidth="1.8" strokeLinecap="round" />
+              <line x1="8"  y1="12" x2="20" y2="12"
+                stroke={filtersOpen ? "white" : "var(--color-text-secondary)"}
+                strokeWidth="1.8" strokeLinecap="round" />
+              <line x1="12" y1="18" x2="20" y2="18"
+                stroke={filtersOpen ? "white" : "var(--color-text-secondary)"}
+                strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            {activeFilterCount > 0 && (
+              <span
+                className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center font-bold"
+                style={{ backgroundColor: "#E53935", color: "#fff", fontSize: 9 }}
+              >
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Filter panel */}
+        {filtersOpen && (
+          <div
+            className="rounded-2xl p-4 space-y-3"
+            style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>LGA</label>
+                <select
+                  value={lga}
+                  onChange={(e) => setLga(e.target.value)}
+                  className="w-full text-xs px-3 py-2 rounded-xl focus:outline-none"
+                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
+                >
+                  <option value="">All LGAs</option>
+                  {lgaOptions.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>Type</label>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  className="w-full text-xs px-3 py-2 rounded-xl focus:outline-none"
+                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
+                >
+                  {PROPERTY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
             </div>
-            <p
-              className="text-sm font-semibold mb-1"
-              style={{
-                color: "var(--color-text)",
-                fontFamily: "var(--font-heading)",
-              }}
-            >
-              No properties found
+
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>Purpose</label>
+              <div className="flex gap-2">
+                {(["all", "rent", "sale"] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setPurpose(v === "all" ? "" : v)}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold"
+                    style={{
+                      backgroundColor: (v === "all" ? purpose === "" : purpose === v)
+                        ? "var(--color-primary)" : "var(--color-bg)",
+                      color: (v === "all" ? purpose === "" : purpose === v)
+                        ? "#fff" : "var(--color-text-secondary)",
+                      border: "1px solid var(--color-border)",
+                    }}
+                  >
+                    {v === "all" ? "Any" : v === "rent" ? "Rent" : "Sale"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>
+                Price range (₦) — updates after you stop typing
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text" inputMode="numeric" value={minPriceRaw}
+                  onChange={(e) => setMinPriceRaw(e.target.value)}
+                  placeholder="Min e.g. 100000"
+                  className="text-xs px-3 py-2 rounded-xl focus:outline-none"
+                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
+                />
+                <input
+                  type="text" inputMode="numeric" value={maxPriceRaw}
+                  onChange={(e) => setMaxPriceRaw(e.target.value)}
+                  placeholder="Max e.g. 300000"
+                  className="text-xs px-3 py-2 rounded-xl focus:outline-none"
+                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
+                />
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="w-full py-2 rounded-xl text-xs font-semibold"
+                style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-muted)" }}
+              >
+                Clear all filters
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Result count row */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {loading
+              ? "Searching…"
+              : `${displayedListings.length} propert${displayedListings.length === 1 ? "y" : "ies"}`}
+          </p>
+          {hasSearched && searchInput && (
+            <p className="text-xs" style={{ color: "var(--color-primary)" }}>
+              Results for "{searchInput}"
             </p>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {purposeFilter !== "all"
-                ? `No ${purposeFilter === "rent" ? "rental" : "sale"} listings available right now. Try "All".`
-                : "No listings available in Akwa Ibom right now. Check back soon."}
+          )}
+        </div>
+      </div>
+
+      {/* ── MAIN CONTENT ── */}
+      <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+
+        {/* Welcome banner — only on initial load, hidden while searching */}
+        {!hasSearched && (
+          <div
+            className="rounded-2xl px-4 py-4"
+            style={{ background: "linear-gradient(135deg, #1B2E1B 0%, #2E7D32 100%)" }}
+          >
+            <p className="text-xs mb-0.5" style={{ color: "#7A9A7A", letterSpacing: "0.5px" }}>
+              FIND YOUR HOME
+            </p>
+            <p className="text-lg font-bold" style={{ color: "#E8F5E9", fontFamily: "var(--font-heading)" }}>
+              Welcome, {firstName} 👋
+            </p>
+            <p className="text-xs mt-1" style={{ color: "#A5C8A5" }}>
+              Verified properties in Akwa Ibom — inspect before you pay rent.
             </p>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredListings.map((l) => (
-              <PropertyCard
-                key={l.id}
-                listing={l}
-                isWatchlisted={watchedIds.has(l.id)}
-                onWatchlistChange={handleWatchlistChange}
-              />
-            ))}
+        )}
 
-            {/* Load more */}
-            {hasMore && (
-              <div className="pt-2 pb-4">
-                {loadingMore ? (
-                  // Skeleton cards while loading next page
+        {/* Skeleton loader */}
+        {loading && (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+          </div>
+        )}
+
+        {/* Listings */}
+        {!loading && (
+          displayedListings.length === 0 ? (
+            <div
+              className="rounded-2xl p-10 flex flex-col items-center text-center"
+              style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}
+            >
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
+                style={{ backgroundColor: "#E8F5E9" }}
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="8" stroke="#2E7D32" strokeWidth="1.8" />
+                  <path d="M21 21l-4.35-4.35" stroke="#2E7D32" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold mb-1" style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
+                No properties found
+              </p>
+              <p className="text-xs mb-4" style={{ color: "var(--color-text-muted)" }}>
+                {searchInput
+                  ? `No results for "${searchInput}". Try different keywords.`
+                  : activeFilterCount > 0
+                  ? "No listings match your filters. Try adjusting them."
+                  : "No listings available in Akwa Ibom right now."}
+              </p>
+              {(activeFilterCount > 0 || searchInput) && (
+                <button
+                  onClick={clearFilters}
+                  className="text-xs font-semibold px-4 py-2 rounded-xl"
+                  style={{ backgroundColor: "var(--color-light)", color: "var(--color-primary)" }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {displayedListings.map((l) => (
+                <PropertyCard
+                  key={l.id}
+                  listing={l}
+                  isLoggedIn
+                  isWatchlisted={watchedIds.has(l.id)}
+                  onWatchlistChange={handleWatchlistChange}
+                />
+              ))}
+
+              {hasMore && (
+                loadingMore ? (
                   <div className="space-y-4">
                     <SkeletonCard />
                     <SkeletonCard />
                   </div>
                 ) : (
                   <button
-                    onClick={loadMore}
+                    onClick={() => fetchListings(searchInput.trim(), true, page)}
                     className="w-full py-3.5 rounded-2xl text-sm font-semibold"
                     style={{
                       backgroundColor: "var(--color-card)",
@@ -267,20 +477,16 @@ export default function HomeClient({
                   >
                     Load more properties
                   </button>
-                )}
-              </div>
-            )}
+                )
+              )}
 
-            {/* End of results */}
-            {!hasMore && filteredListings.length > 0 && (
-              <p
-                className="text-xs text-center pb-4"
-                style={{ color: "var(--color-text-muted)" }}
-              >
-                You've seen all available properties
-              </p>
-            )}
-          </div>
+              {!hasMore && displayedListings.length > 0 && (
+                <p className="text-xs text-center pb-4" style={{ color: "var(--color-text-muted)" }}>
+                  You've seen all available properties
+                </p>
+              )}
+            </div>
+          )
         )}
       </div>
     </div>

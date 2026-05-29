@@ -344,6 +344,31 @@ export const watchlist = pgTable(
   ],
 );
 
+//  NOTIFICATION ───────────────────────────────────────────────────────────────
+
+export const notification = pgTable(
+  "notification",
+  {
+    id:        text("id").primaryKey(),
+    userId:    text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    // booking-created | date-confirmed | both-confirmed |
+    // agent-verified  | inspection-reminder
+    type:      text("type").notNull(),
+    title:     text("title").notNull(),
+    message:   text("message").notNull(),
+    // Optional deep-link — e.g. /properties/abc or /bookings/xyz
+    link:      text("link"),
+    read:      boolean("read").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("notification_user_read_idx").on(table.userId, table.read),
+    index("notification_createdAt_idx").on(table.createdAt),
+  ],
+);
+
+
+
 // ─── RELATIONS ───────────────────────────────────────────────────────────────
 
 export const userRelations = relations(user, ({ many }) => ({
@@ -358,10 +383,15 @@ export const userRelations = relations(user, ({ many }) => ({
   referralsAsReferring: many(referral, { relationName: "referringAgent" }),
   referralsAsReceiving: many(referral, { relationName: "receivingAgent" }),
   payoutSplits: many(payoutSplit),
+  notifications: many(notification),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, { fields: [session.userId], references: [user.id] }),
+}));
+
+export const notificationRelations = relations(notification, ({ one }) => ({
+  user: one(user, { fields: [notification.userId], references: [user.id] }),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({

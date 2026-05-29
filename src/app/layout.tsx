@@ -24,6 +24,10 @@ const dmMono = DM_Mono({
 export const metadata: Metadata = {
   title: "CorperNest",
   description: "Verified housing for NYSC Corpers",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 export const viewport = {
   width: "device-width",

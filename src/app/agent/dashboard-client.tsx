@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+// ─── TYPES ────────────────────────────────────────────────────────────────────
+
 type Listing = {
   id: string;
   title: string;
@@ -19,36 +21,44 @@ type Listing = {
   images: string[] | null;
 };
 
-type PendingBooking = {
-  id: string;
+type IncomingBooking = {
+  id:          string;
   bookingCode: string;
-  status: string;
-  visitDate: Date | null;
-  listingId: string;
-  renterId: string;
+  status:      string;
+  agreedDate:  Date | null;
+  agreedTime:  string | null;
+  listingId:   string;
+  renterId:    string;
+  renterName:  string;
+  renterPhone: string | null;
+  renterEmail: string;
 };
 
 type Props = {
-  agentName: string;
-  listings: Listing[];
-  pendingBookings: PendingBooking[];
+  agentName:        string;
+  listings:         Listing[];
+  incomingBookings: IncomingBooking[];
   expiringListings: Listing[];
-  staleListings: Listing[];
-  completedCount: number;
+  staleListings:    Listing[];
+  completedCount:   number;
 };
 
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
 const STATUS_OPTIONS = [
-  { value: "available", label: "Available" },
-  { value: "occupied", label: "Occupied" },
+  { value: "available",        label: "Available" },
+  { value: "occupied",         label: "Occupied" },
   { value: "temp-unavailable", label: "Temp unavailable" },
 ];
 
 const statusStyle: Record<string, { bg: string; color: string; dot: string }> = {
-  available:        { bg: "#EAF3DE", color: "#27500A", dot: "#43A047" },
-  occupied:         { bg: "#FCEBEB", color: "#791F1F", dot: "#E53935" },
+  available:          { bg: "#EAF3DE", color: "#27500A", dot: "#43A047" },
+  occupied:           { bg: "#FCEBEB", color: "#791F1F", dot: "#E53935" },
   "temp-unavailable": { bg: "#F3F4F6", color: "#4B5563", dot: "#9CA3AF" },
-  "under-review":   { bg: "#EEF2FF", color: "#3730A3", dot: "#6366F1" },
+  "under-review":     { bg: "#EEF2FF", color: "#3730A3", dot: "#6366F1" },
 };
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function daysAgo(date: Date) {
   const diff = Date.now() - new Date(date).getTime();
@@ -62,16 +72,120 @@ function daysUntilExpiry(date: Date) {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
-type VerifyState = {
-  step: "idle" | "code-sent" | "confirming" | "error";
-  maskedEmail?: string;
-  errorMessage?: string;
-};
+function formatDate(date: Date) {
+  return new Date(date).toLocaleDateString("en-NG", {
+    day:   "numeric",
+    month: "short",
+    year:  "numeric",
+  });
+}
+
+// ─── INCOMING BOOKING CARD ────────────────────────────────────────────────────
+
+function IncomingBookingCard({ booking }: { booking: IncomingBooking }) {
+  const isScheduled = booking.status === "scheduled";
+  const initial     = booking.renterName?.charAt(0).toUpperCase() ?? "C";
+
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}
+    >
+      {/* Corper info row */}
+      <div className="flex items-center gap-3 mb-3">
+        <div
+          className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+          style={{ backgroundColor: "#E8F5E9", color: "#2E7D32", fontFamily: "var(--font-heading)" }}
+        >
+          {initial}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold" style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
+            {booking.renterName}
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
+            {booking.bookingCode}
+          </p>
+        </div>
+        {/* Status pill */}
+        <span
+          className="text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0"
+          style={
+            isScheduled
+              ? { backgroundColor: "#E8F5E9", color: "#2E7D32" }
+              : { backgroundColor: "#FFF8E1", color: "#F59E0B" }
+          }
+        >
+          {isScheduled ? "Scheduled" : "Awaiting date"}
+        </span>
+      </div>
+
+      <div style={{ height: 1, background: "var(--color-border)", marginBottom: 12 }} />
+
+      {/* Visit date — shown when corper has scheduled */}
+      {isScheduled && booking.agreedDate ? (
+        <div
+          className="flex items-center gap-2 rounded-xl px-3 py-2.5 mb-3"
+          style={{ backgroundColor: "#E8F5E9", border: "1px solid var(--color-border)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4" width="18" height="18" rx="2" stroke="#2E7D32" strokeWidth="1.8" />
+            <path d="M16 2V6M8 2V6M3 10H21" stroke="#2E7D32" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <p className="text-xs font-semibold" style={{ color: "#2E7D32" }}>
+            Visit: {formatDate(booking.agreedDate)}{booking.agreedTime ? ` · ${booking.agreedTime}` : ""}
+          </p>
+        </div>
+      ) : (
+        <div
+          className="rounded-xl px-3 py-2.5 mb-3"
+          style={{ backgroundColor: "#FFF8E1", border: "1px solid #FDE68A" }}
+        >
+          <p className="text-xs" style={{ color: "#92400E" }}>
+            Corper hasn't scheduled a visit date yet.
+          </p>
+        </div>
+      )}
+
+      {/* Corper contact */}
+      <div
+        className="rounded-xl px-3 py-2.5"
+        style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)" }}
+      >
+        <p className="text-xs font-semibold uppercase mb-2"
+          style={{ color: "var(--color-text-muted)", letterSpacing: "0.5px" }}>
+          Corper Contact
+        </p>
+        {booking.renterPhone && (
+          <a
+            href={`tel:${booking.renterPhone}`}
+            className="flex items-center gap-2 mb-1"
+            style={{ color: "var(--color-primary)", textDecoration: "none", fontSize: 13, fontWeight: 600 }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"
+                stroke="currentColor" strokeWidth="1.8" fill="none" />
+            </svg>
+            {booking.renterPhone}
+          </a>
+        )}
+        <a
+          href={`mailto:${booking.renterEmail}`}
+          style={{ color: "var(--color-text-secondary)", textDecoration: "none", fontSize: 12 }}
+        >
+          {booking.renterEmail}
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function AgentDashboardClient({
   agentName,
   listings,
-  pendingBookings,
+  incomingBookings,
   expiringListings,
   staleListings,
   completedCount,
@@ -81,37 +195,24 @@ export default function AgentDashboardClient({
   const [statusMap, setStatusMap] = useState<Record<string, string>>(
     Object.fromEntries(listings.map((l) => [l.id, l.status]))
   );
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-
-  // Bottom sheet state: which listing's sheet is open
+  const [deletedIds, setDeletedIds]   = useState<Set<string>>(new Set());
+  const [updatingId, setUpdatingId]   = useState<string | null>(null);
   const [sheetListingId, setSheetListingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId]   = useState<string | null>(null);
 
-  const [verifyStates, setVerifyStates] = useState<Record<string, VerifyState>>(
-    Object.fromEntries(pendingBookings.map((b) => [b.id, { step: "idle" }]))
-  );
-  const [codeInputs, setCodeInputs] = useState<Record<string, string>>(
-    Object.fromEntries(pendingBookings.map((b) => [b.id, ""]))
-  );
+  // suppress unused warning — router used for potential future refresh
+  void router;
 
   const initial = agentName ? agentName.charAt(0).toUpperCase() : "A";
-
-  function setVerifyState(bookingId: string, state: VerifyState) {
-    setVerifyStates((prev) => ({ ...prev, [bookingId]: state }));
-  }
-  function setCodeInput(bookingId: string, value: string) {
-    setCodeInputs((prev) => ({ ...prev, [bookingId]: value.toUpperCase().trim() }));
-  }
 
   async function handleDelete(listingId: string, mode: "temporary" | "permanent") {
     setSheetListingId(null);
     setDeletingId(listingId);
     try {
-      const res = await fetch("/api/properties/delete", {
-        method: "POST",
+      const res  = await fetch("/api/properties/delete", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listingId, mode }),
+        body:    JSON.stringify({ listingId, mode }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -131,57 +232,14 @@ export default function AgentDashboardClient({
     }
   }
 
-  async function handleSendCode(bookingId: string) {
-    setVerifyState(bookingId, { step: "confirming" });
-    try {
-      const res = await fetch("/api/bookings/send-verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setVerifyState(bookingId, { step: "error", errorMessage: data.error ?? "Failed to send code." });
-        return;
-      }
-      setVerifyState(bookingId, { step: "code-sent", maskedEmail: data.maskedRenterEmail });
-    } catch {
-      setVerifyState(bookingId, { step: "error", errorMessage: "Network error." });
-    }
-  }
-
-  async function handleConfirmCode(bookingId: string) {
-    const code = codeInputs[bookingId];
-    if (!code || code.length < 3) {
-      setVerifyState(bookingId, { step: "code-sent", errorMessage: "Enter the code the renter received." });
-      return;
-    }
-    setVerifyState(bookingId, { step: "confirming" });
-    try {
-      const res = await fetch("/api/bookings/confirm-verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, code }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setVerifyState(bookingId, { step: "code-sent", errorMessage: data.error ?? "Invalid code." });
-        return;
-      }
-      router.refresh();
-    } catch {
-      setVerifyState(bookingId, { step: "code-sent", errorMessage: "Network error." });
-    }
-  }
-
   async function handleStatusUpdate(listingId: string, newStatus: string) {
     setStatusMap((prev) => ({ ...prev, [listingId]: newStatus }));
     setUpdatingId(listingId);
     try {
       await fetch("/api/properties/update-status", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listingId, status: newStatus }),
+        body:    JSON.stringify({ listingId, status: newStatus }),
       });
     } finally {
       setUpdatingId(null);
@@ -189,7 +247,7 @@ export default function AgentDashboardClient({
   }
 
   const visibleListings = listings.filter((l) => !deletedIds.has(l.id));
-  const sheetListing = sheetListingId ? listings.find((l) => l.id === sheetListingId) : null;
+  const sheetListing    = sheetListingId ? listings.find((l) => l.id === sheetListingId) : null;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "var(--color-bg)" }}>
@@ -219,7 +277,7 @@ export default function AgentDashboardClient({
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"
                 stroke="#C8E6C9" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {pendingBookings.length > 0 && (
+            {incomingBookings.length > 0 && (
               <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#E53935" }} />
             )}
           </button>
@@ -231,9 +289,9 @@ export default function AgentDashboardClient({
         {/* ── STAT CARDS ── */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { num: pendingBookings.length, label: "Pending Visits", color: "#BA7517" },
-            { num: visibleListings.length, label: "Listings", color: "#3B6D11" },
-            { num: completedCount, label: "Completed", color: "var(--color-text-secondary)" },
+            { num: incomingBookings.length, label: "Incoming",  color: "#BA7517" },
+            { num: visibleListings.length,  label: "Listings",  color: "#3B6D11" },
+            { num: completedCount,          label: "Completed", color: "var(--color-text-secondary)" },
           ].map((stat) => (
             <div key={stat.label} className="rounded-2xl p-3 text-center"
               style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
@@ -282,98 +340,22 @@ export default function AgentDashboardClient({
           </div>
         )}
 
-        {/* ── PENDING VISITS ── */}
+        {/* ── INCOMING BOOKINGS ── */}
         <div>
           <p className="text-xs font-semibold uppercase mb-3 tracking-wide"
             style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
-            Pending Visits
+            Incoming Bookings
           </p>
-          {pendingBookings.length === 0 ? (
+          {incomingBookings.length === 0 ? (
             <div className="rounded-2xl p-6 text-center"
               style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No pending visits right now</p>
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No incoming bookings right now</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {pendingBookings.map((b) => {
-                const vs = verifyStates[b.id] ?? { step: "idle" };
-                return (
-                  <div key={b.id} className="rounded-2xl p-4"
-                    style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-                        style={{ backgroundColor: "#E8F5E9", color: "#2E7D32", fontFamily: "var(--font-heading)" }}>
-                        {b.renterId.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>Pending Visit</p>
-                        <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
-                          {b.bookingCode}
-                        </p>
-                      </div>
-                      {vs.step === "idle" && (
-                        <button onClick={() => handleSendCode(b.id)}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0"
-                          style={{ backgroundColor: "#43A047", color: "#fff" }}>
-                          Verify
-                        </button>
-                      )}
-                      {vs.step === "confirming" && (
-                        <div className="w-5 h-5 rounded-full border-2 animate-spin shrink-0"
-                          style={{ borderColor: "#43A047", borderTopColor: "transparent" }} />
-                      )}
-                    </div>
-                    {vs.step === "code-sent" && (
-                      <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--color-border)" }}>
-                        <p className="text-xs mb-2" style={{ color: "var(--color-text-secondary)" }}>
-                          Code sent to <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>{vs.maskedEmail}</span>. Ask renter to read it out.
-                        </p>
-                        {vs.errorMessage && (
-                          <p className="text-xs mb-2" style={{ color: "#E53935" }}>{vs.errorMessage}</p>
-                        )}
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={codeInputs[b.id] ?? ""}
-                            onChange={(e) => setCodeInput(b.id, e.target.value)}
-                            placeholder="CNV-XXXXXX"
-                            maxLength={10}
-                            className="flex-1 text-sm px-3 py-2 rounded-xl focus:outline-none"
-                            style={{
-                              border: "1px solid var(--color-border)",
-                              backgroundColor: "var(--color-bg)",
-                              color: "var(--color-text)",
-                              fontFamily: "var(--font-mono)",
-                              letterSpacing: "1px",
-                            }}
-                          />
-                          <button onClick={() => handleConfirmCode(b.id)}
-                            className="text-xs font-semibold px-3 py-2 rounded-xl shrink-0"
-                            style={{ backgroundColor: "#2E7D32", color: "#fff" }}>
-                            Confirm
-                          </button>
-                        </div>
-                        <button
-                          onClick={() => { setCodeInput(b.id, ""); handleSendCode(b.id); }}
-                          className="text-xs mt-2 underline underline-offset-2"
-                          style={{ color: "var(--color-text-muted)" }}>
-                          Resend code
-                        </button>
-                      </div>
-                    )}
-                    {vs.step === "error" && (
-                      <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--color-border)" }}>
-                        <p className="text-xs mb-2" style={{ color: "#E53935" }}>{vs.errorMessage}</p>
-                        <button onClick={() => handleSendCode(b.id)}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-lg"
-                          style={{ backgroundColor: "#43A047", color: "#fff" }}>
-                          Try again
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {incomingBookings.map((b) => (
+                <IncomingBookingCard key={b.id} booking={b} />
+              ))}
             </div>
           )}
         </div>
@@ -395,27 +377,23 @@ export default function AgentDashboardClient({
             <div className="space-y-4">
               {visibleListings.map((l) => {
                 const currentStatus = statusMap[l.id] ?? l.status;
-                const badge = statusStyle[currentStatus] ?? statusStyle.available;
-                const coverImage = l.images?.[0] ?? null;
-                const isDeleting = deletingId === l.id;
+                const badge         = statusStyle[currentStatus] ?? statusStyle.available;
+                const coverImage    = l.images?.[0] ?? null;
+                const isDeleting    = deletingId === l.id;
 
                 return (
                   <div key={l.id} className="rounded-2xl overflow-hidden"
                     style={{
                       backgroundColor: "var(--color-card)",
-                      border: "1px solid var(--color-border)",
-                      opacity: isDeleting ? 0.5 : 1,
+                      border:     "1px solid var(--color-border)",
+                      opacity:    isDeleting ? 0.5 : 1,
                       transition: "opacity 0.2s",
                     }}>
 
-                    {/* ── COVER IMAGE ── */}
+                    {/* Cover image */}
                     <div className="relative w-full" style={{ height: "180px" }}>
                       {coverImage ? (
-                        <img
-                          src={coverImage}
-                          alt={l.title}
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={coverImage} alt={l.title} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center"
                           style={{ backgroundColor: "#E8F5E9" }}>
@@ -426,12 +404,10 @@ export default function AgentDashboardClient({
                           </svg>
                         </div>
                       )}
-
-                      {/* Gradient overlay at bottom for text legibility */}
                       <div className="absolute inset-0"
                         style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.0) 40%, rgba(0,0,0,0.55) 100%)" }} />
 
-                      {/* Status badge — top left */}
+                      {/* Status badge */}
                       <span className="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-lg"
                         style={{ backgroundColor: badge.bg, color: badge.color }}>
                         <span className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
@@ -439,7 +415,7 @@ export default function AgentDashboardClient({
                         {currentStatus.replace(/-/g, " ")}
                       </span>
 
-                      {/* ⋯ menu button — top right */}
+                      {/* Menu button */}
                       <button
                         onClick={() => setSheetListingId(l.id)}
                         disabled={isDeleting}
@@ -457,25 +433,22 @@ export default function AgentDashboardClient({
                         )}
                       </button>
 
-                      {/* Price over image — bottom left */}
+                      {/* Price */}
                       <p className="absolute bottom-3 left-3 text-sm font-bold"
                         style={{ color: "#fff", fontFamily: "var(--font-heading)", textShadow: "0 1px 3px rgba(0,0,0,0.4)" }}>
                         ₦{l.price.toLocaleString()}<span className="text-xs font-normal opacity-80">/yr</span>
                       </p>
                     </div>
 
-                    {/* ── LISTING INFO ── */}
+                    {/* Listing info */}
                     <div className="px-4 pt-3 pb-4">
                       <p className="text-sm font-semibold"
                         style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
                         {l.title}
                       </p>
-                      <p className="text-xs mt-0.5 mb-3"
-                        style={{ color: "var(--color-text-muted)" }}>
+                      <p className="text-xs mt-0.5 mb-3" style={{ color: "var(--color-text-muted)" }}>
                         {l.lga}, {l.state}
                       </p>
-
-                      {/* Status update select */}
                       <div className="flex items-center gap-2">
                         <label className="text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>
                           Update status:
@@ -486,10 +459,10 @@ export default function AgentDashboardClient({
                           disabled={updatingId === l.id}
                           className="text-xs px-2.5 py-1.5 rounded-lg flex-1 disabled:opacity-50"
                           style={{
-                            border: "1px solid var(--color-border)",
+                            border:          "1px solid var(--color-border)",
                             backgroundColor: "var(--color-bg)",
-                            color: "var(--color-text)",
-                            maxWidth: "180px",
+                            color:           "var(--color-text)",
+                            maxWidth:        "180px",
                           }}
                         >
                           {STATUS_OPTIONS.map((s) => (
@@ -571,32 +544,23 @@ export default function AgentDashboardClient({
         className="fixed left-0 right-0 bottom-0 z-50 rounded-t-3xl"
         style={{
           backgroundColor: "var(--color-card)",
-          transform: sheetListingId ? "translateY(0)" : "translateY(100%)",
-          transition: "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-          maxWidth: "672px",
-          margin: "0 auto",
-          paddingBottom: "env(safe-area-inset-bottom, 16px)",
+          transform:        sheetListingId ? "translateY(0)" : "translateY(100%)",
+          transition:       "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+          maxWidth:         "672px",
+          margin:           "0 auto",
+          paddingBottom:    "env(safe-area-inset-bottom, 16px)",
         }}
       >
-        {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full" style={{ backgroundColor: "var(--color-border)" }} />
         </div>
-
-        {/* Sheet title */}
         <div className="px-5 pt-2 pb-4" style={{ borderBottom: "1px solid var(--color-border)" }}>
           <p className="text-sm font-semibold truncate" style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
             {sheetListing?.title ?? "Listing"}
           </p>
-          <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            Choose an action
-          </p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Choose an action</p>
         </div>
-
-        {/* Actions */}
         <div className="px-4 py-3 space-y-2">
-
-          {/* Hide temporarily — soft delete, agent can restore */}
           <button
             onClick={() => sheetListingId && handleDelete(sheetListingId, "temporary")}
             className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-left"
@@ -616,8 +580,6 @@ export default function AgentDashboardClient({
               </p>
             </div>
           </button>
-
-          {/* Delete permanently */}
           <button
             onClick={() => sheetListingId && handleDelete(sheetListingId, "permanent")}
             className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-left"
@@ -636,8 +598,6 @@ export default function AgentDashboardClient({
               </p>
             </div>
           </button>
-
-          {/* Cancel */}
           <button
             onClick={() => setSheetListingId(null)}
             className="w-full py-3.5 rounded-2xl text-sm font-semibold"

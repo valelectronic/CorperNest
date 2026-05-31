@@ -266,18 +266,14 @@ export const booking = pgTable(
     // Phone or email used at payment — null until Phase 5
     renterContact: text("renter_contact"),
     renterContactType: text("renter_contact_type"),
-    // pending | corper-confirmed | both-confirmed | verified | completed | cancelled
-    // pending: booking created, corper hasn't set date yet
-    // corper-confirmed: corper set date+time, waiting for agent
-    //                   agent phone still hidden from corper
-    // both-confirmed: agent confirmed, contacts revealed to both
-    //                 CNV verification now unlocked
+    // pending | scheduled | verified | completed | cancelled
+    // pending: booking created, corper hasn't set visit date yet
+    // scheduled: corper set date+time, full details revealed to both sides
     // verified: CNV code confirmed on visit day
     // completed: visit done, booking closed
     // cancelled: either party cancelled
     status: text("status").default("pending").notNull(),
-    // Confirmation tracking — separate from status for clarity
-    // pending | corper-confirmed | both-confirmed
+    // kept for schema compatibility — not used in MVP flow
     confirmationStatus: text("confirmation_status").default("pending").notNull(),
     // Set by corper when they confirm their preferred visit date
     agreedDate: timestamp("agreed_date"),

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { authClient } from "@/lib/auth-client";
 import UserAvatar from "@/components/user-avatar";
+import CustomerCare from "@/components/customer-care";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -231,6 +232,7 @@ function ListPropertyModal({
           Cancel
         </button>
       </div>
+      
     </div>
   );
 }
@@ -597,6 +599,7 @@ useEffect(() => {
 
       {/* ── LIST PROPERTY MODAL ── */}
       <ListPropertyModal type={modal} onClose={() => setModal(null)} onConfirm={handleModalConfirm} />
+        <CustomerCare />
     </div>
   );
 }

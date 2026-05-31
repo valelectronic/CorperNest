@@ -12,44 +12,20 @@ export default function Loading() {
         gap: "16px",
       }}
     >
-      {/* Animated logo mark */}
-      <div
+      {/* Logo */}
+      <img
+        src="/corperNestLogo.png"
+        alt="CoperNest"
         style={{
-          width: 48,
-          height: 48,
-          borderRadius: "14px",
-          background: "var(--color-primary)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          width: 120,
+          height: "auto",
+          objectFit: "contain",
           animation: "cn-pulse 1.4s ease-in-out infinite",
         }}
-      >
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 26 26"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          {/* House silhouette */}
-          <path
-            d="M13 3L2 11.5V23h8v-7h6v7h8V11.5L13 3Z"
-            fill="white"
-            fillOpacity="0.9"
-          />
-        </svg>
-      </div>
+      />
 
       {/* Dot spinner */}
-      <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          alignItems: "center",
-        }}
-      >
+      <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
         {[0, 1, 2].map((i) => (
           <span
             key={i}
@@ -68,7 +44,7 @@ export default function Loading() {
       <style>{`
         @keyframes cn-pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.75; transform: scale(0.93); }
+          50% { opacity: 0.85; transform: scale(0.96); }
         }
         @keyframes cn-bounce {
           0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }

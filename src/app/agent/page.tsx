@@ -1,23 +1,19 @@
+// src/app/agent/page.tsx
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { listing, booking } from "@/db/schema";
+import { listing, booking, user } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import AgentDashboardClient from "./dashboard-client";
 
-// Force Next.js to always fetch fresh data on every request
-// Without this, Vercel caches the page and listings appear stale
 export const dynamic = "force-dynamic";
 
 export default async function AgentPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
+  const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/signin");
 
-  const agentId = session.user.id;
+  const agentId   = session.user.id;
   const agentName = session.user.name;
 
   // All active listings for this agent
@@ -26,31 +22,45 @@ export default async function AgentPage() {
     .from(listing)
     .where(and(eq(listing.agentId, agentId), eq(listing.isActive, true)));
 
-  // All pending bookings for this agent
-  const pendingBookings = await db
+  // Incoming bookings — pending (payment done, no date yet) + scheduled (date set)
+  // Join with user table to get corper name and phone
+  const incomingBookings = await db
     .select({
-      id: booking.id,
+      id:          booking.id,
       bookingCode: booking.bookingCode,
-      status: booking.status,
-      visitDate: booking.visitDate,
-      listingId: booking.listingId,
-      renterId: booking.renterId,
+      status:      booking.status,
+      agreedDate:  booking.agreedDate,
+      agreedTime:  booking.agreedTime,
+      listingId:   booking.listingId,
+      renterId:    booking.renterId,
+      renterName:  user.name,
+      renterPhone: user.phone,
+      renterEmail: user.email,
     })
     .from(booking)
-    .where(and(eq(booking.agentId, agentId), eq(booking.status, "pending")));
+    .innerJoin(user, eq(booking.renterId, user.id))
+    .where(
+      and(
+        eq(booking.agentId, agentId),
+        // show pending + scheduled — not completed/cancelled/verified
+      )
+    );
+
+  // Filter in JS to avoid complex OR in drizzle without helper
+  const activeBookings = incomingBookings.filter(
+    (b) => b.status === "pending" || b.status === "scheduled"
+  );
 
   // Listings expiring soon (lastStatusUpdate older than 7 days)
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
   const expiringListings = listings.filter(
     (l) => new Date(l.lastStatusUpdate) <= sevenDaysAgo
   );
 
-  // Stale listings (not updated in 5+ days) for reminder box
+  // Stale listings (not updated in 5+ days)
   const fiveDaysAgo = new Date();
   fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
-
   const staleListings = listings.filter(
     (l) => new Date(l.lastStatusUpdate) <= fiveDaysAgo
   );
@@ -65,7 +75,7 @@ export default async function AgentPage() {
     <AgentDashboardClient
       agentName={agentName}
       listings={listings}
-      pendingBookings={pendingBookings}
+      incomingBookings={activeBookings}
       expiringListings={expiringListings}
       staleListings={staleListings}
       completedCount={completedBookings.length}

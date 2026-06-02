@@ -16,6 +16,8 @@ interface SendOTPParams {
 }
 
 export async function sendOTP({ to, code, type }: SendOTPParams) {
+
+
   if (process.env.OTP_PROVIDER === "sms") {
     await sendViaSMS(to, code);
   } else {
@@ -41,7 +43,7 @@ async function sendViaEmail(to: string, code: string, type: OTPType) {
   };
 
   await resend.emails.send({
-    from: "CorperNest <onboarding@resend.dev>",
+    from: "CorperNest <noreply@contact.corpernest.com.ng>",
     to,
     subject: subjects[type],
     html: `
@@ -59,6 +61,7 @@ async function sendViaEmail(to: string, code: string, type: OTPType) {
     `,
   });
 }
+
 
 async function sendViaSMS(to: string, code: string) {
   await fetch("https://api.ng.termii.com/api/sms/send", {

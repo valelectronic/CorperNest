@@ -26,7 +26,7 @@ function Logo({ variant = "dark" }: { variant?: "dark" | "light" }) {
         letterSpacing: "-0.5px",
       }}
     >
-      Coper<span style={{ color: "var(--color-action)", fontStyle: "italic" }}>Nest</span>
+      Corper<span style={{ color: "var(--color-action)", fontStyle: "italic" }}>Nest</span>
     </span>
   );
 }
@@ -107,7 +107,7 @@ export default function LandingPageClient() {
               marginBottom: 16,
             }}
           >
-            Rent a 
+            Rent/buy a 
             home.{" "}
             <span style={{ color: "var(--color-action)", fontStyle: "italic" }}>
               No scams.
@@ -301,7 +301,7 @@ export default function LandingPageClient() {
                 marginBottom: 20,
               }}
             >
-              Rent a home.{" "}
+              Rent/buy a home.{" "}
               <span style={{ color: "var(--color-action)", fontStyle: "italic" }}>
                 Zero scams.
               </span>

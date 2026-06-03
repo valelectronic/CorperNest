@@ -19,16 +19,23 @@ export const auth = betterAuth({
   ],
   plugins: [
     emailOTP({
-      async sendVerificationOTP({ email, otp, type }) {
-        await sendOTP({
-          to: email,
-          code: otp,
-          type: type as OTPType,
-        });
-      },
-      otpLength: 6,
-      expiresIn: 300,
-    }),
+  async sendVerificationOTP({ email, otp, type }) {
+    console.log("[Better Auth] sendVerificationOTP called for:", email, type);
+    try {
+      await sendOTP({
+        to: email,
+        code: otp,
+        type: type as OTPType,
+      });
+      console.log("[Better Auth] sendOTP completed successfully");
+    } catch (err) {
+      console.error("[Better Auth] sendOTP failed:", err);
+      throw err;
+    }
+  },
+  otpLength: 6,
+  expiresIn: 300,
+}),
   ],
 
   user: {

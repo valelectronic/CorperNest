@@ -10,49 +10,47 @@ export default function SigninPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
- async function handleSubmit(e: { preventDefault: () => void }) {
-  e.preventDefault();
-  setLoading(true);
-  setError("");
+  async function handleSubmit(e: { preventDefault: () => void }) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
 
-  // Check if email exists — must exist for signin
-  try {
-    const checkRes = await fetch("/api/auth/check-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.toLowerCase().trim() }),
-    });
+    try {
+      const checkRes = await fetch("/api/auth/check-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.toLowerCase().trim() }),
+      });
 
-    if (!checkRes.ok) throw new Error("Check failed");
+      if (!checkRes.ok) throw new Error("Check failed");
 
-    const { exists } = await checkRes.json();
+      const { exists } = await checkRes.json();
 
-    if (!exists) {
-      setError("No account found with this email. Create one instead.");
+      if (!exists) {
+        setError("No account found with this email. Create one instead.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      setError("Could not verify email. Check your connection and try again.");
       setLoading(false);
       return;
     }
-  } catch {
-    setError("Could not verify email. Check your connection and try again.");
-    setLoading(false);
-    return;
+
+    const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
+      email,
+      type: "sign-in",
+    });
+
+    if (otpError) {
+      setError(otpError.message ?? "Something went wrong. Try again.");
+      setLoading(false);
+      return;
+    }
+
+    // Pass email via URL — localStorage fails silently in some production browsers
+    router.push(`/verify?type=signin&email=${encodeURIComponent(email)}`);
   }
-
-  // Send OTP
-  const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
-    email,
-    type: "sign-in",
-  });
-
-  if (otpError) {
-    setError(otpError.message ?? "Something went wrong. Try again.");
-    setLoading(false);
-    return;
-  }
-
-  localStorage.setItem("pending_email", email);
-  router.push("/verify?type=signin");
-}
 
   return (
     <div
@@ -66,14 +64,10 @@ export default function SigninPage() {
           border: "1px solid var(--color-border)",
         }}
       >
-        {/* Logo */}
         <div className="mb-8">
           <span
             className="text-2xl font-bold"
-            style={{
-              fontFamily: "var(--font-heading)",
-              color: "var(--color-primary)",
-            }}
+            style={{ fontFamily: "var(--font-heading)", color: "var(--color-primary)" }}
           >
             CorperNest
           </span>
@@ -81,17 +75,11 @@ export default function SigninPage() {
 
         <h1
           className="text-2xl font-bold mb-1"
-          style={{
-            fontFamily: "var(--font-heading)",
-            color: "var(--color-text)",
-          }}
+          style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}
         >
           Welcome back
         </h1>
-        <p
-          className="text-sm mb-8"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+        <p className="text-sm mb-8" style={{ color: "var(--color-text-muted)" }}>
           Enter your email to receive a login code
         </p>
 
@@ -119,7 +107,6 @@ export default function SigninPage() {
             />
           </div>
 
-          {/* Info notice */}
           <div
             className="rounded-xl px-4 py-3 text-sm"
             style={{
@@ -132,9 +119,7 @@ export default function SigninPage() {
           </div>
 
           {error && (
-            <p className="text-sm" style={{ color: "#E53935" }}>
-              {error}
-            </p>
+            <p className="text-sm" style={{ color: "#E53935" }}>{error}</p>
           )}
 
           <button
@@ -151,16 +136,9 @@ export default function SigninPage() {
           </button>
         </form>
 
-        <p
-          className="text-center text-sm mt-6"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+        <p className="text-center text-sm mt-6" style={{ color: "var(--color-text-muted)" }}>
           No account yet?{" "}
-          <a
-            href="/signup"
-            className="font-medium"
-            style={{ color: "var(--color-primary)" }}
-          >
+          <a href="/signup" className="font-medium" style={{ color: "var(--color-primary)" }}>
             Create one
           </a>
         </p>

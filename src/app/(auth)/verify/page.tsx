@@ -7,7 +7,10 @@ import { authClient } from "@/lib/auth-client";
 function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const type = searchParams.get("type");
+
+  const type  = searchParams.get("type");
+  const email = searchParams.get("email") ?? "";
+  const name  = searchParams.get("name") ?? "";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -15,16 +18,10 @@ function VerifyForm() {
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [canResend, setCanResend] = useState(false);
-  const [email, setEmail] = useState("");
   const [inputsLocked, setInputsLocked] = useState(false);
 
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const hasAttempted = useRef(false);
-
-  // Read localStorage safely on client
-  useEffect(() => {
-    setEmail(localStorage.getItem("pending_email") ?? "");
-  }, []);
 
   // Countdown — only ticks when inputs are locked after a wrong attempt
   useEffect(() => {
@@ -51,12 +48,7 @@ function VerifyForm() {
     setError("");
 
     if (type === "signup") {
-      const name = localStorage.getItem("pending_name") ?? "";
-
-      const { error } = await authClient.emailOtp.verifyEmail({
-        email,
-        otp: code,
-      });
+      const { error } = await authClient.emailOtp.verifyEmail({ email, otp: code });
 
       if (error) {
         setError(error.message ?? "Invalid or expired code.");
@@ -67,18 +59,13 @@ function VerifyForm() {
         return;
       }
 
-      await authClient.updateUser({ name });
-      localStorage.removeItem("pending_email");
-      localStorage.removeItem("pending_name");
+      if (name) await authClient.updateUser({ name });
       router.push("/role");
       return;
     }
 
     if (type === "signin") {
-      const { error } = await authClient.signIn.emailOtp({
-        email,
-        otp: code,
-      });
+      const { error } = await authClient.signIn.emailOtp({ email, otp: code });
 
       if (error) {
         setError(error.message ?? "Invalid or expired code.");
@@ -89,13 +76,12 @@ function VerifyForm() {
         return;
       }
 
-      localStorage.removeItem("pending_email");
       router.push("/home");
       return;
     }
-  }, [email, type, router]);
+  }, [email, name, type, router]);
 
-  // Auto-verify when all 6 digits filled — once per attempt
+  // Auto-verify when all 6 digits filled
   useEffect(() => {
     const code = otp.join("");
     if (code.length === 6 && !loading && !hasAttempted.current && !inputsLocked) {
@@ -143,11 +129,7 @@ function VerifyForm() {
     setTimeout(() => inputs.current[0]?.focus(), 50);
 
     const otpType = type === "signup" ? "email-verification" : "sign-in";
-
-    await authClient.emailOtp.sendVerificationOtp({
-      email,
-      type: otpType,
-    });
+    await authClient.emailOtp.sendVerificationOtp({ email, type: otpType });
 
     setCountdown(30);
     setCanResend(false);
@@ -168,14 +150,10 @@ function VerifyForm() {
           border: "1px solid var(--color-border)",
         }}
       >
-        {/* Logo */}
         <div className="mb-6">
           <span
             className="text-xl font-bold"
-            style={{
-              fontFamily: "var(--font-heading)",
-              color: "var(--color-primary)",
-            }}
+            style={{ fontFamily: "var(--font-heading)", color: "var(--color-primary)" }}
           >
             CorperNest
           </span>
@@ -183,28 +161,18 @@ function VerifyForm() {
 
         <h1
           className="text-xl font-bold mb-1"
-          style={{
-            fontFamily: "var(--font-heading)",
-            color: "var(--color-text)",
-          }}
+          style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}
         >
           Enter your code
         </h1>
 
-        <p
-          className="text-sm mb-6 leading-relaxed"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+        <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--color-text-muted)" }}>
           We sent a 6-digit code to{" "}
-          <span
-            className="break-all"
-            style={{ color: "var(--color-primary)", fontWeight: 600 }}
-          >
+          <span className="break-all" style={{ color: "var(--color-primary)", fontWeight: 600 }}>
             {email || "your email"}
           </span>
         </p>
 
-        {/* OTP Boxes — grid so they never overflow */}
         <div className="grid grid-cols-6 gap-2 mb-5">
           {otp.map((digit, index) => (
             <input
@@ -238,29 +206,20 @@ function VerifyForm() {
           ))}
         </div>
 
-        {/* Wrong code lock notice with countdown */}
         {inputsLocked && (
           <div
             className="rounded-xl px-4 py-3 mb-4 text-sm text-center"
-            style={{
-              backgroundColor: "#FFF5F5",
-              border: "1px solid #FFCDD2",
-              color: "#C62828",
-            }}
+            style={{ backgroundColor: "#FFF5F5", border: "1px solid #FFCDD2", color: "#C62828" }}
           >
             Wrong code. Try again in{" "}
             <span className="font-bold">{countdown}s</span>
           </div>
         )}
 
-        {/* General error (non-lock) */}
         {error && !inputsLocked && (
-          <p className="text-sm mb-4" style={{ color: "#E53935" }}>
-            {error}
-          </p>
+          <p className="text-sm mb-4" style={{ color: "#E53935" }}>{error}</p>
         )}
 
-        {/* Verify Button */}
         <button
           onClick={() => {
             if (isDisabled) return;
@@ -285,11 +244,7 @@ function VerifyForm() {
           )}
         </button>
 
-        {/* Resend */}
-        <p
-          className="text-center text-sm"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+        <p className="text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
           {canResend ? (
             <button
               onClick={handleResend}
@@ -302,9 +257,7 @@ function VerifyForm() {
           ) : !inputsLocked ? (
             <>
               Resend code in{" "}
-              <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>
-                {countdown}s
-              </span>
+              <span style={{ color: "var(--color-primary)", fontWeight: 600 }}>{countdown}s</span>
             </>
           ) : null}
         </p>
@@ -323,10 +276,7 @@ export default function VerifyPage() {
         >
           <div
             className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-            style={{
-              borderColor: "var(--color-primary)",
-              borderTopColor: "transparent",
-            }}
+            style={{ borderColor: "var(--color-primary)", borderTopColor: "transparent" }}
           />
         </div>
       }

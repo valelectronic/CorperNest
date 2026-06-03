@@ -41,7 +41,7 @@ async function sendViaEmail(to: string, code: string, type: OTPType) {
     "change-email": "Use this code to confirm your new email address.",
     "viewing-verification": "Share this code with your agent to verify your viewing session.",
   };
-
+console.log(`[EMAIL] Sending ${type} OTP to ${to} from noreply@contact.corpernest.com.ng`);
   await resend.emails.send({
     from: "CorperNest <noreply@contact.corpernest.com.ng>",
     to,

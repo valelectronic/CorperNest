@@ -12,11 +12,12 @@ export const auth = betterAuth({
   }),
 
    trustedOrigins: [
-    "https://corpernest.com.ng",
-    "https://www.corpernest.com.ng",
-    "https://corper-nest.vercel.app",
-    "http://localhost:3000",
-  ],
+  "https://corpernest.com.ng",
+  "https://www.corpernest.com.ng",
+  "https://corper-nest.vercel.app",
+  "https://corper-nest-l5iz8x6rs-valelectronics-projects.vercel.app",
+  "http://localhost:3000",
+],
   plugins: [
     emailOTP({
   async sendVerificationOTP({ email, otp, type }) {

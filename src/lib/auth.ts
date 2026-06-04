@@ -3,12 +3,11 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP } from "better-auth/plugins";
 import { db } from "./db";
 import { sendOTP, type OTPType } from "./otp-sender";
-import * as schema from "@/db/schema";
+
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
-    schema: schema,
   }),
 
    trustedOrigins: [
@@ -34,6 +33,7 @@ export const auth = betterAuth({
       throw err;
     }
   },
+  sendVerificationOnSignUp: true,
   otpLength: 6,
   expiresIn: 300,
 }),

@@ -39,6 +39,8 @@ function VerifyForm() {
   }, [countdown, inputsLocked]);
 
   const handleVerify = useCallback(async (code: string) => {
+
+
     if (code.length < 6) {
       setError("Enter the full 6-digit code.");
       return;
@@ -47,8 +49,8 @@ function VerifyForm() {
     setLoading(true);
     setError("");
 
-    if (type === "signup") {
-      const { error } = await authClient.emailOtp.verifyEmail({ email, otp: code });
+  if (type === "signup") {
+  const { error } = await authClient.signIn.emailOtp({ email, otp: code });
 
       if (error) {
         setError(error.message ?? "Invalid or expired code.");
@@ -63,7 +65,7 @@ function VerifyForm() {
       router.push("/role");
       return;
     }
-
+      
     if (type === "signin") {
       const { error } = await authClient.signIn.emailOtp({ email, otp: code });
 
@@ -128,7 +130,7 @@ function VerifyForm() {
     setOtp(["", "", "", "", "", ""]);
     setTimeout(() => inputs.current[0]?.focus(), 50);
 
-    const otpType = type === "signup" ? "email-verification" : "sign-in";
+    const otpType = "sign-in";
     await authClient.emailOtp.sendVerificationOtp({ email, type: otpType });
 
     setCountdown(30);

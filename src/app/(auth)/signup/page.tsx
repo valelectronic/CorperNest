@@ -40,7 +40,7 @@ export default function SignupPage() {
 
     const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
       email,
-      type: "email-verification",
+      type: "sign-in", 
     });
 
     if (otpError) {
@@ -48,6 +48,8 @@ export default function SignupPage() {
       setLoading(false);
       return;
     }
+
+    
 
     // Pass email + name via URL — localStorage fails silently in some production browsers
     router.push(

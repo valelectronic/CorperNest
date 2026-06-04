@@ -17,7 +17,6 @@ interface SendOTPParams {
 
 export async function sendOTP({ to, code, type }: SendOTPParams) {
 
-
   if (process.env.OTP_PROVIDER === "sms") {
     await sendViaSMS(to, code);
   } else {

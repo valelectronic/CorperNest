@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     type:    "date-proposed",
     title:   "Inspection Scheduled",
     message: `${corperName} scheduled an inspection of your ${listingTitle} — check your bookings for their contact details.`,
-    link:    `/bookings`,
+    link:    `/agent`,
   });
 
   return NextResponse.json({ success: true });

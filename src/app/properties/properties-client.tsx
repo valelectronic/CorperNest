@@ -50,18 +50,15 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
   const [maxPriceRaw, setMaxPriceRaw] = useState("");
   const [searchInput, setSearchInput] = useState("");
 
-  // Debounced price values — only update after 800ms of no typing
+  // Debounced price values
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
 
-  // Ref to hold latest filter values for use inside fetch
-  // Avoids stale closure issues that caused search not working
   const filtersRef = useRef({ state, lga, type, purpose, minPrice, maxPrice });
-
   const lgaOptions = getLGAs(state);
   const activeFilterCount = [lga, type, purpose, minPrice, maxPrice].filter(Boolean).length;
 
-  // Keep ref in sync with latest filter values
+  // Keep ref in sync
   useEffect(() => {
     filtersRef.current = { state, lga, type, purpose, minPrice, maxPrice };
   }, [state, lga, type, purpose, minPrice, maxPrice]);
@@ -78,7 +75,11 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
     return () => clearTimeout(timer);
   }, [maxPriceRaw]);
 
-  // Build query from current filters — reads from ref so always fresh
+  // Auto-load on mount
+  useEffect(() => {
+    fetchListings("");
+  }, []);
+
   function buildQuery(pageNum: number, keyword: string) {
     const f = filtersRef.current;
     const params = new URLSearchParams();
@@ -93,9 +94,6 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
     return params.toString();
   }
 
-  // Core fetch function — takes keyword directly as argument
-  // This fixes the search bug where setKeyword + fetchListings()
-  // ran back to back and React hadn't flushed the keyword state yet
   async function fetchListings(keyword = "", isLoadMore = false, currentPage = 1) {
     if (!isLoadMore) {
       setLoading(true);
@@ -120,27 +118,25 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
         setHasSearched(true);
       }
     } catch {
-      // Silent fail — user can retry
+      // Silent fail
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
   }
 
-  // Search button / Enter key — passes keyword directly to fetchListings
-  // No state update race condition
   function handleSearch() {
     fetchListings(searchInput.trim());
   }
 
-  // Select filter changes — refetch with current search input if already searched
+  // Refetch on filter change (after initial load)
   useEffect(() => {
     if (hasSearched) {
       fetchListings(searchInput.trim());
     }
   }, [state, lga, type, purpose]);
 
-  // Debounced price changes — refetch only after user stops typing
+  // Refetch on debounced price change
   useEffect(() => {
     if (hasSearched) {
       fetchListings(searchInput.trim());
@@ -161,6 +157,8 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
     setListings([]);
     setHasMore(false);
     setPage(1);
+    // Re-fetch defaults after clearing
+    setTimeout(() => fetchListings(""), 0);
   }
 
   return (
@@ -196,15 +194,15 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
             )}
           </div>
 
-        <button onClick={handleSearch}
-          className="flex items-center justify-center rounded-xl shrink-0"
-          style={{ width: 44, height: 44, backgroundColor: "var(--color-primary)", border: "none" }}
-          aria-label="Search">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="8" stroke="white" strokeWidth="2.2" />
-            <path d="M21 21l-4.35-4.35" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-          </svg>
-        </button>
+          <button onClick={handleSearch}
+            className="flex items-center justify-center rounded-xl shrink-0"
+            style={{ width: 44, height: 44, backgroundColor: "var(--color-primary)", border: "none" }}
+            aria-label="Search">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="8" stroke="white" strokeWidth="2.2" />
+              <path d="M21 21l-4.35-4.35" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+            </svg>
+          </button>
 
           <button
             onClick={() => setFiltersOpen(!filtersOpen)}
@@ -311,10 +309,10 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
           </div>
         )}
 
-        {hasSearched && (
+        {hasSearched && !loading && (
           <div className="flex items-center justify-between">
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {loading ? "Searching..." : `${listings.length} propert${listings.length === 1 ? "y" : "ies"} found`}
+              {`${listings.length} propert${listings.length === 1 ? "y" : "ies"} found`}
             </p>
             {searchInput && (
               <p className="text-xs" style={{ color: "var(--color-primary)" }}>
@@ -327,32 +325,6 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
 
       {/* ── LISTINGS ── */}
       <div className="max-w-2xl mx-auto px-4 py-5 space-y-4 pb-24">
-
-        {!hasSearched && !loading && (
-          <div className="flex flex-col items-center justify-center pt-16 pb-8 text-center px-6">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center mb-5"
-              style={{ backgroundColor: "#E8F5E9" }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-                  stroke="#2E7D32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <polyline points="9 22 9 12 15 12 15 22"
-                  stroke="#2E7D32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <p className="text-base font-semibold mb-2"
-              style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
-              Find your corper home
-            </p>
-            <p className="text-sm mb-6" style={{ color: "var(--color-text-muted)" }}>
-              Search by keyword or browse all verified properties in your area.
-            </p>
-            <button onClick={() => fetchListings("")}
-              className="px-8 py-3 rounded-2xl font-semibold text-sm"
-              style={{ backgroundColor: "var(--color-primary)", color: "#fff" }}>
-              Show all properties in Akwa Ibom
-            </button>
-          </div>
-        )}
 
         {loading && (
           <div className="space-y-4">

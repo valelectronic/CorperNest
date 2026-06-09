@@ -210,7 +210,7 @@ function ListPropertyModal({
         </p>
         <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 24px" }}>
           {isCorper
-            ? "You're currently on a Corper account. To list properties on CorperNest, you need to switch to an Agent account. Your saved properties and bookings won't be affected."
+            ? "You're currently on a Client account. To list properties on CorperNest, you need to switch to an Agent account. Your saved properties and bookings won't be affected."
             : "Before you can start listing, our team needs to verify your identity with a quick phone call. This usually takes less than 24 hours and only happens once."}
         </p>
         {!isCorper && (
@@ -256,8 +256,19 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     agentVerified?: boolean | null;
   } | undefined;
 
-  const isVerifiedAgent = user?.role === "agent" && user?.agentVerified;
   const isLoggedIn = !!user;
+const [isVerifiedAgent, setIsVerifiedAgent] = useState(false);
+
+useEffect(() => {
+  if (!isLoggedIn || user?.role !== "agent") {
+    setIsVerifiedAgent(false);
+    return;
+  }
+  fetch("/api/user/agent-status")
+    .then((r) => r.json())
+    .then((data) => setIsVerifiedAgent(data.agentVerified ?? false))
+    .catch(() => setIsVerifiedAgent(user?.agentVerified ?? false));
+}, [isLoggedIn, user?.role]);
 
   // ── Poll unread count every 30s ───────────────────────────────────────────
   const fetchUnreadCount = useCallback(async () => {
@@ -368,7 +379,7 @@ useEffect(() => {
 
   function handleModalConfirm() {
     setModal(null);
-    if (modal === "corper-switch") router.push("/auth/role");
+    if (modal === "corper-switch") router.push("/role");
     else if (modal === "agent-kyc") router.push("/agent/kyc");
   }
 

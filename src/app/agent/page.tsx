@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { listing, booking, user } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import AgentDashboardClient from "./dashboard-client";
 
 export const dynamic = "force-dynamic";
@@ -16,15 +16,39 @@ export default async function AgentPage() {
   const agentId   = session.user.id;
   const agentName = session.user.name;
 
-  // All active listings for this agent
+  // ── Unverified agent → send to KYC ───────────────────────────────────────
+  const sessionUser = session.user as { agentVerified?: boolean | null };
+  if (!sessionUser.agentVerified) redirect("/agent/kyc");
+
+  // ── All active listings for this agent ───────────────────────────────────
   const listings = await db
     .select()
     .from(listing)
     .where(and(eq(listing.agentId, agentId), eq(listing.isActive, true)));
 
-  // Incoming bookings — pending (payment done, no date yet) + scheduled (date set)
-  // Join with user table to get corper name and phone
-  const incomingBookings = await db
+  // ── Auto-expire reserved listings older than 24hrs ────────────────────────
+  // If a listing has been reserved for 24+ hours, flip it back to available
+  // This handles cases where visit day passed without CNV verification
+  const twentyFourHoursAgo = new Date();
+  twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+
+  const toExpire = listings.filter(
+    (l) => l.status === "reserved" && new Date(l.lastStatusUpdate) < twentyFourHoursAgo
+  );
+
+  if (toExpire.length > 0) {
+    const expireIds = toExpire.map((l) => l.id);
+    await db
+      .update(listing)
+      .set({ status: "available", lastStatusUpdate: new Date(), updatedAt: new Date() })
+      .where(inArray(listing.id, expireIds));
+
+    // Update in-memory array so the dashboard shows correct status
+    toExpire.forEach((l) => { l.status = "available"; });
+  }
+
+  // ── Incoming bookings (pending + scheduled) ───────────────────────────────
+  const allBookings = await db
     .select({
       id:          booking.id,
       bookingCode: booking.bookingCode,
@@ -39,33 +63,30 @@ export default async function AgentPage() {
     })
     .from(booking)
     .innerJoin(user, eq(booking.renterId, user.id))
-    .where(
-      and(
-        eq(booking.agentId, agentId),
-        // show pending + scheduled — not completed/cancelled/verified
-      )
-    );
+    .where(eq(booking.agentId, agentId));
 
-  // Filter in JS to avoid complex OR in drizzle without helper
-  const activeBookings = incomingBookings.filter(
+  // Filter in JS — show pending + scheduled only
+  const activeBookings = allBookings.filter(
     (b) => b.status === "pending" || b.status === "scheduled"
   );
 
-  // Listings expiring soon (lastStatusUpdate older than 7 days)
+  // ── Listing health checks ─────────────────────────────────────────────────
+
+  // Expiring soon — lastStatusUpdate older than 7 days
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const expiringListings = listings.filter(
     (l) => new Date(l.lastStatusUpdate) <= sevenDaysAgo
   );
 
-  // Stale listings (not updated in 5+ days)
+  // Stale — not updated in 5+ days (for availability reminder)
   const fiveDaysAgo = new Date();
   fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
   const staleListings = listings.filter(
     (l) => new Date(l.lastStatusUpdate) <= fiveDaysAgo
   );
 
-  // Completed bookings count
+  // ── Completed bookings count ──────────────────────────────────────────────
   const completedBookings = await db
     .select({ id: booking.id })
     .from(booking)

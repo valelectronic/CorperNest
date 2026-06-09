@@ -364,6 +364,45 @@ export const notification = pgTable(
 );
 
 
+// ─── AGENT KYC REQUEST ───────────────────────────────────────────────────────
+// Submitted by agent when applying for verification
+// Admin reviews and updates user.agentVerified directly
+// status: pending | approved | declined
+export const agentKycRequest = pgTable(
+  "agent_kyc_request",
+  {
+    id:            text("id").primaryKey(),
+    agentId:       text("agent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Contact
+    fullName:      text("full_name").notNull(),
+    phone:         text("phone").notNull(),
+    whatsapp:      text("whatsapp"),
+    // Location — where they operate
+    state:         text("state").notNull(),
+    lga:           text("lga").notNull(),
+    // Bank details for payouts
+    bankName:      text("bank_name").notNull(),
+    accountNumber: text("account_number").notNull(),
+    accountName:   text("account_name").notNull(),
+    // Review
+    // pending | approved | declined
+    status:        text("status").default("pending").notNull(),
+    adminNote:     text("admin_note"),
+    reviewedAt:    timestamp("reviewed_at"),
+    createdAt:     timestamp("created_at").defaultNow().notNull(),
+    updatedAt:     timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("kyc_agentId_idx").on(table.agentId),
+    index("kyc_status_idx").on(table.status),
+  ],
+);
+
 
 // ─── RELATIONS ───────────────────────────────────────────────────────────────
 
@@ -380,6 +419,14 @@ export const userRelations = relations(user, ({ many }) => ({
   referralsAsReceiving: many(referral, { relationName: "receivingAgent" }),
   payoutSplits: many(payoutSplit),
   notifications: many(notification),
+  agentKycRequests: many(agentKycRequest),
+}));
+
+export const agentKycRequestRelations = relations(agentKycRequest, ({ one }) => ({
+  agent: one(user, {
+    fields: [agentKycRequest.agentId],
+    references: [user.id],
+  }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({

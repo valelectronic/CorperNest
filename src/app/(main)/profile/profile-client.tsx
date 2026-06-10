@@ -51,7 +51,6 @@ export default function ProfileClient({ user }: { user: User }) {
   const router = useRouter();
   const [loggingOut, setLoggingOut]   = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [switching, setSwitching]     = useState(false);
 
   const isAgent = user.role === "agent";
 
@@ -66,21 +65,9 @@ export default function ProfileClient({ user }: { user: User }) {
     }
   }
 
-  async function handleBecomeAgent() {
-    setSwitching(true);
-    try {
-      const res = await fetch("/api/user/update-role", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: "agent" }),
-      });
-      if (!res.ok) throw new Error();
-      // Go directly to KYC form — not /agent
-      router.push("/agent/kyc");
-    } catch {
-      toast.error("Could not switch role. Try again.");
-      setSwitching(false);
-    }
+  // Fix 4 — no API call, no role switching here, just navigate
+  function handleBecomeAgent() {
+    router.push("/agent/kyc");
   }
 
   return (
@@ -259,17 +246,16 @@ export default function ProfileClient({ user }: { user: User }) {
         {!isAgent && (
           <button
             onClick={handleBecomeAgent}
-            disabled={switching}
             style={{
               width: "100%",
               padding: "14px 16px",
-              background: switching ? "var(--color-border)" : "var(--color-primary)",
+              background: "var(--color-primary)",
               border: "none",
               borderRadius: 16,
               display: "flex",
               alignItems: "center",
               gap: 12,
-              cursor: switching ? "not-allowed" : "pointer",
+              cursor: "pointer",
               textAlign: "left",
             }}
           >
@@ -290,17 +276,15 @@ export default function ProfileClient({ user }: { user: User }) {
             </div>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: "var(--font-heading)" }}>
-                {switching ? "Switching role…" : "Become a Verified Agent"}
+                Become a Verified Agent
               </p>
               <p style={{ margin: "2px 0 0", fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
                 List properties and earn from inspections
               </p>
             </div>
-            {!switching && (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.8)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.8)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
         )}
 

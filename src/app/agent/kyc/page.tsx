@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { agentKycRequest } from "@/db/schema";
+import { agentKycRequest, user as userTable } from "@/db/schema"; // ← add userTable
 import { eq } from "drizzle-orm";
 import KycClient from "./kyc-client";
 
@@ -13,17 +13,20 @@ export default async function AgentKYCPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/signin");
 
-  const user = session.user as {
-    id:             string;
-    name:           string;
-    phone?:         string | null;
-    role?:          string | null;
-    agentVerified?: boolean | null;
-  };
+  // ← FIX: read agentVerified from DB directly, never trust session cache
+  const dbUser = await db
+    .select({
+      agentVerified: userTable.agentVerified,
+      phone:         userTable.phone,
+    })
+    .from(userTable)
+    .where(eq(userTable.id, session.user.id))
+    .limit(1);
 
+  if (!dbUser[0]) redirect("/signin");
 
-  // Already verified in session → go straight to dashboard
-  if (user.agentVerified) redirect("/agent");
+  // Already verified → go straight to dashboard
+  if (dbUser[0].agentVerified) redirect("/agent");
 
   // Check existing KYC submission
   const existing = await db
@@ -38,12 +41,10 @@ export default async function AgentKYCPage() {
 
   const existingRequest = existing[0] ?? null;
 
- 
-
   return (
     <KycClient
-      agentName={user.name}
-      agentPhone={user.phone ?? ""}
+      agentName={session.user.name}
+      agentPhone={dbUser[0].phone ?? ""}
       existingRequest={existingRequest}
     />
   );

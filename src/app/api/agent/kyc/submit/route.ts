@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { agentKycRequest } from "@/db/schema";
+import { agentKycRequest, user as userTable } from "@/db/schema"; // ← add user table import
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -15,13 +15,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = session.user as { role?: string | null; agentVerified?: boolean | null };
+  // ← REMOVE the role !== "agent" check entirely
+  // Any logged-in user can submit KYC
 
-  if (user.role !== "agent") {
-    return NextResponse.json({ error: "Only agents can submit KYC" }, { status: 403 });
-  }
+  const existingUser = await db
+    .select({ agentVerified: userTable.agentVerified })
+    .from(userTable)
+    .where(eq(userTable.id, session.user.id))
+    .limit(1);
 
-  if (user.agentVerified) {
+  if (existingUser[0]?.agentVerified) {
     return NextResponse.json({ error: "Already verified" }, { status: 400 });
   }
 
@@ -52,17 +55,14 @@ export async function POST(req: NextRequest) {
     accountName:   string;
   };
 
-  // Validate required fields
   if (!fullName || !phone || !state || !lga || !bankName || !accountNumber || !accountName) {
     return NextResponse.json({ error: "All required fields must be filled" }, { status: 400 });
   }
 
-  // Validate account number is digits only
   if (!/^\d{10}$/.test(accountNumber.trim())) {
     return NextResponse.json({ error: "Account number must be exactly 10 digits" }, { status: 400 });
   }
 
-  // If declined before, create new request (allow resubmission)
   if (existing.length > 0 && existing[0].status === "declined") {
     await db
       .update(agentKycRequest)
@@ -97,9 +97,13 @@ export async function POST(req: NextRequest) {
       createdAt:     new Date(),
       updatedAt:     new Date(),
     });
-
-    
   }
+
+  // ← THE FIX: set role=agent on every submit (insert or resubmit)
+  await db
+    .update(userTable)
+    .set({ role: "agent" })
+    .where(eq(userTable.id, session.user.id));
 
   return NextResponse.json({ success: true });
 }

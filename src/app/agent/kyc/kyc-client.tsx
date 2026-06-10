@@ -149,6 +149,8 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
     );
   }
 
+
+  
   // ── DECLINED STATE ────────────────────────────────────────────────────────
   // Show declined notice at top but still allow resubmission
 

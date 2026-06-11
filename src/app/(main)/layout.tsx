@@ -1,4 +1,3 @@
-// src/app/(main)/layout.tsx
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
@@ -7,6 +6,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { authClient } from "@/lib/auth-client";
 import UserAvatar from "@/components/user-avatar";
 import CustomerCare from "@/components/customer-care";
+
+const ADMIN_EMAIL = "corpernestng@gmail.com";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -184,11 +185,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   const { data: session } = authClient.useSession();
   const user = session?.user as {
+    email?: string | null;
     role?: string | null;
     agentVerified?: boolean | null;
   } | undefined;
 
   const isLoggedIn = !!user;
+  const isAdmin    = user?.email === ADMIN_EMAIL;
   const [isVerifiedAgent, setIsVerifiedAgent] = useState(false);
 
   useEffect(() => {
@@ -281,11 +284,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     if (notif.link) router.push(notif.link);
   }
 
-  // ── Fix 3: List Property — skip modal entirely, always go to /agent/kyc ──
   function handleListProperty() {
     if (!user)           { router.push("/signin");    return; }
     if (isVerifiedAgent) { router.push("/agent");     return; }
-    router.push("/agent/kyc"); // handles all states: form, pending, approved
+    router.push("/agent/kyc");
   }
 
   return (
@@ -300,14 +302,34 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
           {/* Logo */}
           <Link href="/home" style={{ textDecoration: "none", flexShrink: 0 }}>
-            <img
-              src="/corperNestLogo.png"
-              alt="CorperNest"
-              style={{ height: 32, width: "auto", display: "block" }}
-            />
+            <img src="/corperNestLogo.png" alt="CorperNest" style={{ height: 32, width: "auto", display: "block" }} />
           </Link>
 
           <div style={{ flex: 1 }} />
+
+          {/* Admin button — desktop only, only for admin */}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="hidden md:flex"
+              style={{
+                alignItems: "center", gap: 6,
+                padding: "6px 12px", borderRadius: 10,
+                background: "var(--color-header)",
+                textDecoration: "none", flexShrink: 0,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#fff" strokeWidth="1.8" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#fff" strokeWidth="1.8" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#fff" strokeWidth="1.8" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#fff" strokeWidth="1.8" />
+              </svg>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "var(--font-heading)" }}>
+                Admin
+              </span>
+            </Link>
+          )}
 
           {/* List Property button */}
           <button
@@ -460,6 +482,32 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </Link>
             );
           })}
+
+          {/* Admin shortcut in mobile bottom nav */}
+          {isAdmin && (
+            <Link href="/admin" className="flex flex-col items-center gap-1 px-4 py-1">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="3" width="7" height="7" rx="1.5"
+                  stroke={pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)"}
+                  strokeWidth="1.8" />
+                <rect x="14" y="3" width="7" height="7" rx="1.5"
+                  stroke={pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)"}
+                  strokeWidth="1.8" />
+                <rect x="3" y="14" width="7" height="7" rx="1.5"
+                  stroke={pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)"}
+                  strokeWidth="1.8" />
+                <rect x="14" y="14" width="7" height="7" rx="1.5"
+                  stroke={pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)"}
+                  strokeWidth="1.8" />
+              </svg>
+              <span className="text-xs" style={{
+                color: pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)",
+                fontFamily: "var(--font-body)", fontWeight: pathname.startsWith("/admin") ? 600 : 400,
+              }}>
+                Admin
+              </span>
+            </Link>
+          )}
         </div>
       </nav>
 

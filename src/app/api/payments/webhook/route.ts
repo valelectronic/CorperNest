@@ -6,6 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createHmac } from "crypto";
 import { createNotification } from "@/lib/create-notification";
+import { sendAdminEmail } from "@/lib/send-admin-email";
 
 export const dynamic = "force-dynamic";
 
@@ -171,6 +172,22 @@ export async function POST(req: NextRequest) {
       message: `A corper just paid to inspect your ${theListing.title}. Check your bookings.`,
       link:    "/agent",
     });
+
+    // ── 15. Admin email alert ─────────────────────────────────────────────────
+    await sendAdminEmail(
+      `New Booking — ${bookingCode}`,
+      `
+        <h2>New Inspection Booking</h2>
+        <table cellpadding="6">
+          <tr><td><b>Booking Code</b></td><td>${bookingCode}</td></tr>
+          <tr><td><b>Renter Email</b></td><td>${event.data.customer.email}</td></tr>
+          <tr><td><b>Listing</b></td><td>${theListing.title}</td></tr>
+          <tr><td><b>Amount Paid</b></td><td>₦5,000</td></tr>
+          <tr><td><b>Time</b></td><td>${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}</td></tr>
+        </table>
+        <p><a href="https://www.corpernest.com.ng/admin/bookings">View on Admin Dashboard →</a></p>
+      `
+    );
   }
 
   return NextResponse.json({ received: true });

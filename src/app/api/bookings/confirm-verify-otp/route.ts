@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { booking, visitVerification, inspectionPayment, listing } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { sendAdminEmail } from "@/lib/send-admin-email";
 
 export async function POST(req: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   // Confirm booking belongs to this agent and is scheduled
   const theBooking = await db
-    .select({ id: booking.id, status: booking.status, listingId: booking.listingId, inspectionPaymentId: booking.inspectionPaymentId })
+    .select({ id: booking.id, status: booking.status, listingId: booking.listingId, inspectionPaymentId: booking.inspectionPaymentId, bookingCode: booking.bookingCode })
     .from(booking)
     .where(and(eq(booking.id, bookingId), eq(booking.agentId, session.user.id)))
     .limit(1);
@@ -74,6 +75,22 @@ export async function POST(req: NextRequest) {
       .set({ status: "expired", updatedAt: new Date() })
       .where(eq(inspectionPayment.id, theBooking[0].inspectionPaymentId));
   }
+
+  // Admin email — visit confirmed, payout now owed
+  await sendAdminEmail(
+    `Visit Confirmed — ${theBooking[0].bookingCode}`,
+    `
+      <h2>Inspection Visit Confirmed</h2>
+      <p>The agent has confirmed the client visited and read back the correct CNV code.</p>
+      <table cellpadding="6">
+        <tr><td><b>Booking Code</b></td><td>${theBooking[0].bookingCode}</td></tr>
+        <tr><td><b>Agent ID</b></td><td>${session.user.id}</td></tr>
+        <tr><td><b>Confirmed At</b></td><td>${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}</td></tr>
+      </table>
+      <p><b>Action required: agent payout is now owed.</b></p>
+      <p><a href="https://www.corpernest.com.ng/admin/payments">View Payouts →</a></p>
+    `
+  );
 
   return NextResponse.json({ success: true });
 }

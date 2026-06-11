@@ -158,7 +158,7 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
   async function handleSendCode() {
     setVs({ step: "sending" });
     try {
-      const res  = await fetch("/api/bookings/send-verify-otp", {
+      const res  = await fetch("/api/bookings/sender-verify-otp", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId: booking.id }),
       });

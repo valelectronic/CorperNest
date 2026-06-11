@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { agentKycRequest, user as userTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { sendAdminEmail } from "@/lib/send-admin-email";
 
 export const dynamic = "force-dynamic";
 
@@ -105,5 +106,26 @@ export async function POST(req: NextRequest) {
     .set({ role: "agent" })
     .where(eq(userTable.id, session.user.id));
 
-  return NextResponse.json({ success: true });
+    // Admin email alert — new KYC submission
+await sendAdminEmail(
+  `New KYC Request — ${fullName}`,
+  `
+    <h2>Agent KYC Submission</h2>
+    <table cellpadding="6">
+      <tr><td><b>Name</b></td><td>${fullName}</td></tr>
+      <tr><td><b>Email</b></td><td>${session.user.email}</td></tr>
+      <tr><td><b>Phone</b></td><td>${phone.trim()}</td></tr>
+      <tr><td><b>WhatsApp</b></td><td>${whatsapp?.trim() || "—"}</td></tr>
+      <tr><td><b>State</b></td><td>${state}</td></tr>
+      <tr><td><b>LGA</b></td><td>${lga}</td></tr>
+      <tr><td><b>Bank</b></td><td>${bankName}</td></tr>
+      <tr><td><b>Account Number</b></td><td>${accountNumber.trim()}</td></tr>
+      <tr><td><b>Account Name</b></td><td>${accountName.trim()}</td></tr>
+      <tr><td><b>Submitted</b></td><td>${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}</td></tr>
+    </table>
+    <p><a href="https://www.corpernest.com.ng/admin/kyc">Review on Admin Dashboard →</a></p>
+  `
+);
+
+return NextResponse.json({ success: true });
 }

@@ -22,8 +22,10 @@ interface Booking {
   listingPrice:   number;
   listingAddress: string | null;
   listingImages:  string[];
+  agentId?:       string;
   agentName?:     string;
   agentPhone?:    string | null;
+  hasReview?:     boolean;
 }
 
 interface Props {
@@ -73,80 +75,176 @@ function ListingThumb({ images, title }: { images: string[]; title: string }) {
   return <img src={src} alt={title} style={{ width: 64, height: 64, borderRadius: 12, objectFit: "cover", flexShrink: 0 }} />;
 }
 
+// ─── STAR RATING INPUT ────────────────────────────────────────────────────────
+
+function StarInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHovered(star)}
+          onMouseLeave={() => setHovered(0)}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1 }}
+        >
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+              fill={(hovered || value) >= star ? "#F59E0B" : "none"}
+              stroke={(hovered || value) >= star ? "#F59E0B" : "var(--color-border)"}
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── REVIEW PROMPT CARD ───────────────────────────────────────────────────────
+
+function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmitted: () => void }) {
+  const [rating,    setRating]    = useState(0);
+  const [comment,   setComment]   = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [dismissed, setDismissed]  = useState(false);
+
+  if (dismissed) return null;
+
+  async function handleSubmit() {
+    if (!rating) { toast.error("Please select a star rating"); return; }
+    setSubmitting(true);
+    try {
+      const res  = await fetch("/api/reviews/submit", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ bookingId: booking.id, rating, comment }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Failed to submit review"); return; }
+      toast.success("Review submitted. Thank you!");
+      onSubmitted();
+    } catch {
+      toast.error("Network error. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div style={{
+      background: "var(--color-card)", border: "1.5px solid #F59E0B",
+      borderRadius: 18, padding: 16, marginBottom: 14,
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#FFF8E1", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                fill="#F59E0B" stroke="#F59E0B" strokeWidth="1.5" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, color: "var(--color-header)" }}>
+              Rate your visit
+            </p>
+            <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-muted)" }}>
+              {booking.listingTitle} · {booking.agentName}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", padding: 4, flexShrink: 0 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Stars */}
+      <div style={{ marginBottom: 12 }}>
+        <StarInput value={rating} onChange={setRating} />
+        {rating > 0 && (
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--color-text-muted)" }}>
+            {["", "Poor", "Fair", "Good", "Very good", "Excellent"][rating]}
+          </p>
+        )}
+      </div>
+
+      {/* Optional comment */}
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Share your experience (optional)..."
+        maxLength={500}
+        rows={3}
+        style={{
+          width: "100%", padding: "10px 12px", borderRadius: 10, fontSize: 13,
+          border: "1.5px solid var(--color-border)", background: "var(--color-bg)",
+          color: "var(--color-text)", resize: "none", fontFamily: "var(--font-body)",
+          boxSizing: "border-box", lineHeight: 1.5, marginBottom: 12,
+          outline: "none",
+        }}
+      />
+
+      <button
+        onClick={handleSubmit}
+        disabled={submitting || rating === 0}
+        style={{
+          width: "100%", padding: "12px", borderRadius: 12,
+          background: rating === 0 || submitting ? "var(--color-border)" : "var(--color-primary)",
+          color: "#fff", border: "none",
+          fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14,
+          cursor: rating === 0 || submitting ? "not-allowed" : "pointer",
+        }}
+      >
+        {submitting ? "Submitting…" : "Submit Review"}
+      </button>
+    </div>
+  );
+}
+
 // ─── CUSTOM TIME PICKER ───────────────────────────────────────────────────────
 
 function TimePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  // value format: "2:30 PM"
   const [hour,   setHour]   = useState("8");
   const [minute, setMinute] = useState("00");
   const [ampm,   setAmpm]   = useState("AM");
 
-  // Sync internal state with value prop
   useEffect(() => {
     if (value) {
       const match = value.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
-      if (match) {
-        setHour(match[1]);
-        setMinute(match[2]);
-        setAmpm(match[3].toUpperCase());
-      }
+      if (match) { setHour(match[1]); setMinute(match[2]); setAmpm(match[3].toUpperCase()); }
     }
   }, []);
 
-  function update(h: string, m: string, a: string) {
-    onChange(`${h}:${m} ${a}`);
-  }
+  function update(h: string, m: string, a: string) { onChange(`${h}:${m} ${a}`); }
 
   const hours   = Array.from({ length: 12 }, (_, i) => String(i + 1));
   const minutes = ["00", "15", "30", "45"];
 
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      {/* Hour */}
-      <select
-        value={hour}
-        onChange={(e) => { setHour(e.target.value); update(e.target.value, minute, ampm); }}
-        style={{
-          flex: 1, padding: "13px 10px", borderRadius: 12,
-          border: "1.5px solid var(--color-border)", fontSize: 16, fontWeight: 700,
-          color: "var(--color-text)", background: "var(--color-bg)",
-          textAlign: "center", fontFamily: "var(--font-mono)",
-        }}
-      >
+      <select value={hour} onChange={(e) => { setHour(e.target.value); update(e.target.value, minute, ampm); }}
+        style={{ flex: 1, padding: "13px 10px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 16, fontWeight: 700, color: "var(--color-text)", background: "var(--color-bg)", textAlign: "center", fontFamily: "var(--font-mono)" }}>
         {hours.map((h) => <option key={h} value={h}>{h}</option>)}
       </select>
-
       <span style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-muted)" }}>:</span>
-
-      {/* Minute */}
-      <select
-        value={minute}
-        onChange={(e) => { setMinute(e.target.value); update(hour, e.target.value, ampm); }}
-        style={{
-          flex: 1, padding: "13px 10px", borderRadius: 12,
-          border: "1.5px solid var(--color-border)", fontSize: 16, fontWeight: 700,
-          color: "var(--color-text)", background: "var(--color-bg)",
-          textAlign: "center", fontFamily: "var(--font-mono)",
-        }}
-      >
+      <select value={minute} onChange={(e) => { setMinute(e.target.value); update(hour, e.target.value, ampm); }}
+        style={{ flex: 1, padding: "13px 10px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 16, fontWeight: 700, color: "var(--color-text)", background: "var(--color-bg)", textAlign: "center", fontFamily: "var(--font-mono)" }}>
         {minutes.map((m) => <option key={m} value={m}>{m}</option>)}
       </select>
-
-      {/* AM/PM */}
       <div style={{ display: "flex", borderRadius: 12, overflow: "hidden", border: "1.5px solid var(--color-border)", flexShrink: 0 }}>
         {["AM", "PM"].map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => { setAmpm(a); update(hour, minute, a); }}
-            style={{
-              padding: "13px 16px", border: "none", cursor: "pointer",
-              fontSize: 14, fontWeight: 700,
-              background: ampm === a ? "var(--color-primary)" : "var(--color-bg)",
-              color: ampm === a ? "#fff" : "var(--color-text-muted)",
-              transition: "background 0.15s",
-            }}
-          >
+          <button key={a} type="button" onClick={() => { setAmpm(a); update(hour, minute, a); }}
+            style={{ padding: "13px 16px", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700, background: ampm === a ? "var(--color-primary)" : "var(--color-bg)", color: ampm === a ? "#fff" : "var(--color-text-muted)", transition: "background 0.15s" }}>
             {a}
           </button>
         ))}
@@ -168,21 +266,13 @@ function SetDateSheet({ booking, onClose, onSuccess }: { booking: Booking; onClo
 
   async function handleSubmit() {
     if (!date) { toast.error("Please select a visit date"); return; }
-    if (!time) { toast.error("Please select a time"); return; }
-
     setLoading(true);
     try {
       const res = await fetch("/api/bookings/set-date", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ bookingId: booking.id, agreedDate: date, agreedTime: time }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: booking.id, agreedDate: date, agreedTime: time }),
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Failed to set date");
-      }
-
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error ?? "Failed"); }
       toast.success("Visit scheduled! Agent details are now visible.");
       onSuccess();
     } catch (err: unknown) {
@@ -195,9 +285,8 @@ function SetDateSheet({ booking, onClose, onSuccess }: { booking: Booking; onClo
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} />
-      <div style={{ position: "relative", background: "var(--color-card)", borderRadius: "22px 22px 0 0", padding: "8px 20px 40px", display: "flex", flexDirection: "column" }}>
+      <div style={{ position: "relative", background: "var(--color-card)", borderRadius: "22px 22px 0 0", padding: "8px 20px 40px" }}>
         <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--color-border)", margin: "8px auto 20px" }} />
-
         <div style={{ width: 52, height: 52, borderRadius: 16, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
             <rect x="3" y="4" width="18" height="18" rx="2" stroke="var(--color-primary)" strokeWidth="1.8" />
@@ -205,40 +294,19 @@ function SetDateSheet({ booking, onClose, onSuccess }: { booking: Booking; onClo
             <circle cx="12" cy="15" r="2" fill="var(--color-primary)" />
           </svg>
         </div>
-
         <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>
           Schedule your visit
         </p>
         <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px" }}>
-          Pick when you want to inspect <strong>{booking.listingTitle}</strong>. Agent contact and full address revealed immediately.
+          Pick when you want to tour with <strong>{booking.agentName ?? "the agent"}</strong>. They'll show you this property and any other available options in one visit.
         </p>
-
-        {/* Date */}
-        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>
-          Visit Date
-        </label>
-        <input
-          type="date"
-          value={date}
-          min={minDate}
-          onChange={(e) => setDate(e.target.value)}
-          style={{
-            width: "100%", padding: "13px 14px", borderRadius: 12,
-            border: "1.5px solid var(--color-border)", fontSize: 14,
-            color: "var(--color-text)", background: "var(--color-bg)",
-            marginBottom: 16, boxSizing: "border-box",
-          }}
-        />
-
-        {/* Time — custom AM/PM picker */}
-        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 8, display: "block" }}>
-          Preferred Time
-        </label>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>Visit Date</label>
+        <input type="date" value={date} min={minDate} onChange={(e) => setDate(e.target.value)}
+          style={{ width: "100%", padding: "13px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", marginBottom: 16, boxSizing: "border-box" }} />
+        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 8, display: "block" }}>Preferred Time</label>
         <div style={{ marginBottom: 24 }}>
           <TimePicker value={time} onChange={setTime} />
         </div>
-
-        {/* Selected summary */}
         {date && time && (
           <div style={{ background: "var(--color-light)", borderRadius: 12, padding: "10px 14px", marginBottom: 16, textAlign: "center" }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--color-primary)" }}>
@@ -246,32 +314,13 @@ function SetDateSheet({ booking, onClose, onSuccess }: { booking: Booking; onClo
             </p>
           </div>
         )}
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !date}
-          style={{
-            width: "100%", padding: "15px",
-            background: loading || !date ? "var(--color-border)" : "var(--color-primary)",
-            color: "#fff", border: "none", borderRadius: 14,
-            fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15,
-            cursor: loading || !date ? "not-allowed" : "pointer",
-            marginBottom: 10, transition: "background 0.2s",
-          }}
-        >
+        <button onClick={handleSubmit} disabled={loading || !date}
+          style={{ width: "100%", padding: "15px", background: loading || !date ? "var(--color-border)" : "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: loading || !date ? "not-allowed" : "pointer", marginBottom: 10 }}>
           {loading ? "Scheduling…" : "Confirm Visit Date"}
         </button>
-
-        <button
-          onClick={onClose}
-          style={{
-            width: "100%", padding: "15px",
-            background: "var(--color-bg)", color: "var(--color-text-muted)",
-            border: "1px solid var(--color-border)", borderRadius: 14,
-            fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15, cursor: "pointer",
-          }}
-        >
-          I'll do this later from My Bookings
+        <button onClick={onClose}
+          style={{ width: "100%", padding: "15px", background: "var(--color-bg)", color: "var(--color-text-muted)", border: "1px solid var(--color-border)", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15, cursor: "pointer" }}>
+          I'll do this later
         </button>
       </div>
     </div>
@@ -324,11 +373,9 @@ function BookingCard({ booking, onSetDate }: { booking: Booking; onSetDate: (b: 
           <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 10 }}>
             <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Property Address</p>
             <p style={{ margin: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.5 }}>{booking.listingAddress}</p>
-            <a
-              href={`https://maps.google.com/?q=${encodeURIComponent(booking.listingAddress + " " + booking.listingLga + " " + booking.listingState)}`}
+            <a href={`https://maps.google.com/?q=${encodeURIComponent(booking.listingAddress + " " + booking.listingLga + " " + booking.listingState)}`}
               target="_blank" rel="noopener noreferrer"
-              style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none" }}
-            >
+              style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none" }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                 <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.8" />
                 <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="1.8" />
@@ -341,11 +388,19 @@ function BookingCard({ booking, onSetDate }: { booking: Booking; onSetDate: (b: 
         {isScheduled && booking.agentName && (
           <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 10 }}>
             <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Agent Contact</p>
-            <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>{booking.agentName}</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>{booking.agentName}</p>
+              {booking.agentId && (
+                <a href={`/agent/${booking.agentId}`} style={{ fontSize: 11, color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>
+                  View profile →
+                </a>
+              )}
+            </div>
             {booking.agentPhone && (
               <a href={`tel:${booking.agentPhone}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="currentColor" strokeWidth="1.8" fill="none" />
+                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"
+                    stroke="currentColor" strokeWidth="1.8" fill="none" />
                 </svg>
                 {booking.agentPhone}
               </a>
@@ -354,10 +409,8 @@ function BookingCard({ booking, onSetDate }: { booking: Booking; onSetDate: (b: 
         )}
 
         {booking.status === "pending" && (
-          <button
-            onClick={() => onSetDate(booking)}
-            style={{ width: "100%", padding: "13px", background: "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 4 }}
-          >
+          <button onClick={() => onSetDate(booking)}
+            style={{ width: "100%", padding: "13px", background: "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 4 }}>
             Schedule Visit Date
           </button>
         )}
@@ -391,10 +444,8 @@ function EmptyBookings() {
       <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 24px", lineHeight: 1.6 }}>
         Find a verified property and pay the inspection fee to get started.
       </p>
-      <button
-        onClick={() => router.push("/home")}
-        style={{ padding: "12px 24px", background: "var(--color-primary)", color: "#fff", border: "none", borderRadius: 12, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: "pointer" }}
-      >
+      <button onClick={() => router.push("/home")}
+        style={{ padding: "12px 24px", background: "var(--color-primary)", color: "#fff", border: "none", borderRadius: 12, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
         Browse Listings
       </button>
     </div>
@@ -404,9 +455,10 @@ function EmptyBookings() {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function BookingsClient({ currentUserId, currentUserName }: Props) {
-  const [bookings, setBookings]               = useState<Booking[]>([]);
-  const [loading, setLoading]                 = useState(true);
-  const [activeDateSheet, setActiveDateSheet] = useState<Booking | null>(null);
+  const [bookings,         setBookings]         = useState<Booking[]>([]);
+  const [loading,          setLoading]          = useState(true);
+  const [activeDateSheet,  setActiveDateSheet]  = useState<Booking | null>(null);
+  const [reviewedIds,      setReviewedIds]      = useState<Set<string>>(new Set());
 
   void currentUserId;
   void currentUserName;
@@ -423,14 +475,17 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
     }
   }, []);
 
-  useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
+  useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
   function handleDateSuccess() {
     setActiveDateSheet(null);
     fetchBookings();
   }
+
+  // Bookings that need a review (verified + no review submitted yet + not dismissed)
+  const pendingReviews = bookings.filter(
+    (b) => b.status === "verified" && !b.hasReview && !reviewedIds.has(b.id)
+  );
 
   if (loading) {
     return (
@@ -462,6 +517,22 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
           {bookings.length} inspection{bookings.length !== 1 ? "s" : ""} booked
         </p>
       </div>
+
+      {/* Review prompts — shown above booking list */}
+      {pendingReviews.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 10px", fontFamily: "var(--font-heading)" }}>
+            Rate your visits
+          </p>
+          {pendingReviews.map((b) => (
+            <ReviewPromptCard
+              key={b.id}
+              booking={b}
+              onSubmitted={() => setReviewedIds((prev) => new Set([...prev, b.id]))}
+            />
+          ))}
+        </div>
+      )}
 
       {bookings.length === 0 && <EmptyBookings />}
 

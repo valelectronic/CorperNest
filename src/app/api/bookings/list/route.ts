@@ -1,10 +1,9 @@
-// src/app/api/bookings/list/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { booking, listing, user } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { booking, listing, user, review } from "@/db/schema";
+import { eq, desc, inArray } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +15,6 @@ export async function GET() {
 
   const currentUser = session.user as { id: string };
 
-  // ALWAYS fetch as renter — role is irrelevant here.
-  // Agent incoming bookings are handled separately in agent/page.tsx.
   const rows = await db
     .select({
       id:             booking.id,
@@ -45,10 +42,22 @@ export async function GET() {
     .where(eq(booking.renterId, currentUser.id))
     .orderBy(desc(booking.createdAt));
 
+  // Check which bookings already have a review from this client
+  let reviewedIds = new Set<string>();
+  if (rows.length > 0) {
+    const bookingIds  = rows.map((r) => r.id);
+    const reviewRows  = await db
+      .select({ bookingId: review.bookingId })
+      .from(review)
+      .where(inArray(review.bookingId, bookingIds));
+    reviewedIds = new Set(reviewRows.map((r) => r.bookingId));
+  }
+
   const masked = rows.map((row) => ({
     ...row,
     agentPhone:     row.status === "pending" ? null : row.agentPhone,
     listingAddress: row.status === "pending" ? null : row.listingAddress,
+    hasReview:      reviewedIds.has(row.id),
   }));
 
   return NextResponse.json({ bookings: masked });

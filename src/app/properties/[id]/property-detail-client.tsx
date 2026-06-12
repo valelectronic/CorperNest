@@ -382,30 +382,55 @@ export default function PropertyDetailClient({
       {/* ── HEADER ── */}
       <div className="sticky top-0 z-30 px-4 py-3 flex items-center justify-between"
         style={{ backgroundColor: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}>
-        <button onClick={() => router.back()}
-          className="w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M19 12H5M5 12L12 19M5 12L12 5"
-              stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <p className="text-sm font-semibold truncate flex-1 mx-3"
-          style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
-          {listing.title}
-        </p>
-        <button onClick={handleWatchlistToggle} disabled={toggling}
-          className="w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-              stroke={watching ? "#E53935" : "var(--color-text-muted)"}
-              strokeWidth="1.8"
-              fill={watching ? "#E53935" : "none"}
-            />
-          </svg>
-        </button>
+       <button onClick={() => router.back()}
+  className="w-9 h-9 rounded-full flex items-center justify-center"
+  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)" }}>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path d="M19 12H5M5 12L12 19M5 12L12 5"
+      stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+</button>
+
+<p className="text-sm font-semibold truncate flex-1 mx-3"
+  style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
+  {listing.title}
+</p>
+
+{/* Share */}
+<button
+  onClick={async () => {
+    const url  = `https://www.corpernest.com.ng/properties/${listing.id}`;
+    const text = `🏠 ${listing.title}\n📍 ${listing.lga}, ${listing.state}\n💰 ₦${listing.price.toLocaleString()}/yr\n\nVerified listing on CorperNest — inspect before you pay rent.`;
+    if (navigator.share) {
+      try { await navigator.share({ title: listing.title, text, url }); } catch {}
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n\n${url}`)}`, "_blank");
+    }
+  }}
+  className="w-9 h-9 rounded-full flex items-center justify-center"
+  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", marginRight: 8 }}>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <circle cx="18" cy="5"  r="3" stroke="var(--color-text)" strokeWidth="1.8" />
+    <circle cx="6"  cy="12" r="3" stroke="var(--color-text)" strokeWidth="1.8" />
+    <circle cx="18" cy="19" r="3" stroke="var(--color-text)" strokeWidth="1.8" />
+    <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"
+      stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" />
+  </svg>
+</button>
+
+{/* Watchlist */}
+<button onClick={handleWatchlistToggle} disabled={toggling}
+  className="w-9 h-9 rounded-full flex items-center justify-center"
+  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)" }}>
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+    <path
+      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+      stroke={watching ? "#E53935" : "var(--color-text-muted)"}
+      strokeWidth="1.8"
+      fill={watching ? "#E53935" : "none"}
+    />
+  </svg>
+</button>
       </div>
 
       {/* ── VERIFYING OVERLAY ── */}

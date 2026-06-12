@@ -403,6 +403,35 @@ export const agentKycRequest = pgTable(
   ],
 );
 
+export const review = pgTable(
+  "review",
+  {
+    id:         text("id").primaryKey(),
+    // The verified booking this review is for
+    bookingId:  text("booking_id")
+      .notNull()
+      .references(() => booking.id, { onDelete: "cascade" }),
+    // The client who is leaving the review
+    reviewerId: text("reviewer_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // The agent being reviewed
+    agentId:    text("agent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // 1–5 stars
+    rating:     integer("rating").notNull(),
+    // Optional short comment — max ~500 chars enforced on the API
+    comment:    text("comment"),
+    createdAt:  timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("review_agentId_idx").on(table.agentId),
+    index("review_reviewerId_idx").on(table.reviewerId),
+    index("review_bookingId_idx").on(table.bookingId),
+  ],
+);
+
 
 // ─── RELATIONS ───────────────────────────────────────────────────────────────
 
@@ -420,6 +449,8 @@ export const userRelations = relations(user, ({ many }) => ({
   payoutSplits: many(payoutSplit),
   notifications: many(notification),
   agentKycRequests: many(agentKycRequest),
+  reviewsGiven:    many(review),
+  reviewsReceived: many(review),
 }));
 
 export const agentKycRequestRelations = relations(agentKycRequest, ({ one }) => ({
@@ -428,6 +459,13 @@ export const agentKycRequestRelations = relations(agentKycRequest, ({ one }) => 
     references: [user.id],
   }),
 }));
+
+ export const reviewRelations = relations(review, ({ one }) => ({
+  booking:  one(booking, { fields: [review.bookingId],  references: [booking.id] }),
+  reviewer: one(user,    { fields: [review.reviewerId], references: [user.id]    }),
+  agent:    one(user,    { fields: [review.agentId],    references: [user.id]    }),
+}));
+
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, { fields: [session.userId], references: [user.id] }),

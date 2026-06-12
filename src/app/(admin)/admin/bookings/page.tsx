@@ -50,7 +50,7 @@ function statusBadge(status: string) {
     <span style={{
       display: "inline-block", padding: "3px 10px", borderRadius: 20,
       fontSize: 11, fontWeight: 700, background: s.bg, color: s.color,
-      textTransform: "capitalize",
+      textTransform: "capitalize", flexShrink: 0,
     }}>
       {status}
     </span>
@@ -71,36 +71,44 @@ export default async function AdminBookingsPage({
   const rows = await getBookings(status);
 
   const tabs = [
-    { label: "All", value: "all" },
-    { label: "Pending", value: "pending" },
+    { label: "All",       value: "all" },
+    { label: "Pending",   value: "pending" },
     { label: "Scheduled", value: "scheduled" },
-    { label: "Verified", value: "verified" },
+    { label: "Verified",  value: "verified" },
     { label: "Completed", value: "completed" },
     { label: "Cancelled", value: "cancelled" },
   ];
 
   return (
-    <div style={{ padding: "32px 32px 48px" }}>
+    <div style={{ padding: "24px 16px 48px", maxWidth: 900, margin: "0 auto" }}>
+
+      <style>{`
+        @media (min-width: 640px) {
+          .bookings-row { display: grid !important; grid-template-columns: 1fr 1.4fr 1fr auto !important; }
+          .bookings-row-mobile-meta { display: none !important; }
+          .bookings-row-top { margin-bottom: 0 !important; }
+        }
+      `}</style>
 
       {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 24, fontWeight: 800, color: "var(--color-header)", margin: "0 0 4px" }}>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 800, color: "var(--color-header)", margin: "0 0 4px" }}>
           Bookings
         </h1>
         <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
-          {rows.length} booking{rows.length !== 1 ? "s" : ""} {status !== "all" ? `· ${status}` : "total"}
+          {rows.length} booking{rows.length !== 1 ? "s" : ""}{status !== "all" ? ` · ${status}` : " total"}
         </p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" }}>
+      {/* Tabs — horizontally scrollable on mobile */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" as "touch" }}>
         {tabs.map((t) => (
           <a
             key={t.value}
             href={`/admin/bookings?status=${t.value}`}
             style={{
-              padding: "7px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600,
-              fontFamily: "var(--font-heading)", textDecoration: "none",
+              padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+              fontFamily: "var(--font-heading)", textDecoration: "none", whiteSpace: "nowrap", flexShrink: 0,
               background: status === t.value ? "var(--color-primary)" : "var(--color-card)",
               color: status === t.value ? "#fff" : "var(--color-text-muted)",
               border: `1px solid ${status === t.value ? "var(--color-primary)" : "var(--color-border)"}`,
@@ -123,32 +131,39 @@ export default async function AdminBookingsPage({
         </div>
       )}
 
-      {/* Table */}
+      {/* Cards — stack on mobile, grid on desktop */}
       {rows.length > 0 && (
         <div style={{
           background: "var(--color-card)", border: "1px solid var(--color-border)",
           borderRadius: 16, overflow: "hidden",
         }}>
           {rows.map((b, i) => (
-            <div key={b.id} style={{
-              padding: "16px 20px",
-              borderBottom: i < rows.length - 1 ? "1px solid var(--color-border)" : "none",
-              display: "grid",
-              gridTemplateColumns: "1fr 1.4fr 1fr auto",
-              gap: 16,
-              alignItems: "center",
-            }}>
-              {/* Renter */}
-              <div>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, color: "var(--color-header)", margin: "0 0 2px" }}>
-                  {b.renterName}
-                </p>
-                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 2px" }}>
-                  {b.renterEmail}
-                </p>
-                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0, fontFamily: "var(--font-mono)" }}>
-                  {b.bookingCode}
-                </p>
+            <div
+              key={b.id}
+              className="bookings-row"
+              style={{
+                padding: "14px 16px",
+                borderBottom: i < rows.length - 1 ? "1px solid var(--color-border)" : "none",
+                display: "flex", flexDirection: "column", gap: 10,
+              }}
+            >
+              {/* Top row: name + badge on mobile */}
+              <div className="bookings-row-top" style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+                <div>
+                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, color: "var(--color-header)", margin: "0 0 2px" }}>
+                    {b.renterName}
+                  </p>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 2px" }}>
+                    {b.renterEmail}
+                  </p>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0, fontFamily: "var(--font-mono)" }}>
+                    {b.bookingCode}
+                  </p>
+                </div>
+                {/* Badge shown inline on mobile, hidden on desktop via grid reflow */}
+                <div className="bookings-row-mobile-meta" style={{ display: "flex" }}>
+                  {statusBadge(b.status)}
+                </div>
               </div>
 
               {/* Listing */}
@@ -171,12 +186,22 @@ export default async function AdminBookingsPage({
                 </p>
               </div>
 
-              {/* Status */}
-              {statusBadge(b.status)}
+              {/* Badge — shown in grid column on desktop only */}
+              <div style={{ display: "none" }} className="bookings-status-desktop">
+                {statusBadge(b.status)}
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Desktop: show badge in 4th grid column */}
+      <style>{`
+        @media (min-width: 640px) {
+          .bookings-row-mobile-meta { display: none !important; }
+          .bookings-status-desktop  { display: flex !important; align-items: center; }
+        }
+      `}</style>
     </div>
   );
 }

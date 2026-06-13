@@ -13,8 +13,6 @@ function Logo({ variant = "dark" }: { variant?: "dark" | "light" }) {
   );
 }
 
-// ─── HOW IT WORKS STEPS ───────────────────────────────────────────────────────
-
 const HOW_IT_WORKS = [
   {
     num: "01",
@@ -62,8 +60,6 @@ const HOW_IT_WORKS = [
   },
 ];
 
-// ─── TRUST POINTS ─────────────────────────────────────────────────────────────
-
 const TRUST_POINTS = [
   {
     q: "What is the ₦5,000 for?",
@@ -82,8 +78,6 @@ const TRUST_POINTS = [
     a: "Payments are processed by Paystack — one of Nigeria's most trusted payment companies. We never ask you to send money directly to an agent.",
   },
 ];
-
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function LandingPageClient() {
   return (
@@ -105,11 +99,11 @@ export default function LandingPageClient() {
         {/* Hero */}
         <div style={{ padding: "28px 20px 0" }}>
 
-          {/* Live badge */}
+          {/* Live badge — EKET */}
           <div style={{ marginBottom: 16 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 999, backgroundColor: "var(--color-light)", border: "1px solid var(--color-border)", color: "var(--color-primary)" }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "var(--color-action)", display: "inline-block", animation: "pulse 2s infinite" }} />
-              Now live in Akwa Ibom
+              Now live in Eket, Akwa Ibom
             </span>
           </div>
 
@@ -119,7 +113,7 @@ export default function LandingPageClient() {
           </h1>
 
           <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.65, marginBottom: 24 }}>
-            Pay ₦5,000 once, meet a verified agent, and tour all their available properties in one trip. Move in with confidence.
+            Pay ₦5,000 once, meet a verified agent in Eket, and tour all their available properties in one trip. Move in with confidence.
           </p>
 
           <Link href="/properties" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "15px", backgroundColor: "var(--color-action)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none", marginBottom: 10 }}>
@@ -228,11 +222,11 @@ export default function LandingPageClient() {
         <div style={{ display: "flex", minHeight: "calc(100dvh - 65px)" }}>
 
           {/* Left */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "64px 64px 64px 64px", maxWidth: 660 }}>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "64px", maxWidth: 660 }}>
             <div style={{ marginBottom: 24 }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 999, backgroundColor: "var(--color-light)", border: "1px solid var(--color-border)", color: "var(--color-primary)" }}>
                 <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "var(--color-action)", display: "inline-block" }} />
-                Now live in Akwa Ibom · More states coming soon
+                Now live in Eket, Akwa Ibom · More cities coming soon
               </span>
             </div>
 
@@ -242,7 +236,7 @@ export default function LandingPageClient() {
             </h1>
 
             <p style={{ fontSize: 16, color: "var(--color-text-secondary)", lineHeight: 1.7, marginBottom: 36, maxWidth: 480 }}>
-              Pay ₦5,000 once to book a verified agent. They'll take you around — one trip, multiple properties — until you find the right one. No fake listings, no money to strangers.
+              Pay ₦5,000 once to book a verified agent in Eket. They'll take you around — one trip, multiple properties — until you find the right one. No fake listings, no money to strangers.
             </p>
 
             <div style={{ display: "flex", gap: 12, marginBottom: 48 }}>
@@ -261,9 +255,9 @@ export default function LandingPageClient() {
             {/* Stats */}
             <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
               {[
-                { value: "100%",  label: "Verified listings" },
+                { value: "100%",   label: "Verified listings" },
                 { value: "₦5,000", label: "One fee, full agent tour" },
-                { value: "0",     label: "Scam reports" },
+                { value: "0",      label: "Scam reports" },
               ].map((stat, i) => (
                 <div key={stat.label} style={{ display: "flex", alignItems: "center", gap: 32 }}>
                   {i > 0 && <div style={{ width: 1, height: 32, backgroundColor: "var(--color-border)" }} />}
@@ -278,9 +272,9 @@ export default function LandingPageClient() {
 
           {/* Right card */}
           <div style={{ width: 360, margin: "32px 64px 32px 0", borderRadius: 24, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", padding: 28, display: "flex", flexDirection: "column", justifyContent: "center", boxShadow: "0 4px 24px rgba(46,125,50,0.07)", alignSelf: "center" }}>
-            <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>Find your next home</p>
+            <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>Find your next home in Eket</p>
             <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px", lineHeight: 1.6 }}>
-              Browse listings or create an account to book an agent tour.
+              Browse verified listings or create an account to book an agent tour.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
@@ -305,7 +299,7 @@ export default function LandingPageClient() {
                 How it works
               </p>
               {[
-                "Browse verified listings",
+                "Browse verified listings in Eket",
                 "Pay ₦5,000 — agent tours you around",
                 "Visit multiple properties in one trip",
                 "Move in with full confidence",
@@ -330,7 +324,6 @@ export default function LandingPageClient() {
                 How CorperNest works
               </h2>
             </div>
-
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }}>
               {HOW_IT_WORKS.map((step, i) => (
                 <div key={i} style={{ background: "var(--color-bg)", borderRadius: 20, padding: 24, border: "1px solid var(--color-border)" }}>
@@ -346,7 +339,7 @@ export default function LandingPageClient() {
           </div>
         </div>
 
-        {/* Trust / FAQ section */}
+        {/* Trust / FAQ */}
         <div style={{ padding: "64px 64px", background: "var(--color-bg)" }}>
           <div style={{ maxWidth: 960, margin: "0 auto" }}>
             <div style={{ marginBottom: 40, textAlign: "center" }}>
@@ -357,7 +350,6 @@ export default function LandingPageClient() {
                 Common questions
               </h2>
             </div>
-
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
               {TRUST_POINTS.map((t, i) => (
                 <div key={i} style={{ background: "var(--color-card)", borderRadius: 18, padding: "24px", border: "1px solid var(--color-border)" }}>
@@ -369,13 +361,13 @@ export default function LandingPageClient() {
           </div>
         </div>
 
-        {/* Desktop footer CTA */}
+        {/* Footer CTA */}
         <div style={{ background: "#1B2E1B", padding: "56px 64px", textAlign: "center" }}>
           <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 32, fontWeight: 900, color: "#E8F5E9", margin: "0 0 12px", letterSpacing: "-1px" }}>
-            Ready to find your home?
+            Ready to find your home in Eket?
           </h2>
           <p style={{ fontSize: 15, color: "#7A9A7A", margin: "0 0 32px" }}>
-            Browse verified listings in Akwa Ibom — no account needed.
+            Browse verified listings in Eket, Akwa Ibom — no account needed.
           </p>
           <Link href="/properties" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "15px 36px", backgroundColor: "var(--color-action)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
             Browse listings →

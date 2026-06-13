@@ -4,7 +4,7 @@ import { agentKycRequest, user } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import KycActions from "@/app/(admin)/kyc-actions";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 async function getKycRequests(status: string) {
   const where =

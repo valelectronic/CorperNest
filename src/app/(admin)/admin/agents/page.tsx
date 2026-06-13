@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { user, listing, agentKycRequest } from "@/db/schema";
 import { eq, desc, count, sql } from "drizzle-orm";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 async function getAgents() {
   const agents = await db

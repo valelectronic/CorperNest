@@ -3,7 +3,7 @@ import { listing, user } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import AdminListingsClient from "./listings-client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 async function getPendingListings() {
   const rows = await db

@@ -108,10 +108,10 @@ function StarInput({ value, onChange }: { value: number; onChange: (v: number) =
 // ─── REVIEW PROMPT CARD ───────────────────────────────────────────────────────
 
 function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmitted: () => void }) {
-  const [rating,    setRating]    = useState(0);
-  const [comment,   setComment]   = useState("");
+  const [rating,     setRating]     = useState(0);
+  const [comment,    setComment]    = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [dismissed, setDismissed]  = useState(false);
+  const [dismissed,  setDismissed]  = useState(false);
 
   if (dismissed) return null;
 
@@ -127,6 +127,8 @@ function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmit
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Failed to submit review"); return; }
       toast.success("Review submitted. Thank you!");
+      // Re-fetch bookings so hasReview=true comes back from API
+      // This permanently removes the prompt on all future page visits
       onSubmitted();
     } catch {
       toast.error("Network error. Try again.");
@@ -373,7 +375,8 @@ function BookingCard({ booking, onSetDate }: { booking: Booking; onSetDate: (b: 
           <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 10 }}>
             <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Property Address</p>
             <p style={{ margin: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.5 }}>{booking.listingAddress}</p>
-            <a href={`https://maps.google.com/?q=${encodeURIComponent(booking.listingAddress + " " + booking.listingLga + " " + booking.listingState)}`}
+            <a
+              href={`https://maps.google.com/?q=${encodeURIComponent(booking.listingAddress + " " + booking.listingLga + " " + booking.listingState)}`}
               target="_blank" rel="noopener noreferrer"
               style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none" }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
@@ -455,10 +458,9 @@ function EmptyBookings() {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function BookingsClient({ currentUserId, currentUserName }: Props) {
-  const [bookings,         setBookings]         = useState<Booking[]>([]);
-  const [loading,          setLoading]          = useState(true);
-  const [activeDateSheet,  setActiveDateSheet]  = useState<Booking | null>(null);
-  const [reviewedIds,      setReviewedIds]      = useState<Set<string>>(new Set());
+  const [bookings,        setBookings]        = useState<Booking[]>([]);
+  const [loading,         setLoading]         = useState(true);
+  const [activeDateSheet, setActiveDateSheet] = useState<Booking | null>(null);
 
   void currentUserId;
   void currentUserName;
@@ -482,9 +484,12 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
     fetchBookings();
   }
 
-  // Bookings that need a review (verified + no review submitted yet + not dismissed)
+  // Only show review prompt for verified bookings where API confirms no review yet.
+  // Uses hasReview directly from the API — no local state needed.
+  // After submission, fetchBookings() re-runs and hasReview comes back true,
+  // permanently removing the prompt on all future visits to this page.
   const pendingReviews = bookings.filter(
-    (b) => b.status === "verified" && !b.hasReview && !reviewedIds.has(b.id)
+    (b) => b.status === "verified" && !b.hasReview
   );
 
   if (loading) {
@@ -518,7 +523,7 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
         </p>
       </div>
 
-      {/* Review prompts — shown above booking list */}
+      {/* Review prompts — only shown for verified bookings with no review yet */}
       {pendingReviews.length > 0 && (
         <div style={{ marginBottom: 8 }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 10px", fontFamily: "var(--font-heading)" }}>
@@ -528,7 +533,7 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
             <ReviewPromptCard
               key={b.id}
               booking={b}
-              onSubmitted={() => setReviewedIds((prev) => new Set([...prev, b.id]))}
+              onSubmitted={fetchBookings}
             />
           ))}
         </div>

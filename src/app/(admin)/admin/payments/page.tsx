@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { inspectionPayment, user, payoutSplit } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 async function getPayments() {
   const rows = await db

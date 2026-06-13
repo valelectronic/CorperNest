@@ -449,8 +449,8 @@ export const userRelations = relations(user, ({ many }) => ({
   payoutSplits: many(payoutSplit),
   notifications: many(notification),
   agentKycRequests: many(agentKycRequest),
-  reviewsGiven:    many(review),
-  reviewsReceived: many(review),
+  reviewsGiven:    many(review, { relationName: "reviewsGiven" }),
+reviewsReceived: many(review, { relationName: "reviewsReceived" }),
 }));
 
 export const agentKycRequestRelations = relations(agentKycRequest, ({ one }) => ({
@@ -460,12 +460,11 @@ export const agentKycRequestRelations = relations(agentKycRequest, ({ one }) => 
   }),
 }));
 
- export const reviewRelations = relations(review, ({ one }) => ({
-  booking:  one(booking, { fields: [review.bookingId],  references: [booking.id] }),
-  reviewer: one(user,    { fields: [review.reviewerId], references: [user.id]    }),
-  agent:    one(user,    { fields: [review.agentId],    references: [user.id]    }),
+export const reviewRelations = relations(review, ({ one }) => ({
+  booking:  one(booking, { fields: [review.bookingId],  references: [booking.id]  }),
+  reviewer: one(user,    { fields: [review.reviewerId], references: [user.id], relationName: "reviewsGiven"    }),
+  agent:    one(user,    { fields: [review.agentId],    references: [user.id], relationName: "reviewsReceived" }),
 }));
-
 
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, { fields: [session.userId], references: [user.id] }),

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { booking, user, listing } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 async function getBookings(status: string) {
   const where =

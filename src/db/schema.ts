@@ -472,6 +472,8 @@ export const rentRecord = pgTable(
  
     // Cloudinary URL of the uploaded receipt image
     receiptUrl:   text("receipt_url").notNull(),
+    receiptStatus: text("receipt_status").default("pending").notNull(),
+    adminNote:     text("admin_note"),
  
     // Paystack reference for the ₦1,000 documentation fee
     paystackRef:  text("paystack_ref"),
@@ -493,6 +495,7 @@ export const rentRecord = pgTable(
     index("rent_record_agentId_idx").on(table.agentId),
     index("rent_record_bookingId_idx").on(table.bookingId),
     index("rent_record_renewalDate_idx").on(table.renewalDate),
+    index("rent_record_receiptStatus_idx").on(table.receiptStatus),
   ],
 );
 

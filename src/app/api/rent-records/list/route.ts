@@ -14,7 +14,6 @@ export async function GET(req: NextRequest) {
 
   const userId = session.user.id;
 
-  // Return records where user is either the renter or the agent
   const rows = await db
     .select({
       id:             rentRecord.id,
@@ -25,6 +24,8 @@ export async function GET(req: NextRequest) {
       renewalDate:    rentRecord.renewalDate,
       receiptUrl:     rentRecord.receiptUrl,
       feePaid:        rentRecord.feePaid,
+      receiptStatus:  rentRecord.receiptStatus,
+      adminNote:      rentRecord.adminNote,
       reminderSent:   rentRecord.reminderSent,
       createdAt:      rentRecord.createdAt,
       renterId:       rentRecord.renterId,
@@ -37,19 +38,19 @@ export async function GET(req: NextRequest) {
     .innerJoin(listing, eq(rentRecord.listingId, listing.id))
     .where(or(eq(rentRecord.renterId, userId), eq(rentRecord.agentId, userId)));
 
-  // Check for upcoming renewals — fire reminder if within 30 days and not yet sent
+  // Fire renewal reminders only for approved records expiring within 30 days
   const thirtyDaysFromNow = new Date();
   thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
   const needsReminder = rows.filter(
     (r) =>
       r.feePaid &&
+      r.receiptStatus === "approved" &&
       !r.reminderSent &&
       r.renterId === userId &&
       new Date(r.renewalDate) <= thirtyDaysFromNow
   );
 
-  // Fire renewal notifications — don't await, non-blocking
   if (needsReminder.length > 0) {
     Promise.all(
       needsReminder.map(async (r) => {

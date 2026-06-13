@@ -22,19 +22,17 @@ const dmMono = DM_Mono({
   display: "swap",
 });
 
-const BASE_URL = "https://www.corpernest.com.ng";
-
 export const metadata: Metadata = {
   title: {
-    default:  "CorperNest — Verified Housing in Akwa Ibom",
+    default:  "CorperNest — Verified Housing in Eket",
     template: "%s | CorperNest",
   },
   description:
-    "Find verified, scam-free rental properties in Uyo and Akwa Ibom. Pay ₦5,000 to tour with a verified agent and move in with confidence. Built for NYSC corpers and young professionals.",
-  metadataBase: new URL(BASE_URL),
+    "Find verified, scam-free rentals in Eket, Akwa Ibom. Pay ₦5,000 to tour with a verified agent and move in with confidence.",
+  metadataBase: new URL("https://www.corpernest.com.ng"),
   keywords: [
-    "houses for rent in Uyo Eket",
-    "NYSC accommodation Akwa Ibom",
+    "houses for rent in Eket",
+    "NYSC accommodation Eket Akwa Ibom",
     "verified properties Eket",
     "corper accommodation Eket",
     "rent apartment Eket Akwa Ibom",
@@ -46,28 +44,28 @@ export const metadata: Metadata = {
     "CorperNest",
   ],
   alternates: {
-    canonical: BASE_URL,
+    canonical: "https://www.corpernest.com.ng",
   },
   openGraph: {
     type:        "website",
-    url:         BASE_URL,
+    url:         "https://www.corpernest.com.ng",
     siteName:    "CorperNest",
-    title:       "CorperNest — Verified Housing in Akwa Ibom",
-    description: "Find verified, scam-free rental properties in Uyo and Akwa Ibom. Pay ₦5,000 to tour with a verified agent. Built for NYSC corpers.",
+    title:       "CorperNest — Verified Housing in Eket",
+    description: "Verified rentals in Eket, Akwa Ibom. Pay ₦5,000 to tour with a verified agent. No scams.",
     locale:      "en_NG",
     images: [
       {
         url:    "/og-image.png",
         width:  1200,
         height: 630,
-        alt:    "CorperNest — Verified Housing in Akwa Ibom",
+        alt:    "CorperNest — Verified Housing in Eket, Akwa Ibom",
       },
     ],
   },
   twitter: {
     card:        "summary_large_image",
-    title:       "CorperNest — Verified Housing in Akwa Ibom",
-    description: "Find verified, scam-free rental properties in Uyo. Pay ₦5,000 to tour with a verified agent.",
+    title:       "CorperNest — Verified Housing in Eket",
+    description: "Verified rentals in Eket, Akwa Ibom. Pay ₦5,000 to tour with a verified agent. No scams.",
     images:      ["/og-image.png"],
   },
   robots: {
@@ -83,6 +81,9 @@ export const metadata: Metadata = {
   icons: {
     icon:  "/favicon.ico",
     apple: "/apple-touch-icon.png",
+  },
+  verification: {
+    google: "googleb1ac539760025b3c.html",
   },
 };
 

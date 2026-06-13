@@ -432,6 +432,70 @@ export const review = pgTable(
   ],
 );
 
+export const rentRecord = pgTable(
+  "rent_record",
+  {
+    id:           text("id").primaryKey(),
+ 
+    // The verified booking this rent record is tied to
+    bookingId:    text("booking_id")
+      .notNull()
+      .references(() => booking.id, { onDelete: "cascade" }),
+ 
+    // The client who uploaded the receipt
+    renterId:     text("renter_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+ 
+    // The agent for this booking
+    agentId:      text("agent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+ 
+    // The listing this rent is for
+    listingId:    text("listing_id")
+      .notNull()
+      .references(() => listing.id, { onDelete: "cascade" }),
+ 
+    // Rent amount in naira as typed by the client
+    rentAmount:   integer("rent_amount").notNull(),
+ 
+    // Duration: "6" | "12" | "24" months
+    durationMonths: integer("duration_months").notNull(),
+ 
+    // Date client paid rent (from their receipt)
+    paymentDate:  timestamp("payment_date").notNull(),
+ 
+    // Calculated: paymentDate + durationMonths
+    // Renewal reminder fires 30 days before this
+    renewalDate:  timestamp("renewal_date").notNull(),
+ 
+    // Cloudinary URL of the uploaded receipt image
+    receiptUrl:   text("receipt_url").notNull(),
+ 
+    // Paystack reference for the ₦1,000 documentation fee
+    paystackRef:  text("paystack_ref"),
+ 
+    // Whether the ₦1,000 fee has been confirmed paid
+    feePaid:      boolean("fee_paid").default(false).notNull(),
+ 
+    // Whether a renewal reminder has been sent
+    reminderSent: boolean("reminder_sent").default(false).notNull(),
+ 
+    createdAt:    timestamp("created_at").defaultNow().notNull(),
+    updatedAt:    timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("rent_record_renterId_idx").on(table.renterId),
+    index("rent_record_agentId_idx").on(table.agentId),
+    index("rent_record_bookingId_idx").on(table.bookingId),
+    index("rent_record_renewalDate_idx").on(table.renewalDate),
+  ],
+);
+
 
 // ─── RELATIONS ───────────────────────────────────────────────────────────────
 
@@ -449,15 +513,25 @@ export const userRelations = relations(user, ({ many }) => ({
   payoutSplits: many(payoutSplit),
   notifications: many(notification),
   agentKycRequests: many(agentKycRequest),
-  reviewsGiven:    many(review, { relationName: "reviewsGiven" }),
+ reviewsGiven:    many(review, { relationName: "reviewsGiven"    }),
 reviewsReceived: many(review, { relationName: "reviewsReceived" }),
+rentRecords:     many(rentRecord),
 }));
+
+
 
 export const agentKycRequestRelations = relations(agentKycRequest, ({ one }) => ({
   agent: one(user, {
     fields: [agentKycRequest.agentId],
     references: [user.id],
   }),
+}));
+
+export const rentRecordRelations = relations(rentRecord, ({ one }) => ({
+  booking: one(booking,  { fields: [rentRecord.bookingId],  references: [booking.id]  }),
+  renter:  one(user,     { fields: [rentRecord.renterId],   references: [user.id]     }),
+  agent:   one(user,     { fields: [rentRecord.agentId],    references: [user.id]     }),
+  listing: one(listing,  { fields: [rentRecord.listingId],  references: [listing.id]  }),
 }));
 
 export const reviewRelations = relations(review, ({ one }) => ({

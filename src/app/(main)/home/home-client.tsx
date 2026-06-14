@@ -166,15 +166,26 @@ export default function HomeClient({
 
   // ── Clear all ─────────────────────────────────────────────────────────────
   function clearFilters() {
-    setLga(""); setType(""); setPurpose("");
-    setMinPriceRaw(""); setMaxPriceRaw("");
-    setMinPrice(""); setMaxPrice("");
-    setSearchInput("");
-    setHasSearched(false);
-    setListings(initialListings);
-    setHasMore(initialListings.length < totalCount);
-    setPage(1);
-  }
+  filtersRef.current = {
+    lga:      "",
+    type:     "",
+    purpose:  "",
+    minPrice: "",
+    maxPrice: "",
+  };
+  setLga("");
+  setType("");
+  setPurpose("");
+  setMinPriceRaw("");
+  setMaxPriceRaw("");
+  setMinPrice("");
+  setMaxPrice("");
+  setSearchInput("");
+  setHasSearched(false);
+  setListings(initialListings);
+  setHasMore(initialListings.length < totalCount);
+  setPage(1);
+}
 
   // ── Watchlist toggle callback (passed to PropertyCard) ────────────────────
   const handleWatchlistChange = useCallback((listingId: string, watching: boolean) => {
@@ -209,8 +220,18 @@ export default function HomeClient({
             <input
               type="text"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              onChange={(e) => {
+              const val = e.target.value;
+              setSearchInput(val);
+              if (val === "" && hasSearched) {
+                filtersRef.current = { lga, type, purpose, minPrice, maxPrice };
+                setHasSearched(false);
+                setListings(initialListings);
+                setHasMore(initialListings.length < totalCount);
+                setPage(1);
+              }
+            }}
+                          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="Search area, keyword..."
               className="flex-1 min-w-0 text-sm bg-transparent focus:outline-none"
               style={{ color: "var(--color-text)" }}

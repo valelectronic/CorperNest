@@ -178,7 +178,21 @@ export default function PropertiesClient({ isLoggedIn }: Props) {
             <input
               type="text"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onChange={(e) => {
+            const val = e.target.value;
+            setSearchInput(val);
+            if (val === "" && hasSearched) {
+              filtersRef.current = {
+                state,
+                lga,
+                type,
+                purpose,
+                minPrice,
+                maxPrice,
+              };
+              fetchListings("");
+            }
+          }}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               placeholder="Search by keyword, area..."
               className="flex-1 text-sm bg-transparent focus:outline-none"

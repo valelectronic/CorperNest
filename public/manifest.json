@@ -1,0 +1,24 @@
+{
+  "name": "CorperNest",
+  "short_name": "CorperNest",
+  "description": "Verified housing in Eket, Akwa Ibom. No scams. Pay ₦5,000 to tour with a verified agent.",
+  "start_url": "/home",
+  "display": "standalone",
+  "background_color": "#1B2E1B",
+  "theme_color": "#2E7D32",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

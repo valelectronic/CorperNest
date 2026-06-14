@@ -85,11 +85,13 @@ export const metadata: Metadata = {
   verification: {
     google: "googleb1ac539760025b3c.html",
   },
+  manifest: "/manifest.json",
 };
 
 export const viewport = {
   width:        "device-width",
   initialScale: 1,
+  themeColor:   "#2E7D32",
 };
 
 export default function RootLayout({

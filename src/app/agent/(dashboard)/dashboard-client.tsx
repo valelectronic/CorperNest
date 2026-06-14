@@ -202,18 +202,13 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
       background: "var(--color-card)", border: "1px solid var(--color-border)",
       borderRadius: 18, overflow: "hidden",
     }}>
-      {/* Color-coded top strip */}
-      <div style={{
-        height: 3,
-        background: isVerified ? "#43A047" : isScheduled ? "#6366F1" : "#F59E0B",
-      }} />
-
+      <div style={{ height: 3, background: isVerified ? "#43A047" : isScheduled ? "#6366F1" : "#F59E0B" }} />
       <div style={{ padding: 16 }}>
+
         {/* Client row */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: "var(--color-light)",
+            width: 40, height: 40, borderRadius: 12, background: "var(--color-light)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16,
             color: "var(--color-primary)", flexShrink: 0,
@@ -472,7 +467,6 @@ export default function AgentDashboardClient({
   completedCount,
 }: Props) {
   const router = useRouter();
-  void router;
 
   const [statusMap, setStatusMap]           = useState<Record<string, string>>(
     Object.fromEntries(listings.map((l) => [l.id, l.status]))
@@ -543,6 +537,8 @@ export default function AgentDashboardClient({
 
           {/* Top row */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+
+            {/* Agent info */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 12,
@@ -563,22 +559,46 @@ export default function AgentDashboardClient({
               </div>
             </div>
 
-            {/* Stats */}
-            <div style={{ display: "flex", gap: 16 }}>
-              {[
-                { num: activeBookings.length, label: "Active",   color: "#FAC775" },
-                { num: visibleListings.length, label: "Listings", color: "#A5D6A7" },
-                { num: completedCount,         label: "Done",     color: "#7A9A7A" },
-              ].map((s) => (
-                <div key={s.label} style={{ textAlign: "center" }}>
-                  <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 20, color: s.color, lineHeight: 1 }}>
-                    {s.num}
-                  </p>
-                  <p style={{ margin: "2px 0 0", fontSize: 9, color: "#7A9A7A", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    {s.label}
-                  </p>
-                </div>
-              ))}
+            {/* Right side — back to site + stats */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+
+              {/* Back to site */}
+              <button
+                onClick={() => router.push("/home")}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "7px 11px", borderRadius: 10, flexShrink: 0,
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#A5D6A7", cursor: "pointer",
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"
+                    stroke="#A5D6A7" strokeWidth="1.8" strokeLinejoin="round" />
+                </svg>
+                <span style={{ fontSize: 11, fontWeight: 600, fontFamily: "var(--font-heading)" }}>
+                  Home
+                </span>
+              </button>
+
+              {/* Stats */}
+              <div style={{ display: "flex", gap: 14 }}>
+                {[
+                  { num: activeBookings.length,  label: "Active",   color: "#FAC775" },
+                  { num: visibleListings.length, label: "Listings", color: "#A5D6A7" },
+                  { num: completedCount,         label: "Done",     color: "#7A9A7A" },
+                ].map((s) => (
+                  <div key={s.label} style={{ textAlign: "center" }}>
+                    <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 20, color: s.color, lineHeight: 1 }}>
+                      {s.num}
+                    </p>
+                    <p style={{ margin: "2px 0 0", fontSize: 9, color: "#7A9A7A", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      {s.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 

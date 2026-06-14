@@ -16,6 +16,7 @@ const TYPE_LABELS: Record<string, string> = {
   "mini-flat": "Mini Flat",
   "1-bed":     "1 Bedroom Flat",
   "2-bed":     "2 Bedroom Flat",
+  "3-bed":     "3 Bedroom",
   "room":      "Single Room",
 };
 

@@ -91,6 +91,8 @@ export const listing = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     address: text("address").notNull(),
+    landmark:text("landmark"), 
+    agencyFeePercent: integer("agency_fee_percent"),
     lga: text("lga").notNull(),
     state: text("state").notNull(),
     price: integer("price").notNull(),

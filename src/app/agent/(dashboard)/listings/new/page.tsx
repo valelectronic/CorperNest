@@ -4,12 +4,23 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { STATE_NAMES, getLGAs } from "@/lib/nigeria-location";
 
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
 const PROPERTY_TYPES = [
-  { value: "self-con",  label: "Self Contained" },
-  { value: "mini-flat", label: "Mini Flat" },
-  { value: "1-bed",     label: "1 Bedroom Flat" },
-  { value: "2-bed",     label: "2 Bedroom Flat" },
-  { value: "room",      label: "Single Room" },
+  { value: "self-con",  label: "Self Contained",  desc: "Single room with private bathroom & kitchen" },
+  { value: "mini-flat", label: "Mini Flat",        desc: "Bedroom, sitting area, kitchen & bathroom" },
+  { value: "1-bed",     label: "1 Bedroom Flat",   desc: "1 bedroom, living room, kitchen & bathroom" },
+  { value: "2-bed",     label: "2 Bedroom Flat",   desc: "2 bedrooms, living room, kitchen & bathroom" },
+  { value: "3-bed",     label: "3 Bedroom Flat",   desc: "3 bedrooms, living room, kitchen & bathroom" },
+  { value: "room",      label: "Single Room",      desc: "One room, shared bathroom or kitchen" },
+];
+
+const AGENCY_FEE_OPTIONS = [
+  { value: 5,  label: "5%"              },
+  { value: 8,  label: "8%"              },
+  { value: 10, label: "10% — standard"  },
+  { value: 12, label: "12%"             },
+  { value: 15, label: "15%"             },
 ];
 
 const AMENITIES = [
@@ -31,87 +42,126 @@ const AMENITIES = [
 ];
 
 const inputStyle = {
-  border: "1px solid var(--color-border)",
+  border: "1.5px solid var(--color-border)",
   backgroundColor: "var(--color-bg)",
   color: "var(--color-text)",
   fontFamily: "var(--font-body)",
+  width: "100%",
+  borderRadius: 12,
+  padding: "13px 14px",
+  fontSize: 14,
+  outline: "none",
+  boxSizing: "border-box" as const,
 };
 
-type ImagePreview = {
-  file: File;
-  previewUrl: string;
-};
+type ImagePreview = { file: File; previewUrl: string };
+
+// ─── REUSABLE COMPONENTS ─────────────────────────────────────────────────────
+
+function SectionCard({
+  num, title, subtitle, children,
+}: {
+  num: string; title: string; subtitle?: string; children: React.ReactNode;
+}) {
+  return (
+    <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, overflow: "hidden" }}>
+      {/* Section header */}
+      <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <span style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 12, fontWeight: 800, color: "#fff", fontFamily: "var(--font-mono)" }}>
+          {num}
+        </span>
+        <div>
+          <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)", margin: 0 }}>{title}</p>
+          {subtitle && <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "3px 0 0", lineHeight: 1.5 }}>{subtitle}</p>}
+        </div>
+      </div>
+      <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 16 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label, hint, optional, children,
+}: {
+  label: string; hint?: string; optional?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: hint ? 4 : 8 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)" }}>{label}</label>
+        {optional && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", padding: "2px 7px", borderRadius: 20, background: "var(--color-bg)", border: "1px solid var(--color-border)", letterSpacing: "0.03em" }}>
+            OPTIONAL
+          </span>
+        )}
+      </div>
+      {hint && <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 8px", lineHeight: 1.55 }}>{hint}</p>}
+      {children}
+    </div>
+  );
+}
+
+// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 export default function NewListingPage() {
-  const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router           = useRouter();
+  const fileInputRef     = useRef<HTMLInputElement>(null);
   const customAmenityRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
-    description: "",
-    address: "",
-    lga: "",
-    state: "Akwa Ibom",
-    price: "",
-    type: "",
-    listingPurpose: "rent" as "rent" | "sale",
-    landlordName: "",
-    landlordPhone: "",
+    description:      "",
+    address:          "",
+    landmark:         "",
+    lga:              "",
+    state:            "Akwa Ibom",
+    price:            "",
+    type:             "",
+    listingPurpose:   "rent" as "rent" | "sale",
+    landlordName:     "",
+    landlordPhone:    "",
+    agencyFeePercent: "" as "" | number,
   });
 
-  const [images, setImages] = useState<ImagePreview[]>([]);
-  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
+  const [images,            setImages]            = useState<ImagePreview[]>([]);
+  const [uploadedUrls,      setUploadedUrls]      = useState<string[]>([]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-  const [customAmenities, setCustomAmenities] = useState<string[]>([]);
-  const [customInput, setCustomInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [uploadProgress, setUploadProgress] = useState("");
+  const [customAmenities,   setCustomAmenities]   = useState<string[]>([]);
+  const [customInput,       setCustomInput]       = useState("");
+  const [loading,           setLoading]           = useState(false);
+  const [error,             setError]             = useState("");
+  const [uploadProgress,    setUploadProgress]    = useState("");
 
   const lgaOptions = getLGAs(form.state);
 
-  function handleChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { name, value } = e.target;
-    if (name === "state") {
-      setForm((prev) => ({ ...prev, state: value, lga: "" }));
-    } else {
-      setForm((prev) => ({ ...prev, [name]: value }));
-    }
+    setForm((prev) => name === "state" ? { ...prev, state: value, lga: "" } : { ...prev, [name]: value });
   }
 
   function toggleAmenity(slug: string) {
-    setSelectedAmenities((prev) =>
-      prev.includes(slug) ? prev.filter((a) => a !== slug) : [...prev, slug]
-    );
+    setSelectedAmenities((prev) => prev.includes(slug) ? prev.filter((a) => a !== slug) : [...prev, slug]);
   }
 
   function addCustomAmenity() {
     const val = customInput.trim();
-    if (!val) return;
-    if (customAmenities.length >= 10) return;
+    if (!val || customAmenities.length >= 10) return;
     if (customAmenities.map((a) => a.toLowerCase()).includes(val.toLowerCase())) return;
     setCustomAmenities((prev) => [...prev, val]);
     setCustomInput("");
     customAmenityRef.current?.focus();
   }
 
-  function removeCustomAmenity(index: number) {
-    setCustomAmenities((prev) => prev.filter((_, i) => i !== index));
+  function removeCustomAmenity(i: number) {
+    setCustomAmenities((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-    if (images.length + files.length > 5) {
-      setError("Maximum 5 images allowed.");
-      return;
-    }
-    setImages((prev) => [
-      ...prev,
-      ...files.map((file) => ({ file, previewUrl: URL.createObjectURL(file) })),
-    ]);
+    if (images.length + files.length > 5) { setError("Maximum 5 images allowed."); return; }
+    setImages((prev) => [...prev, ...files.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))]);
     setUploadedUrls([]);
     setError("");
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -127,71 +177,52 @@ export default function NewListingPage() {
     setUploadedUrls([]);
   }
 
+  // Live fee calculation
+  const priceNum       = parseInt(form.price.replace(/,/g, "")) || 0;
+  const agencyFeeNaira = form.agencyFeePercent && priceNum > 0
+    ? Math.round(priceNum * (Number(form.agencyFeePercent) / 100))
+    : null;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    if (!form.type)  { setError("Please select a property type."); return; }
-    if (!form.lga)   { setError("Please select an LGA."); return; }
-
-    const priceNum = parseInt(form.price.replace(/,/g, ""));
-    if (isNaN(priceNum) || priceNum <= 0) {
-      setError("Please enter a valid price.");
-      return;
-    }
-    if (images.length < 2) {
-      setError("Please upload at least 2 photos.");
-      return;
-    }
+    if (!form.type)     { setError("Please select a property type."); return; }
+    if (!form.lga)      { setError("Please select your LGA."); return; }
+    if (!form.landmark.trim()) { setError("Please enter the nearest landmark — this helps clients find the property."); return; }
+    if (!priceNum || priceNum <= 0) { setError("Please enter a valid price."); return; }
+    if (form.description.trim().length < 50) { setError("Description is too short. Please describe the property properly (at least 50 characters)."); return; }
+    if (images.length < 2) { setError("Please upload at least 2 photos."); return; }
 
     setLoading(true);
-
     try {
-      // Step 1 — upload images (skipped if already done on a previous attempt)
       let imageUrls = uploadedUrls;
-
       if (imageUrls.length === 0) {
-        setUploadProgress("Uploading photos...");
-        const formData = new FormData();
-        images.forEach((img) => formData.append("images", img.file));
-
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
+        setUploadProgress("Uploading photos…");
+        const fd = new FormData();
+        images.forEach((img) => fd.append("images", img.file));
+        const uploadRes  = await fetch("/api/upload", { method: "POST", body: fd });
         const uploadData = await uploadRes.json();
-
-        if (!uploadRes.ok) {
-          setError(uploadData.error ?? "Image upload failed. Try again.");
-          setLoading(false);
-          setUploadProgress("");
-          return;
-        }
-
+        if (!uploadRes.ok) { setError(uploadData.error ?? "Image upload failed."); setLoading(false); setUploadProgress(""); return; }
         imageUrls = uploadData.urls;
         setUploadedUrls(imageUrls);
       }
 
-      // Step 2 — create listing (title auto-generated on the server)
-      setUploadProgress("Saving listing...");
-      const createRes = await fetch("/api/properties/create", {
-        method: "POST",
+      setUploadProgress("Saving listing…");
+      const res  = await fetch("/api/properties/create", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body:    JSON.stringify({
           ...form,
-          price: priceNum,
-          images: imageUrls,
-          amenities: selectedAmenities,
+          price:            priceNum,
+          images:           imageUrls,
+          amenities:        selectedAmenities,
           customAmenities,
+          agencyFeePercent: form.agencyFeePercent ? Number(form.agencyFeePercent) : null,
         }),
       });
-
-      const createData = await createRes.json();
-
-      if (!createRes.ok) {
-        setError(createData.error ?? "Failed to save listing. Try again.");
-        setLoading(false);
-        setUploadProgress("");
-        return;
-      }
-
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Failed to save listing."); setLoading(false); setUploadProgress(""); return; }
       router.push("/agent");
     } catch {
       setError("Network error. Check your connection and try again.");
@@ -200,203 +231,194 @@ export default function NewListingPage() {
     }
   }
 
-  const formattedPrice = form.price
-    ? parseInt(form.price.replace(/,/g, ""))
-    : null;
-
-  const priceLabel = form.listingPurpose === "sale" ? "Selling price (₦)" : "Annual rent (₦)";
-  const priceSuffix = form.listingPurpose === "sale" ? "one-time" : "per year";
-
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "var(--color-bg)" }}>
+    <div style={{ backgroundColor: "var(--color-bg)", minHeight: "100dvh" }}>
 
-      {/* ── DARK HEADER ── */}
-      <header className="sticky top-0 z-50 px-4 py-4" style={{ backgroundColor: "#1B2E1B" }}>
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+      {/* ── HEADER ── */}
+      <header style={{ backgroundColor: "#1B2E1B", padding: "14px 16px", position: "sticky", top: 0, zIndex: 50 }}>
+        <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", alignItems: "center", gap: 12 }}>
           <button type="button" onClick={() => router.back()}
-            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-            style={{ border: "1px solid #2E7D32" }}>
+            style={{ width: 34, height: 34, borderRadius: "50%", border: "1px solid #2E7D32", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M19 12H5M5 12L12 19M5 12L12 5"
-                stroke="#C8E6C9" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="#C8E6C9" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <div>
-            <p className="text-xs" style={{ color: "#7A9A7A", letterSpacing: "0.5px" }}>AGENT</p>
-            <p className="text-sm font-semibold"
-              style={{ color: "#E8F5E9", fontFamily: "var(--font-heading)" }}>
-              Add New Listing
-            </p>
+            <p style={{ fontSize: 10, color: "#7A9A7A", letterSpacing: "0.06em", fontFamily: "var(--font-mono)", margin: 0 }}>AGENT</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: "#E8F5E9", fontFamily: "var(--font-heading)", margin: 0 }}>Add New Listing</p>
           </div>
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-12">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      {/* ── HINT BAR ── */}
+      <div style={{ background: "var(--color-light)", borderBottom: "1px solid var(--color-border)", padding: "10px 16px", textAlign: "center" }}>
+        <p style={{ fontSize: 12, color: "var(--color-primary)", margin: 0, fontWeight: 600 }}>
+          Fill all sections carefully — honest listings get approved faster and attract more bookings
+        </p>
+      </div>
 
-          {/* ── 1. PROPERTY DETAILS ── */}
-          <div className="rounded-2xl p-4 space-y-4"
-            style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "16px 16px 80px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
-            <p className="text-xs font-semibold uppercase tracking-wide"
-              style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
-              Property Details
-            </p>
+          {/* ── 1. WHAT ARE YOU LISTING ── */}
+          <SectionCard num="1" title="What are you listing?" subtitle="Select the type and purpose of this property">
 
-            {/* Purpose toggle — Rent or Sale */}
-            <div>
-              <label className="block text-sm font-medium mb-2"
-                style={{ color: "var(--color-text-secondary)" }}>
-                Purpose
-              </label>
-              <div className="grid grid-cols-2 gap-2">
+            <Field label="Purpose">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 {(["rent", "sale"] as const).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
+                  <button key={p} type="button"
                     onClick={() => setForm((prev) => ({ ...prev, listingPurpose: p }))}
-                    className="py-2.5 rounded-xl text-sm font-semibold transition-all"
-                    style={{
-                      backgroundColor: form.listingPurpose === p
-                        ? "var(--color-primary)" : "var(--color-bg)",
-                      color: form.listingPurpose === p ? "#fff" : "var(--color-text-secondary)",
-                      border: form.listingPurpose === p
-                        ? "1.5px solid var(--color-primary)"
-                        : "1.5px solid var(--color-border)",
-                    }}
-                  >
+                    style={{ padding: "13px", borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-heading)", border: "1.5px solid", backgroundColor: form.listingPurpose === p ? "var(--color-primary)" : "var(--color-bg)", color: form.listingPurpose === p ? "#fff" : "var(--color-text-secondary)", borderColor: form.listingPurpose === p ? "var(--color-primary)" : "var(--color-border)" }}>
                     {p === "rent" ? "🏠 For Rent" : "💰 For Sale"}
                   </button>
                 ))}
               </div>
-            </div>
+            </Field>
 
-            {/* Property type */}
-            <div>
-              <label className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--color-text-secondary)" }}>
-                Property type
-              </label>
-              <select name="type" value={form.type} onChange={handleChange} required
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
-                style={inputStyle}>
-                <option value="">Select type</option>
+            <Field label="Property type" hint="Choose the option that best matches your property">
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {PROPERTY_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
+                  <button key={t.value} type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, type: t.value }))}
+                    style={{ padding: "12px 14px", borderRadius: 12, fontSize: 13, fontWeight: 600, textAlign: "left", cursor: "pointer", border: "1.5px solid", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: form.type === t.value ? "var(--color-light)" : "var(--color-bg)", color: form.type === t.value ? "var(--color-primary)" : "var(--color-text-secondary)", borderColor: form.type === t.value ? "var(--color-primary)" : "var(--color-border)" }}>
+                    <div>
+                      <span style={{ display: "block", fontWeight: 700 }}>{t.label}</span>
+                      <span style={{ fontSize: 11, color: form.type === t.value ? "var(--color-primary)" : "var(--color-text-muted)", fontWeight: 400 }}>{t.desc}</span>
+                    </div>
+                    {form.type === t.value && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                        <circle cx="12" cy="12" r="10" fill="var(--color-primary)" />
+                        <path d="M8 12l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </button>
                 ))}
-              </select>
-            </div>
+              </div>
+            </Field>
+          </SectionCard>
 
-            {/* Price */}
-            <div>
-              <label className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--color-text-secondary)" }}>
-                {priceLabel}
-              </label>
+          {/* ── 2. PRICING ── */}
+          <SectionCard num="2" title="Pricing" subtitle="Set the price and your agency fee so clients know upfront">
+
+            <Field label={form.listingPurpose === "sale" ? "Selling price (₦)" : "Annual rent (₦)"}
+              hint={form.listingPurpose === "rent" ? "Enter the full annual rent. E.g. type 150000 for ₦150,000 per year." : "Enter the total selling price in naira."}>
               <input name="price" type="text" inputMode="numeric"
-                value={form.price} onChange={handleChange}
-                placeholder="e.g. 150000" required
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
+                value={form.price} onChange={handleChange} required
+                placeholder="e.g. 150000"
                 style={inputStyle} />
-              {formattedPrice && !isNaN(formattedPrice) && formattedPrice > 0 && (
-                <p className="text-xs mt-1.5" style={{ color: "var(--color-primary)" }}>
-                  ₦{formattedPrice.toLocaleString()} {priceSuffix}
+              {priceNum > 0 && (
+                <p style={{ fontSize: 12, color: "var(--color-primary)", margin: "6px 0 0", fontWeight: 600 }}>
+                  ₦{priceNum.toLocaleString()} {form.listingPurpose === "sale" ? "— one-time" : "per year"}
                 </p>
               )}
-            </div>
+            </Field>
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--color-text-secondary)" }}>
-                Description
-              </label>
-              <textarea name="description" value={form.description} onChange={handleChange}
-                placeholder="e.g. Spacious self-con with tiled floors, prepaid meter, good water supply. Close to NYSC secretariat."
-                required rows={4}
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none resize-none"
-                style={inputStyle} />
-            </div>
-          </div>
-
-          {/* ── 2. LOCATION ── */}
-          <div className="rounded-2xl p-4 space-y-4"
-            style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-
-            <p className="text-xs font-semibold uppercase tracking-wide"
-              style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
-              Location
-            </p>
-
-            <div>
-              <label className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--color-text-secondary)" }}>State</label>
-              <select name="state" value={form.state} onChange={handleChange} required
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
+            <Field label="Your agency fee" optional
+              hint="The percentage you charge the client after they secure the property. Clients see this before booking — it builds trust and avoids surprises.">
+              <select name="agencyFeePercent" value={form.agencyFeePercent} onChange={handleChange}
                 style={inputStyle}>
-                {STATE_NAMES.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                <option value="">Not set — I'll discuss with client directly</option>
+                {AGENCY_FEE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
-            </div>
+              {agencyFeeNaira !== null && (
+                <div style={{ marginTop: 8, padding: "12px 14px", borderRadius: 12, background: "var(--color-light)", border: "1px solid var(--color-border)" }}>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 4px" }}>
+                    Client will pay you after securing property:
+                  </p>
+                  <p style={{ fontSize: 18, fontWeight: 800, color: "var(--color-primary)", margin: 0, fontFamily: "var(--font-heading)" }}>
+                    ₦{agencyFeeNaira.toLocaleString()}
+                  </p>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "3px 0 0" }}>
+                    {form.agencyFeePercent}% of ₦{priceNum.toLocaleString()} annual rent
+                  </p>
+                </div>
+              )}
+            </Field>
+          </SectionCard>
 
-            <div>
-              <label className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--color-text-secondary)" }}>LGA</label>
-              <select name="lga" value={form.lga} onChange={handleChange} required
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
-                style={inputStyle}>
+          {/* ── 3. LOCATION ── */}
+          <SectionCard num="3" title="Location" subtitle="Be specific — clients use location to decide if the property is convenient">
+
+            <Field label="State">
+              <select name="state" value={form.state} onChange={handleChange} required style={inputStyle}>
+                {STATE_NAMES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+
+            <Field label="LGA">
+              <select name="lga" value={form.lga} onChange={handleChange} required style={inputStyle}>
                 <option value="">Select LGA</option>
-                {lgaOptions.map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
+                {lgaOptions.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--color-text-secondary)" }}>Full address</label>
-              <input name="address" type="text" value={form.address}
-                onChange={handleChange} placeholder="e.g. 12 Aka Road, Uyo" required
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
+            <Field label="Nearest landmark"
+              hint="This is the most important field for location. Clients in Eket navigate by landmarks, not street names. Be very specific.">
+              <input name="landmark" type="text" value={form.landmark}
+                onChange={handleChange} required
+                placeholder="e.g. Behind NYSC secretariat Eket, Opposite Eket market, Close to Total filling station Eket"
                 style={inputStyle} />
-            </div>
-          </div>
+              {form.landmark.trim() && (
+                <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="var(--color-primary)" strokeWidth="1.8" />
+                    <circle cx="12" cy="10" r="3" stroke="var(--color-primary)" strokeWidth="1.8" />
+                  </svg>
+                  <p style={{ fontSize: 12, color: "var(--color-primary)", margin: 0, fontWeight: 600 }}>{form.landmark}</p>
+                </div>
+              )}
+            </Field>
 
-          {/* ── 3. AMENITIES ── */}
-          <div className="rounded-2xl p-4 space-y-4"
-            style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide"
-                style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
-                Amenities
+            <Field label="Full address"
+              hint="The exact address is hidden from clients until they book and schedule a visit. Write it accurately.">
+              <input name="address" type="text" value={form.address}
+                onChange={handleChange} required
+                placeholder="e.g. No. 12 Aba Road, Eket"
+                style={inputStyle} />
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "6px 0 0" }}>
+                🔒 Only revealed after client pays and schedules a visit
               </p>
-              <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-                Tick everything available. Honest listings build more trust.
-              </p>
-            </div>
+            </Field>
+          </SectionCard>
 
-            {/* Predefined chips */}
-            <div className="flex flex-wrap gap-2">
+          {/* ── 4. DESCRIPTION ── */}
+          <SectionCard num="4" title="Describe the property"
+            subtitle="Write what you'd tell a client face to face. Be honest — clients who get surprises leave bad reviews.">
+
+            <Field label="Description"
+              hint="Include: condition of the property, floor level, water supply, electricity situation, what comes with it, and any things the client should know before visiting.">
+              <textarea name="description" value={form.description}
+                onChange={handleChange} required rows={6}
+                placeholder="e.g. Spacious self-contained on ground floor. Tiled throughout with prepaid meter and borehole water supply. Bathroom inside. Compound is fully fenced with security gate. Very close to NYSC secretariat — about 3 minutes walk. The landlord lives on the same compound and is cooperative."
+                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>
+                  {form.description.length} characters
+                </p>
+                <p style={{ fontSize: 11, margin: 0, color: form.description.length >= 50 ? "var(--color-primary)" : "var(--color-text-muted)" }}>
+                  {form.description.length < 50 ? `${50 - form.description.length} more to go` : "✓ Good length"}
+                </p>
+              </div>
+            </Field>
+          </SectionCard>
+
+          {/* ── 5. AMENITIES ── */}
+          <SectionCard num="5" title="Amenities"
+            subtitle="Tick only what is actually available. Honest listings build more trust and get more bookings.">
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {AMENITIES.map((a) => {
                 const selected = selectedAmenities.includes(a.slug);
                 return (
                   <button key={a.slug} type="button" onClick={() => toggleAmenity(a.slug)}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
-                    style={{
-                      backgroundColor: selected ? "var(--color-light)" : "var(--color-bg)",
-                      border: selected
-                        ? "1.5px solid var(--color-primary)"
-                        : "1.5px solid var(--color-border)",
-                      color: selected ? "var(--color-primary)" : "var(--color-text-secondary)",
-                    }}>
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1.5px solid", backgroundColor: selected ? "var(--color-light)" : "var(--color-bg)", color: selected ? "var(--color-primary)" : "var(--color-text-secondary)", borderColor: selected ? "var(--color-primary)" : "var(--color-border)" }}>
                     <span>{a.icon}</span>
                     <span>{a.label}</span>
                     {selected && (
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                        <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)"
-                          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     )}
                   </button>
@@ -405,93 +427,62 @@ export default function NewListingPage() {
             </div>
 
             {selectedAmenities.length > 0 && (
-              <p className="text-xs" style={{ color: "var(--color-primary)" }}>
+              <p style={{ fontSize: 12, color: "var(--color-primary)", fontWeight: 600, margin: 0 }}>
                 {selectedAmenities.length} amenit{selectedAmenities.length === 1 ? "y" : "ies"} selected
               </p>
             )}
 
-            {/* Custom amenities */}
             <div>
-              <p className="text-xs font-medium mb-2"
-                style={{ color: "var(--color-text-secondary)" }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", margin: "0 0 8px" }}>
                 Anything else? Add your own
               </p>
-
               {customAmenities.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {customAmenities.map((a, i) => (
-                    <span key={i}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
-                      style={{
-                        backgroundColor: "var(--color-light)",
-                        border: "1.5px solid var(--color-primary)",
-                        color: "var(--color-primary)",
-                      }}>
+                    <span key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: "var(--color-light)", border: "1.5px solid var(--color-primary)", color: "var(--color-primary)" }}>
                       {a}
-                      <button type="button" onClick={() => removeCustomAmenity(i)}>
+                      <button type="button" onClick={() => removeCustomAmenity(i)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex" }}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                          <path d="M18 6L6 18M6 6l12 12" stroke="var(--color-primary)"
-                            strokeWidth="2.5" strokeLinecap="round" />
+                          <path d="M18 6L6 18M6 6l12 12" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" />
                         </svg>
                       </button>
                     </span>
                   ))}
                 </div>
               )}
-
               {customAmenities.length < 10 && (
-                <div className="flex gap-2">
-                  <input ref={customAmenityRef} type="text"
-                    value={customInput}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input ref={customAmenityRef} type="text" value={customInput}
                     onChange={(e) => setCustomInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomAmenity(); } }}
-                    placeholder="e.g. Boys quarters, Swimming pool..."
-                    maxLength={40}
-                    className="flex-1 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
-                    style={inputStyle} />
-                  <button type="button" onClick={addCustomAmenity}
-                    disabled={!customInput.trim()}
-                    className="px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40"
-                    style={{ backgroundColor: "var(--color-light)", color: "var(--color-primary)" }}>
+                    placeholder="e.g. Boys quarters, Swimming pool…" maxLength={40}
+                    style={{ ...inputStyle, flex: 1 }} />
+                  <button type="button" onClick={addCustomAmenity} disabled={!customInput.trim()}
+                    style={{ padding: "0 16px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "var(--color-light)", color: "var(--color-primary)", border: "1.5px solid var(--color-border)", cursor: "pointer", opacity: customInput.trim() ? 1 : 0.4 }}>
                     Add
                   </button>
                 </div>
               )}
             </div>
-          </div>
+          </SectionCard>
 
-          {/* ── 4. PHOTOS ── */}
-          <div className="rounded-2xl p-4 space-y-4"
-            style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide"
-                style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
-                Photos
-              </p>
-              <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-                Minimum 2, maximum 5. Clear photos get more bookings.
-              </p>
-            </div>
+          {/* ── 6. PHOTOS ── */}
+          <SectionCard num="6" title="Photos"
+            subtitle="Upload clear photos of: living room, bedroom, bathroom, kitchen, and compound. Good photos = more bookings.">
 
             {images.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
                 {images.map((img, index) => (
-                  <div key={index} className="relative aspect-square rounded-xl overflow-hidden"
-                    style={{ border: "1px solid var(--color-border)" }}>
-                    <img src={img.previewUrl} alt={`Preview ${index + 1}`}
-                      className="w-full h-full object-cover" />
+                  <div key={index} style={{ position: "relative", aspectRatio: "1", borderRadius: 12, overflow: "hidden", border: "1px solid var(--color-border)" }}>
+                    <img src={img.previewUrl} alt={`Photo ${index + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     <button type="button" onClick={() => removeImage(index)}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: "#E53935" }}>
+                      style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "#E53935", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                        <path d="M18 6L6 18M6 6l12 12" stroke="white"
-                          strokeWidth="2.5" strokeLinecap="round" />
+                        <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                       </svg>
                     </button>
                     {index === 0 && (
-                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-md"
-                        style={{ backgroundColor: "#2E7D32", color: "#fff", fontSize: "10px" }}>
+                      <span style={{ position: "absolute", bottom: 6, left: 6, padding: "2px 7px", borderRadius: 6, background: "#2E7D32", color: "#fff", fontSize: 10, fontWeight: 700 }}>
                         Cover
                       </span>
                     )}
@@ -499,13 +490,11 @@ export default function NewListingPage() {
                 ))}
                 {images.length < 5 && (
                   <button type="button" onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square rounded-xl flex flex-col items-center justify-center gap-1"
-                    style={{ border: "1.5px dashed var(--color-border)", backgroundColor: "var(--color-bg)" }}>
+                    style={{ aspectRatio: "1", borderRadius: 12, border: "1.5px dashed var(--color-border)", background: "var(--color-bg)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 5v14M5 12h14" stroke="var(--color-text-muted)"
-                        strokeWidth="1.8" strokeLinecap="round" />
+                      <path d="M12 5v14M5 12h14" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
                     </svg>
-                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Add</span>
+                    <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Add</span>
                   </button>
                 )}
               </div>
@@ -513,102 +502,85 @@ export default function NewListingPage() {
 
             {images.length === 0 && (
               <button type="button" onClick={() => fileInputRef.current?.click()}
-                className="w-full py-8 rounded-xl flex flex-col items-center justify-center gap-2"
-                style={{ border: "1.5px dashed var(--color-border)", backgroundColor: "var(--color-bg)" }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="3" width="18" height="18" rx="2"
-                    stroke="var(--color-text-muted)" strokeWidth="1.5" />
-                  <circle cx="8.5" cy="8.5" r="1.5"
-                    stroke="var(--color-text-muted)" strokeWidth="1.5" />
-                  <path d="M21 15l-5-5L5 21" stroke="var(--color-text-muted)"
-                    strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                style={{ width: "100%", padding: "36px 0", borderRadius: 14, border: "1.5px dashed var(--color-border)", background: "var(--color-bg)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.4" />
+                  <circle cx="8.5" cy="8.5" r="1.5" stroke="var(--color-text-muted)" strokeWidth="1.4" />
+                  <path d="M21 15l-5-5L5 21" stroke="var(--color-text-muted)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <p className="text-sm font-medium" style={{ color: "var(--color-text-secondary)" }}>
-                  Tap to add photos
-                </p>
-                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  At least 2 required
-                </p>
+                <div style={{ textAlign: "center" }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-text-secondary)", margin: 0 }}>Tap to add photos</p>
+                  <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "4px 0 0" }}>Minimum 2 · Maximum 5</p>
+                </div>
               </button>
             )}
 
-            <input ref={fileInputRef} type="file"
-              accept="image/jpeg,image/png,image/webp"
-              multiple onChange={handleImageSelect} className="hidden" />
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+              multiple onChange={handleImageSelect} style={{ display: "none" }} />
 
             {images.length > 0 && (
-              <p className="text-xs" style={{
-                color: images.length >= 2 ? "var(--color-primary)" : "var(--color-text-muted)"
-              }}>
-                {images.length}/5 photos added{images.length < 2 && " — add at least 2"}
+              <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: images.length >= 2 ? "var(--color-primary)" : "var(--color-text-muted)" }}>
+                {images.length}/5 photos {images.length < 2 ? "— add at least 2 to continue" : "✓"}
               </p>
             )}
 
             {uploadedUrls.length > 0 && (
-              <p className="text-xs" style={{ color: "var(--color-primary)" }}>
-                ✓ Photos already uploaded — will not re-upload on retry
+              <p style={{ fontSize: 12, color: "var(--color-primary)", margin: 0 }}>
+                ✓ Photos already uploaded — won't re-upload on retry
               </p>
             )}
-          </div>
+          </SectionCard>
 
-          {/* ── 5. LANDLORD DETAILS ── */}
-          <div className="rounded-2xl p-4 space-y-4"
-            style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
+          {/* ── 7. LANDLORD DETAILS (OPTIONAL) ── */}
+          <SectionCard num="7" title="Landlord details"
+            subtitle="Optional — helps us resolve disputes faster if they arise. We will not contact the landlord without your knowledge.">
 
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide"
-                style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
-                Landlord Details
-              </p>
-              <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-                For our records only. We will reach out to verify consent before the listing goes live.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--color-text-secondary)" }}>
-                Landlord/Caretaker full name
-              </label>
+            <Field label="Landlord / Caretaker name" optional>
               <input name="landlordName" type="text" value={form.landlordName}
                 onChange={handleChange} placeholder="e.g. Chief Udo Bassey"
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
                 style={inputStyle} />
-            </div>
+            </Field>
 
-            <div>
-              <label className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--color-text-secondary)" }}>
-                Landlord/Caretaker phone number
-              </label>
+            <Field label="Landlord / Caretaker phone number" optional>
               <input name="landlordPhone" type="tel" value={form.landlordPhone}
                 onChange={handleChange} placeholder="e.g. 08012345678"
-                className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
                 style={inputStyle} />
-            </div>
-          </div>
+            </Field>
+          </SectionCard>
 
+          {/* ── ERROR ── */}
           {error && (
-            <p className="text-sm px-1" style={{ color: "#E53935" }}>{error}</p>
+            <div style={{ padding: "13px 14px", borderRadius: 12, background: "#FEF2F2", border: "1px solid #FECACA" }}>
+              <p style={{ fontSize: 13, color: "#C62828", margin: 0, fontWeight: 500 }}>{error}</p>
+            </div>
           )}
 
+          {/* ── SUBMIT ── */}
           <button type="submit" disabled={loading}
-            className="w-full py-4 rounded-2xl font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ backgroundColor: "#2E7D32", fontFamily: "var(--font-heading)" }}>
+            style={{ width: "100%", padding: "16px", borderRadius: 16, border: "none", background: loading ? "var(--color-border)" : "#2E7D32", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
             {loading ? (
               <>
-                <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                {uploadProgress || "Saving..."}
+                <span style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                {uploadProgress || "Saving…"}
               </>
-            ) : "Submit listing"}
+            ) : (
+              <>
+                Submit listing for review
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </>
+            )}
           </button>
 
-          <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
-            Your listing will be reviewed before going live.
+          <p style={{ fontSize: 12, color: "var(--color-text-muted)", textAlign: "center", margin: "0 0 16px" }}>
+            Your listing will be reviewed by our team before going live — usually within 24 hours.
           </p>
 
         </form>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

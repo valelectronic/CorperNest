@@ -43,20 +43,22 @@ const statusStyle: Record<string, { bg: string; color: string; dot: string }> = 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 type Listing = {
-  id: string;
-  title: string;
-  description: string;
-  address: string;
-  lga: string;
-  state: string;
-  price: number;
-  type: string;
-  status: string;
-  listingPurpose: string;
-  images: string[] | null;
-  amenities: string[] | null;
+  id:              string;
+  title:           string;
+  description:     string;
+  address:         string;
+  lga:             string;
+  state:           string;
+  price:           number;
+  type:            string;
+  status:          string;
+  listingPurpose:  string;
+  images:          string[] | null;
+  amenities:       string[] | null;
   customAmenities: string[] | null;
-  createdAt: Date | string;
+  createdAt:       Date | string;
+  landmark?:       string | null;        // ← NEW
+  agencyFeePercent?: number | null;      // ← NEW
 };
 
 type Props = {
@@ -67,18 +69,12 @@ type Props = {
   autoOpenBooking: boolean;
 };
 
-// ─── SET DATE SHEET (shown immediately after payment) ─────────────────────────
+// ─── SET DATE SHEET ───────────────────────────────────────────────────────────
 
 function SetDateSheet({
-  bookingId,
-  listingTitle,
-  onClose,
-  onSuccess,
+  bookingId, listingTitle, onClose, onSuccess,
 }: {
-  bookingId:    string;
-  listingTitle: string;
-  onClose:      () => void;
-  onSuccess:    () => void;
+  bookingId: string; listingTitle: string; onClose: () => void; onSuccess: () => void;
 }) {
   const [date, setDate]       = useState("");
   const [time, setTime]       = useState("");
@@ -89,29 +85,18 @@ function SetDateSheet({
   const minDate = tomorrow.toISOString().split("T")[0];
 
   async function handleSubmit() {
-    if (!date || !time) {
-      toast.error("Please select both a date and time");
-      return;
-    }
-
-    const [h, m]    = time.split(":").map(Number);
-    const ampm      = h >= 12 ? "PM" : "AM";
-    const hour12    = h % 12 === 0 ? 12 : h % 12;
+    if (!date || !time) { toast.error("Please select both a date and time"); return; }
+    const [h, m] = time.split(":").map(Number);
+    const ampm   = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
     const formatted = `${hour12}:${m.toString().padStart(2, "0")} ${ampm}`;
-
     setLoading(true);
     try {
       const res = await fetch("/api/bookings/set-date", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ bookingId, agreedDate: date, agreedTime: formatted }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, agreedDate: date, agreedTime: formatted }),
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Failed to set date");
-      }
-
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error ?? "Failed to set date"); }
       toast.success("Visit scheduled! Check your bookings for agent details.");
       onSuccess();
     } catch (err: unknown) {
@@ -124,104 +109,35 @@ function SetDateSheet({
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)" }} />
-      <div style={{
-        position: "relative", background: "var(--color-card)",
-        borderRadius: "22px 22px 0 0", padding: "8px 20px 40px",
-        display: "flex", flexDirection: "column",
-      }}>
+      <div style={{ position: "relative", background: "var(--color-card)", borderRadius: "22px 22px 0 0", padding: "8px 20px 40px", display: "flex", flexDirection: "column" }}>
         <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--color-border)", margin: "8px auto 20px" }} />
-
-        {/* Success header */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: 12,
-          padding: "12px 14px", borderRadius: 14,
-          background: "#E8F5E9", border: "1px solid #C0DD97",
-          marginBottom: 20,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: "50%",
-            background: "#2E7D32", display: "flex",
-            alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14, background: "#E8F5E9", border: "1px solid #C0DD97", marginBottom: 20 }}>
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#2E7D32", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M20 6L9 17l-5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <div>
-            <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "#1B5E20", margin: 0 }}>
-              Payment successful!
-            </p>
-            <p style={{ fontSize: 12, color: "#2E7D32", margin: 0 }}>
-              Now schedule your visit to unlock agent contact
-            </p>
+            <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "#1B5E20", margin: 0 }}>Payment successful!</p>
+            <p style={{ fontSize: 12, color: "#2E7D32", margin: 0 }}>Now schedule your visit to unlock agent contact</p>
           </div>
         </div>
-
-        <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>
-          Schedule your visit
-        </p>
+        <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>Schedule your visit</p>
         <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px" }}>
           Pick when you want to inspect <strong>{listingTitle}</strong>. Agent phone and full address will be revealed immediately.
         </p>
-
-        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>
-          Visit Date
-        </label>
-        <input
-          type="date"
-          value={date}
-          min={minDate}
-          onChange={(e) => setDate(e.target.value)}
-          style={{
-            width: "100%", padding: "13px 14px", borderRadius: 12,
-            border: "1.5px solid var(--color-border)", fontSize: 14,
-            color: "var(--color-text)", background: "var(--color-bg)",
-            marginBottom: 16, boxSizing: "border-box",
-            fontFamily: "var(--font-body)",
-          }}
-        />
-
-        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>
-          Preferred Time
-        </label>
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          style={{
-            width: "100%", padding: "13px 14px", borderRadius: 12,
-            border: "1.5px solid var(--color-border)", fontSize: 14,
-            color: "var(--color-text)", background: "var(--color-bg)",
-            marginBottom: 24, boxSizing: "border-box",
-            fontFamily: "var(--font-body)",
-          }}
-        />
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !date || !time}
-          style={{
-            width: "100%", padding: "15px",
-            background: loading || !date || !time ? "var(--color-border)" : "var(--color-primary)",
-            color: "#fff", border: "none", borderRadius: 14,
-            fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15,
-            cursor: loading || !date || !time ? "not-allowed" : "pointer",
-            marginBottom: 10, transition: "background 0.2s",
-          }}
-        >
+        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>Visit Date</label>
+        <input type="date" value={date} min={minDate} onChange={(e) => setDate(e.target.value)}
+          style={{ width: "100%", padding: "13px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", marginBottom: 16, boxSizing: "border-box", fontFamily: "var(--font-body)" }} />
+        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>Preferred Time</label>
+        <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
+          style={{ width: "100%", padding: "13px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", marginBottom: 24, boxSizing: "border-box", fontFamily: "var(--font-body)" }} />
+        <button onClick={handleSubmit} disabled={loading || !date || !time}
+          style={{ width: "100%", padding: "15px", background: loading || !date || !time ? "var(--color-border)" : "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: loading || !date || !time ? "not-allowed" : "pointer", marginBottom: 10 }}>
           {loading ? "Scheduling…" : "Confirm Visit Date"}
         </button>
-
-        <button
-          onClick={onClose}
-          style={{
-            width: "100%", padding: "15px",
-            background: "var(--color-bg)", color: "var(--color-text-muted)",
-            border: "1px solid var(--color-border)", borderRadius: 14,
-            fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15,
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={onClose}
+          style={{ width: "100%", padding: "15px", background: "var(--color-bg)", color: "var(--color-text-muted)", border: "1px solid var(--color-border)", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15, cursor: "pointer" }}>
           I'll do this from My Bookings later
         </button>
       </div>
@@ -232,25 +148,19 @@ function SetDateSheet({
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function PropertyDetailClient({
-  listing,
-  agentName,
-  isLoggedIn,
-  isWatchlisted,
-  autoOpenBooking,
+  listing, agentName, isLoggedIn, isWatchlisted, autoOpenBooking,
 }: Props) {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeImage, setActiveImage]         = useState(0);
-  const [watching, setWatching]               = useState(isWatchlisted);
-  const [toggling, setToggling]               = useState(false);
-  const [bookingSheetOpen, setBookingSheetOpen] = useState(autoOpenBooking && isLoggedIn);
-  const [payLoading, setPayLoading]           = useState(false);
-
-  // After payment redirect
-  const [verifying, setVerifying]             = useState(false);
-  const [bookingId, setBookingId]             = useState<string | null>(null);
-  const [showDateSheet, setShowDateSheet]     = useState(false);
+  const [activeImage,       setActiveImage]       = useState(0);
+  const [watching,          setWatching]          = useState(isWatchlisted);
+  const [toggling,          setToggling]          = useState(false);
+  const [bookingSheetOpen,  setBookingSheetOpen]  = useState(autoOpenBooking && isLoggedIn);
+  const [payLoading,        setPayLoading]        = useState(false);
+  const [verifying,         setVerifying]         = useState(false);
+  const [bookingId,         setBookingId]         = useState<string | null>(null);
+  const [showDateSheet,     setShowDateSheet]     = useState(false);
 
   const images          = listing.images ?? [];
   const badge           = statusStyle[listing.status] ?? statusStyle.available;
@@ -260,229 +170,157 @@ export default function PropertyDetailClient({
   const allAmenities    = listing.amenities ?? [];
   const customAmenities = listing.customAmenities ?? [];
 
-  // ── Handle Paystack redirect back ─────────────────────────────────────────
-  // When Paystack redirects to /properties/[id]?payment=success&ref=CN-xxx
-  // we verify the payment and open the set-date sheet
+  // Agency fee calculation
+  const agencyFeeNaira = listing.agencyFeePercent && listing.price
+    ? Math.round(listing.price * (listing.agencyFeePercent / 100))
+    : null;
+
   const verifyPayment = useCallback(async (ref: string) => {
     setVerifying(true);
     try {
       const res  = await fetch(`/api/payments/verify/${ref}`);
       const data = await res.json();
-
       if (data.paid) {
-        if (data.bookingId) {
-          setBookingId(data.bookingId);
-          setShowDateSheet(true);
-        } else if (data.pending) {
-          // Webhook not yet fired — poll once after 3s
+        if (data.bookingId) { setBookingId(data.bookingId); setShowDateSheet(true); }
+        else if (data.pending) {
           setTimeout(async () => {
             const res2  = await fetch(`/api/payments/verify/${ref}`);
             const data2 = await res2.json();
-            if (data2.paid && data2.bookingId) {
-              setBookingId(data2.bookingId);
-              setShowDateSheet(true);
-            } else {
-              toast.success("Payment confirmed! Your booking will appear in My Bookings shortly.");
-            }
+            if (data2.paid && data2.bookingId) { setBookingId(data2.bookingId); setShowDateSheet(true); }
+            else { toast.success("Payment confirmed! Your booking will appear in My Bookings shortly."); }
             setVerifying(false);
           }, 3000);
           return;
         }
-      } else {
-        toast.error("Payment could not be verified. Contact support if you were charged.");
-      }
-    } catch {
-      toast.error("Could not verify payment. Check My Bookings or contact support.");
-    } finally {
-      setVerifying(false);
-    }
+      } else { toast.error("Payment could not be verified. Contact support if you were charged."); }
+    } catch { toast.error("Could not verify payment. Check My Bookings or contact support."); }
+    finally { setVerifying(false); }
   }, []);
 
   useEffect(() => {
     const paymentStatus = searchParams.get("payment");
     const ref           = searchParams.get("ref");
-
     if (paymentStatus === "success" && ref) {
-      // Clean URL without reloading
       window.history.replaceState({}, "", `/properties/${listing.id}`);
       verifyPayment(ref);
     }
   }, [searchParams, listing.id, verifyPayment]);
 
-  // Auto-redirect if not logged in
   useEffect(() => {
     if (autoOpenBooking && !isLoggedIn) {
       router.push(`/signin?callbackUrl=/properties/${listing.id}?action=book`);
     }
   }, [autoOpenBooking, isLoggedIn, router, listing.id]);
 
-  // ── Initiate Paystack payment ─────────────────────────────────────────────
   async function handlePay() {
     if (payLoading) return;
     setPayLoading(true);
     try {
-      const res = await fetch("/api/payments/initiate", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ listingId: listing.id }),
+      const res  = await fetch("/api/payments/initiate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingId: listing.id }),
       });
-
       const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error ?? "Could not start payment. Try again.");
-        return;
-      }
-
-      // Redirect to Paystack hosted payment page
+      if (!res.ok) { toast.error(data.error ?? "Could not start payment. Try again."); return; }
       window.location.href = data.authorizationUrl;
-    } catch {
-      toast.error("Network error. Please try again.");
-    } finally {
-      setPayLoading(false);
-    }
+    } catch { toast.error("Network error. Please try again."); }
+    finally { setPayLoading(false); }
   }
 
   function handleBookInspection() {
-    if (!isLoggedIn) {
-      router.push(`/signin?callbackUrl=/properties/${listing.id}?action=book`);
-      return;
-    }
+    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${listing.id}?action=book`); return; }
     setBookingSheetOpen(true);
   }
 
   async function handleWatchlistToggle() {
-    if (!isLoggedIn) {
-      router.push(`/signin?callbackUrl=/properties/${listing.id}`);
-      return;
-    }
+    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${listing.id}`); return; }
     if (toggling) return;
     setToggling(true);
     const newWatching = !watching;
     setWatching(newWatching);
     try {
       const res = await fetch("/api/watchlist/toggle", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ listingId: listing.id }),
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingId: listing.id }),
       });
       if (!res.ok) { setWatching(!newWatching); return; }
       toast(newWatching ? "Added to watchlist" : "Removed from watchlist", { duration: 2000 });
-    } catch {
-      setWatching(!newWatching);
-      toast.error("Could not update watchlist. Try again.");
-    } finally {
-      setToggling(false);
-    }
+    } catch { setWatching(!newWatching); toast.error("Could not update watchlist. Try again."); }
+    finally { setToggling(false); }
   }
 
   return (
-    <div className="min-h-screen pb-32" style={{ backgroundColor: "var(--color-bg)" }}>
+    <div style={{ minHeight: "100dvh", paddingBottom: 120, backgroundColor: "var(--color-bg)" }}>
 
       {/* ── HEADER ── */}
-      <div className="sticky top-0 z-30 px-4 py-3 flex items-center justify-between"
-        style={{ backgroundColor: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}>
-       <button onClick={() => router.back()}
-  className="w-9 h-9 rounded-full flex items-center justify-center"
-  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)" }}>
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-    <path d="M19 12H5M5 12L12 19M5 12L12 5"
-      stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-</button>
-
-<p className="text-sm font-semibold truncate flex-1 mx-3"
-  style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
-  {listing.title}
-</p>
-
-{/* Share */}
-<button
-  onClick={async () => {
-    const url  = `https://www.corpernest.com.ng/properties/${listing.id}`;
-    const text = `🏠 ${listing.title}\n📍 ${listing.lga}, ${listing.state}\n💰 ₦${listing.price.toLocaleString()}/yr\n\nVerified listing on CorperNest — inspect before you pay rent.`;
-    if (navigator.share) {
-      try { await navigator.share({ title: listing.title, text, url }); } catch {}
-    } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n\n${url}`)}`, "_blank");
-    }
-  }}
-  className="w-9 h-9 rounded-full flex items-center justify-center"
-  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", marginRight: 8 }}>
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-    <circle cx="18" cy="5"  r="3" stroke="var(--color-text)" strokeWidth="1.8" />
-    <circle cx="6"  cy="12" r="3" stroke="var(--color-text)" strokeWidth="1.8" />
-    <circle cx="18" cy="19" r="3" stroke="var(--color-text)" strokeWidth="1.8" />
-    <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"
-      stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" />
-  </svg>
-</button>
-
-{/* Watchlist */}
-<button onClick={handleWatchlistToggle} disabled={toggling}
-  className="w-9 h-9 rounded-full flex items-center justify-center"
-  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)" }}>
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-    <path
-      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-      stroke={watching ? "#E53935" : "var(--color-text-muted)"}
-      strokeWidth="1.8"
-      fill={watching ? "#E53935" : "none"}
-    />
-  </svg>
-</button>
+      <div style={{ position: "sticky", top: 0, zIndex: 30, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}>
+        <button onClick={() => router.back()}
+          style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--color-text)", flex: 1, margin: "0 12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {listing.title}
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          {/* Share */}
+          <button
+            onClick={async () => {
+              const url  = `https://www.corpernest.com.ng/properties/${listing.id}`;
+              const text = `🏠 ${listing.title}\n📍 ${listing.lga}, ${listing.state}\n💰 ₦${listing.price.toLocaleString()}/yr\n\nVerified listing on CorperNest — inspect before you pay rent.`;
+              if (navigator.share) { try { await navigator.share({ title: listing.title, text, url }); } catch {} }
+              else { window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n\n${url}`)}`, "_blank"); }
+            }}
+            style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <circle cx="18" cy="5"  r="3" stroke="var(--color-text)" strokeWidth="1.8" />
+              <circle cx="6"  cy="12" r="3" stroke="var(--color-text)" strokeWidth="1.8" />
+              <circle cx="18" cy="19" r="3" stroke="var(--color-text)" strokeWidth="1.8" />
+              <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+          {/* Watchlist */}
+          <button onClick={handleWatchlistToggle} disabled={toggling}
+            style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                stroke={watching ? "#E53935" : "var(--color-text-muted)"} strokeWidth="1.8" fill={watching ? "#E53935" : "none"} />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* ── VERIFYING OVERLAY ── */}
       {verifying && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(0,0,0,0.6)",
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center", gap: 16,
-        }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: "50%",
-            border: "3px solid var(--color-primary)",
-            borderTopColor: "transparent",
-            animation: "spin 0.8s linear infinite",
-          }} />
-          <p style={{ color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15 }}>
-            Verifying payment…
-          </p>
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", border: "3px solid var(--color-primary)", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+          <p style={{ color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15 }}>Verifying payment…</p>
         </div>
       )}
 
       {/* ── IMAGE GALLERY ── */}
-      <div className="relative" style={{ height: "280px" }}>
+      <div style={{ position: "relative", height: 280 }}>
         {images.length > 0 ? (
           <>
-            <img
-              src={images[activeImage]}
-              alt={`${listing.title} photo ${activeImage + 1}`}
-              className="w-full h-full object-cover"
-            />
-            <span className="absolute bottom-3 right-3 text-xs font-semibold px-2.5 py-1 rounded-lg"
-              style={{ backgroundColor: "rgba(0,0,0,0.55)", color: "#fff", backdropFilter: "blur(4px)" }}>
+            <img src={images[activeImage]} alt={`${listing.title} photo ${activeImage + 1}`}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <span style={{ position: "absolute", bottom: 12, right: 12, fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "#fff", backdropFilter: "blur(4px)" }}>
               {activeImage + 1} / {images.length}
             </span>
             {images.length > 1 && (
-              <div className="absolute bottom-3 left-3 flex gap-1.5">
+              <div style={{ position: "absolute", bottom: 12, left: 12, display: "flex", gap: 6 }}>
                 {images.map((_, i) => (
                   <button key={i} onClick={() => setActiveImage(i)}
-                    className="rounded-lg overflow-hidden shrink-0"
-                    style={{
-                      width: "44px", height: "44px",
-                      border: i === activeImage ? "2px solid #fff" : "2px solid rgba(255,255,255,0.3)",
-                    }}>
-                    <img src={images[i]} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: i === activeImage ? "2px solid #fff" : "2px solid rgba(255,255,255,0.3)", cursor: "pointer", padding: 0 }}>
+                    <img src={images[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
                   </button>
                 ))}
               </div>
             )}
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: "#E8F5E9" }}>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#E8F5E9" }}>
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="3" width="18" height="18" rx="2" stroke="#7A9A7A" strokeWidth="1.4" />
               <circle cx="8.5" cy="8.5" r="1.5" stroke="#7A9A7A" strokeWidth="1.4" />
@@ -493,123 +331,138 @@ export default function PropertyDetailClient({
       </div>
 
       {/* ── CONTENT ── */}
-      <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
+      <div style={{ maxWidth: 672, margin: "0 auto", padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 12 }}>
 
         {/* Title + badges */}
         <div>
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <h1 className="text-lg font-bold flex-1"
-              style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+            <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: 0, flex: 1 }}>
               {listing.title}
             </h1>
-            <span className="text-xs font-medium px-2.5 py-1 rounded-lg shrink-0"
-              style={{ backgroundColor: "var(--color-light)", color: "var(--color-primary)", border: "1px solid var(--color-border)" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, backgroundColor: "var(--color-light)", color: "var(--color-primary)", border: "1px solid var(--color-border)", flexShrink: 0, whiteSpace: "nowrap" }}>
               {typeLabel}
             </span>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1.5"
-              style={{ backgroundColor: badge.bg, color: badge.color }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: badge.dot }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, backgroundColor: badge.bg, color: badge.color, display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: badge.dot }} />
               {listing.status.replace(/-/g, " ")}
             </span>
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg"
-              style={{ backgroundColor: isForSale ? "#FEF3C7" : "#E8F5E9", color: isForSale ? "#92400E" : "#1B5E20" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, backgroundColor: isForSale ? "#FEF3C7" : "#E8F5E9", color: isForSale ? "#92400E" : "#1B5E20" }}>
               {isForSale ? "For Sale" : "For Rent"}
             </span>
           </div>
         </div>
 
-        {/* Price card */}
-        <div className="rounded-2xl p-4 flex items-center justify-between"
-          style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-          <div>
-            <p className="text-xs mb-0.5" style={{ color: "var(--color-text-muted)" }}>
-              {isForSale ? "Selling price" : "Annual rent"}
-            </p>
-            <p className="text-2xl font-black"
-              style={{ color: "var(--color-primary)", fontFamily: "var(--font-heading)" }}>
-              ₦{listing.price.toLocaleString()}
-              <span className="text-sm font-normal opacity-70 ml-1">
-                {isForSale ? "one-time" : "/yr"}
-              </span>
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs mb-0.5" style={{ color: "var(--color-text-muted)" }}>Listed by</p>
-            <p className="text-sm font-semibold" style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
-              {agentName}
-            </p>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              🔒 Contact after booking
-            </p>
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="rounded-2xl p-4"
-          style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-3"
-            style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
-            Location
-          </p>
-          <div className="flex items-start gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0 mt-0.5">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="var(--color-primary)" strokeWidth="1.8" />
-              <circle cx="12" cy="10" r="3" stroke="var(--color-primary)" strokeWidth="1.8" />
-            </svg>
+        {/* Price card — now includes agency fee */}
+        <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
             <div>
-              <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
-                {listing.lga}, {listing.state}
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 3px" }}>
+                {isForSale ? "Selling price" : "Annual rent"}
               </p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.8" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  Full address unlocked after booking
-                </p>
-              </div>
+              <p style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 900, color: "var(--color-primary)", margin: 0, lineHeight: 1 }}>
+                ₦{listing.price.toLocaleString()}
+                <span style={{ fontSize: 13, fontWeight: 400, opacity: 0.7, marginLeft: 4 }}>
+                  {isForSale ? "one-time" : "/yr"}
+                </span>
+              </p>
+              {/* Agency fee shown under price */}
+              {agencyFeeNaira !== null && (
+                <div style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, background: "#FFF8E1", border: "1px solid #FAC775" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6" stroke="#B45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <p style={{ fontSize: 12, color: "#B45309", margin: 0, fontWeight: 700 }}>
+                    Agency fee: {listing.agencyFeePercent}% — ₦{agencyFeeNaira.toLocaleString()}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: "right", flexShrink: 0 }}>
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 3px" }}>Listed by</p>
+              <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--color-text)", margin: "0 0 3px" }}>{agentName}</p>
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>🔒 Contact after booking</p>
             </div>
           </div>
         </div>
 
+        {/* Location — now includes landmark prominently */}
+        <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 16 }}>
+          <p style={{ fontFamily: "var(--font-heading)", fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 12px" }}>
+            Location
+          </p>
+
+          {/* Landmark — shown first and prominently when available */}
+          {listing.landmark && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 12, background: "var(--color-light)", border: "1px solid var(--color-border)", marginBottom: 10 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="var(--color-primary)" strokeWidth="1.8" />
+                <circle cx="12" cy="10" r="3" stroke="var(--color-primary)" strokeWidth="1.8" />
+              </svg>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 700, color: "var(--color-primary)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>
+                  Nearest landmark
+                </p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--color-header)", margin: 0, lineHeight: 1.4 }}>
+                  {listing.landmark}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* LGA + State */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="var(--color-text-muted)" strokeWidth="1.8" />
+              <circle cx="12" cy="10" r="3" stroke="var(--color-text-muted)" strokeWidth="1.8" />
+            </svg>
+            <p style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text)", margin: 0 }}>
+              {listing.lga}, {listing.state}
+            </p>
+          </div>
+
+          {/* Full address locked */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.8" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
+              Full address unlocked after booking
+            </p>
+          </div>
+        </div>
+
         {/* Description */}
-        <div className="rounded-2xl p-4"
-          style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-          <p className="text-xs font-semibold uppercase tracking-wide mb-3"
-            style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
+        <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 16 }}>
+          <p style={{ fontFamily: "var(--font-heading)", fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 10px" }}>
             About this property
           </p>
-          <p className="text-sm leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+          <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.7 }}>
             {listing.description}
           </p>
         </div>
 
         {/* Amenities */}
         {(allAmenities.length > 0 || customAmenities.length > 0) && (
-          <div className="rounded-2xl p-4"
-            style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-wide mb-3"
-              style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-heading)" }}>
+          <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 16 }}>
+            <p style={{ fontFamily: "var(--font-heading)", fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 12px" }}>
               Amenities
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {allAmenities.map((slug) => {
                 const amenity = AMENITY_MAP[slug];
                 if (!amenity) return null;
                 return (
-                  <span key={slug} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
-                    style={{ backgroundColor: "var(--color-light)", border: "1px solid var(--color-border)", color: "var(--color-primary)" }}>
+                  <span key={slug} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px", borderRadius: 20, backgroundColor: "var(--color-light)", border: "1px solid var(--color-border)", color: "var(--color-primary)" }}>
                     <span>{amenity.icon}</span>
                     {amenity.label}
                   </span>
                 );
               })}
               {customAmenities.map((a, i) => (
-                <span key={i} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
-                  style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
+                <span key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, padding: "6px 12px", borderRadius: 20, backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
                   ✦ {a}
                 </span>
               ))}
@@ -618,17 +471,17 @@ export default function PropertyDetailClient({
         )}
 
         {/* Inspection fee notice */}
-        <div className="rounded-2xl p-4" style={{ backgroundColor: "#EAF3DE", border: "1px solid #C0DD97" }}>
-          <div className="flex items-start gap-3">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="shrink-0 mt-0.5">
+        <div style={{ backgroundColor: "#EAF3DE", border: "1px solid #C0DD97", borderRadius: 20, padding: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
               <circle cx="12" cy="12" r="10" stroke="#27500A" strokeWidth="1.8" />
               <path d="M12 8v4M12 16h.01" stroke="#27500A" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
             <div>
-              <p className="text-sm font-semibold mb-1" style={{ color: "#27500A", fontFamily: "var(--font-heading)" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "#27500A", margin: "0 0 4px" }}>
                 One inspection fee covers all
               </p>
-              <p className="text-xs leading-relaxed" style={{ color: "#3B6D11" }}>
+              <p style={{ fontSize: 13, color: "#3B6D11", margin: 0, lineHeight: 1.6 }}>
                 Pay a flat ₦5,000 inspection fee to unlock this agent's contact and tour all their properties in one visit.
               </p>
             </div>
@@ -637,22 +490,18 @@ export default function PropertyDetailClient({
       </div>
 
       {/* ── FIXED BOTTOM CTA ── */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 z-40"
-        style={{ backgroundColor: "var(--color-bg)", borderTop: "1px solid var(--color-border)" }}>
-        <div className="max-w-2xl mx-auto">
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 16px", paddingBottom: "calc(12px + env(safe-area-inset-bottom))", zIndex: 40, backgroundColor: "var(--color-bg)", borderTop: "1px solid var(--color-border)" }}>
+        <div style={{ maxWidth: 672, margin: "0 auto" }}>
           {isAvailable ? (
-            <button
-              onClick={handleBookInspection}
-              className="w-full py-4 rounded-2xl font-bold text-white flex items-center justify-center gap-2"
-              style={{ backgroundColor: "var(--color-primary)", fontFamily: "var(--font-heading)" }}>
+            <button onClick={handleBookInspection}
+              style={{ width: "100%", padding: "16px", borderRadius: 16, border: "none", backgroundColor: "var(--color-primary)", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               Book Inspection — ₦5,000
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
           ) : (
-            <div className="w-full py-4 rounded-2xl text-center font-semibold text-sm"
-              style={{ backgroundColor: "var(--color-bg)", border: "1.5px solid var(--color-border)", color: "var(--color-text-muted)" }}>
+            <div style={{ width: "100%", padding: "16px", borderRadius: 16, backgroundColor: "var(--color-bg)", border: "1.5px solid var(--color-border)", color: "var(--color-text-muted)", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 14, textAlign: "center" }}>
               This property is currently {listing.status.replace(/-/g, " ")}
             </div>
           )}
@@ -661,66 +510,50 @@ export default function PropertyDetailClient({
 
       {/* ── BOOKING BOTTOM SHEET ── */}
       {bookingSheetOpen && (
-        <div className="fixed inset-0 z-50" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, backgroundColor: "rgba(0,0,0,0.5)" }}
           onClick={() => setBookingSheetOpen(false)} />
       )}
-      <div
-        className="fixed left-0 right-0 bottom-0 z-50 rounded-t-3xl"
-        style={{
-          backgroundColor: "var(--color-card)",
-          transform:    bookingSheetOpen ? "translateY(0)" : "translateY(100%)",
-          transition:   "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-          maxWidth:     "672px",
-          margin:       "0 auto",
-          paddingBottom: "env(safe-area-inset-bottom, 16px)",
-        }}
-      >
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full" style={{ backgroundColor: "var(--color-border)" }} />
+      <div style={{
+        position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
+        backgroundColor: "var(--color-card)", borderRadius: "22px 22px 0 0",
+        transform: bookingSheetOpen ? "translateY(0)" : "translateY(100%)",
+        transition: "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
+        maxWidth: 672, margin: "0 auto",
+        paddingBottom: "env(safe-area-inset-bottom, 16px)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px" }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: "var(--color-border)" }} />
         </div>
-        <div className="px-5 pt-3 pb-6">
-          <p className="text-base font-bold mb-1"
-            style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
+        <div style={{ padding: "4px 20px 24px" }}>
+          <p style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 800, color: "var(--color-header)", margin: "0 0 4px" }}>
             Book Inspection
           </p>
-          <p className="text-sm mb-5" style={{ color: "var(--color-text-muted)" }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px" }}>
             Pay ₦5,000 to unlock agent contact and schedule a visit.
           </p>
 
           {/* What you get */}
-          <div className="rounded-2xl p-4 mb-5 space-y-2"
-            style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+          <div style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 16, padding: "14px 16px", marginBottom: 20, display: "flex", flexDirection: "column", gap: 10 }}>
             {[
               "Agent's phone number revealed",
               "Full property address unlocked",
               "Tour all properties by this agent",
               "Secure visit verification on arrival",
             ].map((item) => (
-              <div key={item} className="flex items-center gap-2">
+              <div key={item} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)" strokeWidth="2.2"
-                    strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{item}</p>
+                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>{item}</p>
               </div>
             ))}
           </div>
 
-          {/* Pay button */}
-          <button
-            onClick={handlePay}
-            disabled={payLoading}
-            className="w-full py-4 rounded-2xl font-bold text-white flex items-center justify-center gap-2 mb-3"
-            style={{
-              backgroundColor: payLoading ? "var(--color-border)" : "var(--color-primary)",
-              fontFamily: "var(--font-heading)",
-              cursor: payLoading ? "not-allowed" : "pointer",
-              transition: "background 0.2s",
-            }}
-          >
+          <button onClick={handlePay} disabled={payLoading}
+            style={{ width: "100%", padding: "15px", borderRadius: 14, border: "none", backgroundColor: payLoading ? "var(--color-border)" : "var(--color-primary)", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: payLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
             {payLoading ? (
               <>
-                <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
                 Starting payment…
               </>
             ) : (
@@ -733,37 +566,27 @@ export default function PropertyDetailClient({
             )}
           </button>
 
-          {/* Paystack trust badge */}
-          <p className="text-center text-xs mb-3" style={{ color: "var(--color-text-muted)" }}>
+          <p style={{ fontSize: 12, color: "var(--color-text-muted)", textAlign: "center", margin: "0 0 10px" }}>
             🔒 Secured by Paystack · Your card is never stored
           </p>
 
-          <button
-            onClick={() => setBookingSheetOpen(false)}
-            className="w-full py-3.5 rounded-2xl text-sm font-semibold"
-            style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-muted)" }}>
+          <button onClick={() => setBookingSheetOpen(false)}
+            style={{ width: "100%", padding: "14px", borderRadius: 14, backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-muted)", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
             Cancel
           </button>
         </div>
       </div>
 
-      {/* ── SET DATE SHEET (shown after successful payment) ── */}
+      {/* ── SET DATE SHEET ── */}
       {showDateSheet && bookingId && (
         <SetDateSheet
           bookingId={bookingId}
           listingTitle={listing.title}
-          onClose={() => {
-            setShowDateSheet(false);
-            router.push("/bookings");
-          }}
-          onSuccess={() => {
-            setShowDateSheet(false);
-            router.push("/bookings");
-          }}
+          onClose={() => { setShowDateSheet(false); router.push("/bookings"); }}
+          onSuccess={() => { setShowDateSheet(false); router.push("/bookings"); }}
         />
       )}
 
-      {/* Spin animation */}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );

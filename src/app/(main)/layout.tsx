@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { authClient } from "@/lib/auth-client";
 import UserAvatar from "@/components/user-avatar";
 import CustomerCare from "@/components/customer-care";
-
+import PWAInstallBanner from "@/components/pwa-install-banner";
 const ADMIN_EMAIL = "corpernestng@gmail.com";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -512,6 +512,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </nav>
 
       <CustomerCare />
+      <PWAInstallBanner />
     </div>
   );
 }

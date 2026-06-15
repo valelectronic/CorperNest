@@ -47,15 +47,20 @@ export default function ProfileClient({ user }: { user: User }) {
   const isAdmin = user.email === ADMIN_EMAIL;
 
   async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await authClient.signOut();
-      router.push("/");
-    } catch {
-      toast.error("Could not sign out. Try again.");
-      setLoggingOut(false);
-    }
+  setLoggingOut(true);
+  try {
+    await authClient.signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          window.location.href = "/";
+        },
+      },
+    });
+  } catch {
+    toast.error("Could not sign out. Try again.");
+    setLoggingOut(false);
   }
+}
 
   function handleBecomeAgent() {
     router.push("/agent/kyc");

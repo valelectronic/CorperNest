@@ -1,28 +1,22 @@
+import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import PropertiesClient from "./properties-client";
 
-
-// ADD THIS export to src/app/properties/page.tsx — paste above the default export
-
-import type { Metadata } from "next";
-
 export const metadata: Metadata = {
-  title: "Verified Properties for Rent and buy in Eket, Akwa Ibom",
+  title: "Verified Properties for Rent in Eket, Akwa Ibom",
   description:
-    "Browse verified houses, self contained, mini flats and rooms for rent and buy in Eket,  Akwa Ibom and the whole nigeria states. All listings reviewed before going live. Book an inspection for ₦5,000.",
+    "Browse verified houses, self contained, mini flats and rooms for rent in Eket, Akwa Ibom. All listings reviewed before going live. Book an inspection for ₦5,000.",
   alternates: {
     canonical: "https://www.corpernest.com.ng/properties",
   },
   openGraph: {
-    title:       "Verified Properties for Rent and buy in Eket, Akwa Ibom | CorperNest",
+    title:       "Verified Properties for Rent in Eket, Akwa Ibom | CorperNest",
     description: "Browse verified rental listings in Eket. Self contained, mini flats, 1-bed and 2-bed flats. No scams — all agents verified.",
     url:         "https://www.corpernest.com.ng/properties",
   },
 };
 
-// Public page — no redirect if not logged in
-// But we check session to pass isLoggedIn to cards
 export const dynamic = "force-dynamic";
 
 export default async function PropertiesPage() {

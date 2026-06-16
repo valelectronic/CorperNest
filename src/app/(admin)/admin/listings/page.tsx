@@ -12,6 +12,7 @@ async function getPendingListings() {
       title:        listing.title,
       description:  listing.description,
       address:      listing.address,
+      landmark:       listing.landmark, 
       lga:          listing.lga,
       state:        listing.state,
       price:        listing.price,
@@ -58,5 +59,31 @@ export default async function AdminListingsPage() {
     getRecentlyReviewed(),
   ]);
 
-  return <AdminListingsClient pending={pending} recentlyDeclined={recentlyDeclined} />;
+  // Check duplicates for each pending listing
+  const { ilike, and, eq: deq, notInArray } = await import("drizzle-orm");
+  const pendingWithDuplicates = await Promise.all(
+    pending.map(async (l) => {
+      if (!l.landmark || !l.type || !l.lga) return { ...l, possibleDuplicate: false };
+      try {
+        const dupes = await db
+          .select({ id: listing.id })
+          .from(listing)
+          .where(
+            and(
+              deq(listing.lga, l.lga),
+              deq(listing.type, l.type),
+              deq(listing.isActive, true),
+              notInArray(listing.status, ["under-review", "flagged"]),
+              ilike(listing.landmark, `%${l.landmark.slice(0, 20)}%`),
+            )
+          )
+          .limit(1);
+        return { ...l, possibleDuplicate: dupes.length > 0 };
+      } catch {
+        return { ...l, possibleDuplicate: false };
+      }
+    })
+  );
+
+  return <AdminListingsClient pending={pendingWithDuplicates} recentlyDeclined={recentlyDeclined} />;
 }

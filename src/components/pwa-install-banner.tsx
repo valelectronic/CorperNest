@@ -22,7 +22,7 @@ function usePWAInstall() {
     }
 
     // Check if dismissed recently (within 7 days)
-    const dismissedAt = localStorage.getItem("pwa-banner-dismissed");
+    const dismissedAt = localStorage.getItem("pwa-banner-v2-dismissed"); // ← CHANGED
     if (dismissedAt) {
       const days = (Date.now() - parseInt(dismissedAt)) / (1000 * 60 * 60 * 24);
       if (days < 7) { setDismissed(true); return; }
@@ -34,7 +34,6 @@ function usePWAInstall() {
     const isChrome  = /chrome/.test(ua) && !/edg/.test(ua);
 
     if (isIOS) {
-      // Only show on Safari (not Chrome on iOS which can't install PWAs)
       const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
       if (isSafari) setPlatform("ios");
     } else if (isAndroid && isChrome) {
@@ -51,7 +50,7 @@ function usePWAInstall() {
   }, []);
 
   function dismiss() {
-    localStorage.setItem("pwa-banner-dismissed", String(Date.now()));
+    localStorage.setItem("pwa-banner-v2-dismissed", String(Date.now())); // ← CHANGED
     setDismissed(true);
   }
 
@@ -75,10 +74,7 @@ export default function PWAInstallBanner() {
   const { platform, deferredPrompt, isInstalled, dismissed, dismiss, installAndroid } = usePWAInstall();
   const [showIOSSteps, setShowIOSSteps] = useState(false);
 
-  // Don't render if installed, dismissed, or no relevant platform
   if (isInstalled || dismissed || !platform) return null;
-
-  // Android — only show if we have the deferred prompt
   if (platform === "android" && !deferredPrompt) return null;
 
   return (
@@ -186,11 +182,9 @@ export default function PWAInstallBanner() {
           display: "flex", alignItems: "center", gap: 12,
           boxShadow: "0 -4px 20px rgba(0,0,0,0.08)",
         }}>
-          {/* App icon */}
           <img src="/icon-192.png" alt="CorperNest"
             style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0 }} />
 
-          {/* Text */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, color: "var(--color-header)", margin: 0 }}>
               Install CorperNest
@@ -202,7 +196,6 @@ export default function PWAInstallBanner() {
             </p>
           </div>
 
-          {/* Action button */}
           {platform === "android" ? (
             <button
               onClick={installAndroid}
@@ -219,7 +212,6 @@ export default function PWAInstallBanner() {
             </button>
           )}
 
-          {/* Dismiss */}
           <button
             onClick={dismiss}
             style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--color-bg)", border: "1px solid var(--color-border)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}

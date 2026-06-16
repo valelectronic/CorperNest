@@ -56,6 +56,11 @@ const inputStyle = {
 
 type ImagePreview = { file: File; previewUrl: string };
 
+type DuplicateWarning = {
+  count:    number;
+  examples: { title: string; landmark: string; status: string }[];
+};
+
 // ─── REUSABLE COMPONENTS ─────────────────────────────────────────────────────
 
 function SectionCard({
@@ -65,7 +70,6 @@ function SectionCard({
 }) {
   return (
     <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, overflow: "hidden" }}>
-      {/* Section header */}
       <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "flex-start", gap: 12 }}>
         <span style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--color-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 12, fontWeight: 800, color: "#fff", fontFamily: "var(--font-mono)" }}>
           {num}
@@ -109,6 +113,7 @@ export default function NewListingPage() {
   const router           = useRouter();
   const fileInputRef     = useRef<HTMLInputElement>(null);
   const customAmenityRef = useRef<HTMLInputElement>(null);
+  const dupTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null); // ← NEW
 
   const [form, setForm] = useState({
     description:      "",
@@ -133,11 +138,41 @@ export default function NewListingPage() {
   const [error,             setError]             = useState("");
   const [uploadProgress,    setUploadProgress]    = useState("");
 
+  // ── Duplicate check state ── ← NEW
+  const [duplicateWarning,    setDuplicateWarning]    = useState<DuplicateWarning | null>(null);
+  const [checkingDuplicate,   setCheckingDuplicate]   = useState(false);
+
   const lgaOptions = getLGAs(form.state);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { name, value } = e.target;
     setForm((prev) => name === "state" ? { ...prev, state: value, lga: "" } : { ...prev, [name]: value });
+  }
+
+  // ── Duplicate check with debounce ── ← NEW
+  function triggerDuplicateCheck(landmarkVal: string, lgaVal: string, typeVal: string) {
+    if (dupTimerRef.current) clearTimeout(dupTimerRef.current);
+    if (!landmarkVal || landmarkVal.trim().length < 5 || !lgaVal || !typeVal) {
+      setDuplicateWarning(null);
+      return;
+    }
+    dupTimerRef.current = setTimeout(async () => {
+      setCheckingDuplicate(true);
+      try {
+        const params = new URLSearchParams({
+          landmark: landmarkVal.trim(),
+          lga:      lgaVal,
+          type:     typeVal,
+        });
+        const res  = await fetch(`/api/properties/check-duplicate?${params}`);
+        const data = await res.json();
+        setDuplicateWarning(data.duplicate ? { count: data.count, examples: data.examples } : null);
+      } catch {
+        setDuplicateWarning(null);
+      } finally {
+        setCheckingDuplicate(false);
+      }
+    }, 800);
   }
 
   function toggleAmenity(slug: string) {
@@ -177,7 +212,6 @@ export default function NewListingPage() {
     setUploadedUrls([]);
   }
 
-  // Live fee calculation
   const priceNum       = parseInt(form.price.replace(/,/g, "")) || 0;
   const agencyFeeNaira = form.agencyFeePercent && priceNum > 0
     ? Math.round(priceNum * (Number(form.agencyFeePercent) / 100))
@@ -187,12 +221,12 @@ export default function NewListingPage() {
     e.preventDefault();
     setError("");
 
-    if (!form.type)     { setError("Please select a property type."); return; }
-    if (!form.lga)      { setError("Please select your LGA."); return; }
+    if (!form.type)            { setError("Please select a property type."); return; }
+    if (!form.lga)             { setError("Please select your LGA."); return; }
     if (!form.landmark.trim()) { setError("Please enter the nearest landmark — this helps clients find the property."); return; }
     if (!priceNum || priceNum <= 0) { setError("Please enter a valid price."); return; }
     if (form.description.trim().length < 50) { setError("Description is too short. Please describe the property properly (at least 50 characters)."); return; }
-    if (images.length < 2) { setError("Please upload at least 2 photos."); return; }
+    if (images.length < 2)    { setError("Please upload at least 2 photos."); return; }
 
     setLoading(true);
     try {
@@ -279,7 +313,11 @@ export default function NewListingPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {PROPERTY_TYPES.map((t) => (
                   <button key={t.value} type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, type: t.value }))}
+                    onClick={() => {
+                      setForm((prev) => ({ ...prev, type: t.value }));
+                      // Re-check duplicate when type changes ← NEW
+                      triggerDuplicateCheck(form.landmark, form.lga, t.value);
+                    }}
                     style={{ padding: "12px 14px", borderRadius: 12, fontSize: 13, fontWeight: 600, textAlign: "left", cursor: "pointer", border: "1.5px solid", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: form.type === t.value ? "var(--color-light)" : "var(--color-bg)", color: form.type === t.value ? "var(--color-primary)" : "var(--color-text-secondary)", borderColor: form.type === t.value ? "var(--color-primary)" : "var(--color-border)" }}>
                     <div>
                       <span style={{ display: "block", fontWeight: 700 }}>{t.label}</span>
@@ -304,8 +342,7 @@ export default function NewListingPage() {
               hint={form.listingPurpose === "rent" ? "Enter the full annual rent. E.g. type 150000 for ₦150,000 per year." : "Enter the total selling price in naira."}>
               <input name="price" type="text" inputMode="numeric"
                 value={form.price} onChange={handleChange} required
-                placeholder="e.g. 150000"
-                style={inputStyle} />
+                placeholder="e.g. 150000" style={inputStyle} />
               {priceNum > 0 && (
                 <p style={{ fontSize: 12, color: "var(--color-primary)", margin: "6px 0 0", fontWeight: 600 }}>
                   ₦{priceNum.toLocaleString()} {form.listingPurpose === "sale" ? "— one-time" : "per year"}
@@ -315,8 +352,7 @@ export default function NewListingPage() {
 
             <Field label="Your agency fee" optional
               hint="The percentage you charge the client after they secure the property. Clients see this before booking — it builds trust and avoids surprises.">
-              <select name="agencyFeePercent" value={form.agencyFeePercent} onChange={handleChange}
-                style={inputStyle}>
+              <select name="agencyFeePercent" value={form.agencyFeePercent} onChange={handleChange} style={inputStyle}>
                 <option value="">Not set — I'll discuss with client directly</option>
                 {AGENCY_FEE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
@@ -324,15 +360,9 @@ export default function NewListingPage() {
               </select>
               {agencyFeeNaira !== null && (
                 <div style={{ marginTop: 8, padding: "12px 14px", borderRadius: 12, background: "var(--color-light)", border: "1px solid var(--color-border)" }}>
-                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 4px" }}>
-                    Client will pay you after securing property:
-                  </p>
-                  <p style={{ fontSize: 18, fontWeight: 800, color: "var(--color-primary)", margin: 0, fontFamily: "var(--font-heading)" }}>
-                    ₦{agencyFeeNaira.toLocaleString()}
-                  </p>
-                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "3px 0 0" }}>
-                    {form.agencyFeePercent}% of ₦{priceNum.toLocaleString()} annual rent
-                  </p>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 4px" }}>Client will pay you after securing property:</p>
+                  <p style={{ fontSize: 18, fontWeight: 800, color: "var(--color-primary)", margin: 0, fontFamily: "var(--font-heading)" }}>₦{agencyFeeNaira.toLocaleString()}</p>
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "3px 0 0" }}>{form.agencyFeePercent}% of ₦{priceNum.toLocaleString()} annual rent</p>
                 </div>
               )}
             </Field>
@@ -348,7 +378,13 @@ export default function NewListingPage() {
             </Field>
 
             <Field label="LGA">
-              <select name="lga" value={form.lga} onChange={handleChange} required style={inputStyle}>
+              <select name="lga" value={form.lga}
+                onChange={(e) => {
+                  handleChange(e);
+                  // Re-check duplicate when LGA changes ← NEW
+                  triggerDuplicateCheck(form.landmark, e.target.value, form.type);
+                }}
+                required style={inputStyle}>
                 <option value="">Select LGA</option>
                 {lgaOptions.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
@@ -357,10 +393,17 @@ export default function NewListingPage() {
             <Field label="Nearest landmark"
               hint="This is the most important field for location. Clients in Eket navigate by landmarks, not street names. Be very specific.">
               <input name="landmark" type="text" value={form.landmark}
-                onChange={handleChange} required
+                onChange={(e) => {
+                  handleChange(e);
+                  // Trigger duplicate check as agent types ← NEW
+                  triggerDuplicateCheck(e.target.value, form.lga, form.type);
+                }}
+                required
                 placeholder="e.g. Behind NYSC secretariat Eket, Opposite Eket market, Close to Total filling station Eket"
                 style={inputStyle} />
-              {form.landmark.trim() && (
+
+              {/* Live landmark preview */}
+              {form.landmark.trim() && !duplicateWarning && !checkingDuplicate && (
                 <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="var(--color-primary)" strokeWidth="1.8" />
@@ -369,14 +412,38 @@ export default function NewListingPage() {
                   <p style={{ fontSize: 12, color: "var(--color-primary)", margin: 0, fontWeight: 600 }}>{form.landmark}</p>
                 </div>
               )}
+
+              {/* Checking indicator ← NEW */}
+              {checkingDuplicate && (
+                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "8px 0 0", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1.5px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                  Checking for similar listings…
+                </p>
+              )}
+
+              {/* Duplicate warning ← NEW */}
+              {duplicateWarning && !checkingDuplicate && (
+                <div style={{ marginTop: 8, padding: "12px 14px", borderRadius: 12, background: "#FFF8E1", border: "1px solid #FAC775" }}>
+                  <p style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 700, color: "#92400E" }}>
+                    ⚠️ Similar listing already exists near this landmark
+                  </p>
+                  <p style={{ margin: "0 0 8px", fontSize: 12, color: "#B45309", lineHeight: 1.5 }}>
+                    {duplicateWarning.count} active listing{duplicateWarning.count > 1 ? "s" : ""} found near this landmark with the same property type. If this is a different unit, continue — our team will verify before approving.
+                  </p>
+                  {duplicateWarning.examples.map((ex, i) => (
+                    <p key={i} style={{ margin: "0 0 2px", fontSize: 11, color: "#92400E" }}>
+                      • {ex.title} — {ex.landmark}
+                    </p>
+                  ))}
+                </div>
+              )}
             </Field>
 
             <Field label="Full address"
               hint="The exact address is hidden from clients until they book and schedule a visit. Write it accurately.">
               <input name="address" type="text" value={form.address}
                 onChange={handleChange} required
-                placeholder="e.g. No. 12 Aba Road, Eket"
-                style={inputStyle} />
+                placeholder="e.g. No. 12 Aba Road, Eket" style={inputStyle} />
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "6px 0 0" }}>
                 🔒 Only revealed after client pays and schedules a visit
               </p>
@@ -394,9 +461,7 @@ export default function NewListingPage() {
                 placeholder="e.g. Spacious self-contained on ground floor. Tiled throughout with prepaid meter and borehole water supply. Bathroom inside. Compound is fully fenced with security gate. Very close to NYSC secretariat — about 3 minutes walk. The landlord lives on the same compound and is cooperative."
                 style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>
-                  {form.description.length} characters
-                </p>
+                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>{form.description.length} characters</p>
                 <p style={{ fontSize: 11, margin: 0, color: form.description.length >= 50 ? "var(--color-primary)" : "var(--color-text-muted)" }}>
                   {form.description.length < 50 ? `${50 - form.description.length} more to go` : "✓ Good length"}
                 </p>
@@ -433,9 +498,7 @@ export default function NewListingPage() {
             )}
 
             <div>
-              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", margin: "0 0 8px" }}>
-                Anything else? Add your own
-              </p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", margin: "0 0 8px" }}>Anything else? Add your own</p>
               {customAmenities.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
                   {customAmenities.map((a, i) => (
@@ -482,9 +545,7 @@ export default function NewListingPage() {
                       </svg>
                     </button>
                     {index === 0 && (
-                      <span style={{ position: "absolute", bottom: 6, left: 6, padding: "2px 7px", borderRadius: 6, background: "#2E7D32", color: "#fff", fontSize: 10, fontWeight: 700 }}>
-                        Cover
-                      </span>
+                      <span style={{ position: "absolute", bottom: 6, left: 6, padding: "2px 7px", borderRadius: 6, background: "#2E7D32", color: "#fff", fontSize: 10, fontWeight: 700 }}>Cover</span>
                     )}
                   </div>
                 ))}
@@ -523,11 +584,8 @@ export default function NewListingPage() {
                 {images.length}/5 photos {images.length < 2 ? "— add at least 2 to continue" : "✓"}
               </p>
             )}
-
             {uploadedUrls.length > 0 && (
-              <p style={{ fontSize: 12, color: "var(--color-primary)", margin: 0 }}>
-                ✓ Photos already uploaded — won't re-upload on retry
-              </p>
+              <p style={{ fontSize: 12, color: "var(--color-primary)", margin: 0 }}>✓ Photos already uploaded — won't re-upload on retry</p>
             )}
           </SectionCard>
 
@@ -537,14 +595,12 @@ export default function NewListingPage() {
 
             <Field label="Landlord / Caretaker name" optional>
               <input name="landlordName" type="text" value={form.landlordName}
-                onChange={handleChange} placeholder="e.g. Chief Udo Bassey"
-                style={inputStyle} />
+                onChange={handleChange} placeholder="e.g. Chief Udo Bassey" style={inputStyle} />
             </Field>
 
             <Field label="Landlord / Caretaker phone number" optional>
               <input name="landlordPhone" type="tel" value={form.landlordPhone}
-                onChange={handleChange} placeholder="e.g. 08012345678"
-                style={inputStyle} />
+                onChange={handleChange} placeholder="e.g. 08012345678" style={inputStyle} />
             </Field>
           </SectionCard>
 

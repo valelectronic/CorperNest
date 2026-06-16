@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listing, user } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, ilike, notInArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { headers } from "next/headers";
 import { sendAdminEmail } from "@/lib/send-admin-email";
@@ -36,19 +36,19 @@ export async function POST(req: NextRequest) {
 
   // 2. Parse body
   let body: {
-    description?:     string;
-    address?:         string;
-    landmark?:        string;
-    lga?:             string;
-    state?:           string;
-    price?:           number;
-    type?:            string;
-    listingPurpose?:  string;
-    landlordName?:    string;
-    landlordPhone?:   string;
-    images?:          string[];
-    amenities?:       string[];
-    customAmenities?: string[];
+    description?:      string;
+    address?:          string;
+    landmark?:         string;
+    lga?:              string;
+    state?:            string;
+    price?:            number;
+    type?:             string;
+    listingPurpose?:   string;
+    landlordName?:     string;
+    landlordPhone?:    string;
+    images?:           string[];
+    amenities?:        string[];
+    customAmenities?:  string[];
     agencyFeePercent?: number | null;
   };
 
@@ -82,7 +82,6 @@ export async function POST(req: NextRequest) {
   if (!VALID_PURPOSES.includes(listingPurpose))
     return NextResponse.json({ error: "listingPurpose must be 'rent' or 'sale'" }, { status: 400 });
 
-  // Validate agency fee if provided
   if (agencyFeePercent !== null && agencyFeePercent !== undefined) {
     if (!VALID_AGENCY_FEE.includes(agencyFeePercent))
       return NextResponse.json({ error: `agencyFeePercent must be one of: ${VALID_AGENCY_FEE.join(", ")}` }, { status: 400 });
@@ -100,7 +99,28 @@ export async function POST(req: NextRequest) {
     .map((a) => a.trim())
     .slice(0, 10);
 
-  // 6. Insert
+  // 6. Check for possible duplicates (soft — never blocks submission)
+  let possibleDuplicate = false;
+  try {
+    const dupes = await db
+      .select({ id: listing.id })
+      .from(listing)
+      .where(
+        and(
+          eq(listing.lga,    lga.trim()),
+          eq(listing.type,   type),
+          eq(listing.isActive, true),
+          notInArray(listing.status, ["flagged"]),
+          ilike(listing.landmark, `%${landmark.trim().slice(0, 20)}%`),
+        )
+      )
+      .limit(1);
+    possibleDuplicate = dupes.length > 0;
+  } catch {
+    // Silent — never block submission due to duplicate check failure
+  }
+
+  // 7. Insert
   try {
     const listingId = nanoid();
     const now       = new Date();
@@ -116,7 +136,7 @@ export async function POST(req: NextRequest) {
       state:               state.trim(),
       price:               Math.round(price),
       listingPurpose,
-      type:                type as "self-con" | "mini-flat" | "1-bed" | "2-bed" | "room",
+      type:                type as "self-con" | "mini-flat" | "1-bed" | "2-bed" | "3-bed" | "room",
       status:              "under-review",
       landlordName:        landlordName?.trim()  ?? null,
       landlordPhone:       landlordPhone?.trim() ?? null,
@@ -131,7 +151,7 @@ export async function POST(req: NextRequest) {
       updatedAt:           now,
     });
 
-    // 7. Notify agent in-app
+    // 8. Notify agent in-app
     await createNotification({
       userId:  session.user.id,
       type:    "listing-under-review",
@@ -140,7 +160,7 @@ export async function POST(req: NextRequest) {
       link:    "/agent",
     });
 
-    // 8. Fetch agent for admin email
+    // 9. Fetch agent for admin email
     const agentRows = await db
       .select({ name: user.name, email: user.email, phone: user.phone })
       .from(user)
@@ -148,13 +168,26 @@ export async function POST(req: NextRequest) {
       .limit(1);
     const agent = agentRows[0];
 
-    // 9. Email admin (fire-and-forget)
+    // 10. Email admin — include duplicate warning if detected
     sendAdminEmail(
-      `New Listing for Review — ${title}`,
+      `New Listing for Review${possibleDuplicate ? " ⚠️ Possible Duplicate" : ""} — ${title}`,
       `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
           <h2 style="color:#1B2E1B;margin:0 0 4px">New Listing Submitted</h2>
           <p style="color:#7A9A7A;margin:0 0 24px;font-size:13px">Requires your review before going live</p>
+
+          ${possibleDuplicate ? `
+          <div style="background:#FFF8E1;border:1px solid #FAC775;border-radius:10px;padding:12px 16px;margin-bottom:20px">
+            <p style="margin:0;font-size:13px;font-weight:700;color:#92400E">
+              ⚠️ Possible duplicate detected
+            </p>
+            <p style="margin:4px 0 0;font-size:12px;color:#B45309">
+              Another active listing exists with a similar landmark and property type in ${lga.trim()}. 
+              Please verify this is a different unit before approving.
+            </p>
+          </div>
+          ` : ""}
+
           <table style="width:100%;border-collapse:collapse;font-size:14px">
             <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A;width:140px">Listing</td>
                 <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;font-weight:600;color:#1B1B1B">${title}</td></tr>
@@ -175,6 +208,7 @@ export async function POST(req: NextRequest) {
             <tr><td style="padding:10px 0;color:#7A9A7A">Agent Phone</td>
                 <td style="padding:10px 0;color:#1B1B1B">${agent?.phone ?? "—"}</td></tr>
           </table>
+
           <a href="https://www.corpernest.com.ng/admin/listings"
              style="display:inline-block;margin-top:24px;padding:12px 24px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">
             Review in Admin Dashboard →
@@ -186,7 +220,7 @@ export async function POST(req: NextRequest) {
       `
     ).catch((err) => console.error("[create listing] admin email failed:", err));
 
-    return NextResponse.json({ success: true, listingId }, { status: 201 });
+    return NextResponse.json({ success: true, listingId, possibleDuplicate }, { status: 201 });
   } catch (error) {
     console.error("[properties/create] DB error:", error);
     return NextResponse.json({ error: "Failed to create listing. Please try again." }, { status: 500 });

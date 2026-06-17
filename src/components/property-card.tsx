@@ -52,6 +52,7 @@ function timeAgo(date: Date | string): string {
 
 export type PropertyCardData = {
   id:              string;
+  slug?:           string | null;   // ← NEW
   title:           string;
   description:     string;
   lga:             string;
@@ -98,6 +99,9 @@ export default function PropertyCard({
   const isAvailable   = listing.status === "available";
   const topAmenities  = (listing.amenities ?? []).slice(0, 3);
 
+  // Use slug for all links when available, fall back to raw id for older listings ← NEW
+  const linkPath = listing.slug ?? listing.id;
+
   const agencyFeeNaira = listing.agencyFeePercent && listing.price
     ? Math.round(listing.price * (listing.agencyFeePercent / 100))
     : null;
@@ -107,28 +111,28 @@ export default function PropertyCard({
     if (!hasMultiple || isPaused) return;
     intervalRef.current = setInterval(() => {
       setActiveImg((prev) => (prev + 1) % images.length);
-    }, 3000); // 3 seconds per image
+    }, 3000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [hasMultiple, isPaused, images.length]);
 
   function handleViewProperty() {
-    router.push(`/properties/${listing.id}`);
+    router.push(`/properties/${linkPath}`);
   }
 
   function handleBookInspection(e: React.MouseEvent) {
     e.stopPropagation();
     if (!isLoggedIn) {
-      router.push(`/signin?callbackUrl=/properties/${listing.id}`);
+      router.push(`/signin?callbackUrl=/properties/${linkPath}`);
       return;
     }
-    router.push(`/properties/${listing.id}?action=book`);
+    router.push(`/properties/${linkPath}?action=book`);
   }
 
   async function handleWatchlistToggle(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${listing.id}`); return; }
+    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${linkPath}`); return; }
     if (toggling) return;
     setToggling(true);
     const newWatching = !watching;
@@ -137,11 +141,11 @@ export default function PropertyCard({
       const res = await fetch("/api/watchlist/toggle", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ listingId: listing.id }),
+        body:    JSON.stringify({ listingId: listing.id }), // ← keep using raw id for API calls
       });
       if (!res.ok) {
         setWatching(!newWatching);
-        if (res.status === 401) router.push(`/signin?callbackUrl=/properties/${listing.id}`);
+        if (res.status === 401) router.push(`/signin?callbackUrl=/properties/${linkPath}`);
         return;
       }
       if (newWatching) {
@@ -158,12 +162,11 @@ export default function PropertyCard({
     }
   }
 
-  // Manual navigation — clicking dots or arrows pauses auto-swap briefly
   function goToImage(e: React.MouseEvent, index: number) {
     e.stopPropagation();
     setActiveImg(index);
     setIsPaused(true);
-    setTimeout(() => setIsPaused(false), 6000); // resume after 6s of inactivity
+    setTimeout(() => setIsPaused(false), 6000);
   }
 
   function goNext(e: React.MouseEvent) {
@@ -207,21 +210,17 @@ export default function PropertyCard({
           </div>
         )}
 
-        {/* Gradient */}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0.7) 100%)", pointerEvents: "none" }} />
 
-        {/* Status badge — top left */}
         <span style={{ position: "absolute", top: 10, left: 10, fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 8, backgroundColor: badge.bg, color: badge.color, display: "flex", alignItems: "center", gap: 5 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: badge.dot, flexShrink: 0 }} />
           {listing.status.replace(/-/g, " ")}
         </span>
 
-        {/* Purpose badge */}
         <span style={{ position: "absolute", top: 10, right: 44, fontSize: 11, fontWeight: 700, padding: "4px 8px", borderRadius: 6, backgroundColor: isForSale ? "#FEF3C7" : "#E8F5E9", color: isForSale ? "#92400E" : "#1B5E20", pointerEvents: "none" }}>
           {isForSale ? "For Sale" : "For Rent"}
         </span>
 
-        {/* Watchlist */}
         <button onClick={handleWatchlistToggle} disabled={toggling}
           style={{ position: "absolute", top: 10, right: 10, width: 32, height: 32, borderRadius: "50%", backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
           aria-label={watching ? "Remove from watchlist" : "Save property"}>
@@ -231,7 +230,6 @@ export default function PropertyCard({
           </svg>
         </button>
 
-        {/* ── Carousel arrows — only when multiple images ── */}
         {hasMultiple && (
           <>
             <button onClick={goPrev}
@@ -251,7 +249,6 @@ export default function PropertyCard({
           </>
         )}
 
-        {/* ── Dot indicators — only when multiple images ── */}
         {hasMultiple && (
           <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
             {images.map((_, i) => (
@@ -269,7 +266,6 @@ export default function PropertyCard({
           </div>
         )}
 
-        {/* Photo count badge — bottom right of image, replaces date when multiple */}
         {hasMultiple && (
           <span style={{
             position: "absolute", bottom: 38, right: 10,
@@ -286,7 +282,6 @@ export default function PropertyCard({
           </span>
         )}
 
-        {/* Bottom overlay — price + date */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 12px 12px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", pointerEvents: "none" }}>
           <p style={{ color: "#fff", fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 800, margin: 0, textShadow: "0 1px 4px rgba(0,0,0,0.6)", lineHeight: 1 }}>
             ₦{listing.price.toLocaleString()}
@@ -303,7 +298,6 @@ export default function PropertyCard({
       {/* ── CARD BODY ── */}
       <div style={{ padding: "12px 14px 14px" }}>
 
-        {/* Title + type badge */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
           <p style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, margin: 0, flex: 1, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>
             {listing.title}
@@ -313,7 +307,6 @@ export default function PropertyCard({
           </span>
         </div>
 
-        {/* Location — LGA + State */}
         <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: listing.landmark ? 4 : 10 }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="var(--color-text-muted)" strokeWidth="1.8" />
@@ -324,7 +317,6 @@ export default function PropertyCard({
           </p>
         </div>
 
-        {/* Landmark */}
         {listing.landmark && (
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 10 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -336,7 +328,6 @@ export default function PropertyCard({
           </div>
         )}
 
-        {/* Agency fee */}
         {agencyFeeNaira !== null && (
           <div style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 8, background: "#FFF8E1", border: "1px solid #FAC775" }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -348,7 +339,6 @@ export default function PropertyCard({
           </div>
         )}
 
-        {/* Amenities */}
         {topAmenities.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
             {topAmenities.map((slug) => {
@@ -369,7 +359,6 @@ export default function PropertyCard({
           </div>
         )}
 
-        {/* Action buttons */}
         {isAvailable ? (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 8 }}>
             <button onClick={handleViewProperty}

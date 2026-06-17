@@ -7,6 +7,7 @@ import { nanoid } from "nanoid";
 import { headers } from "next/headers";
 import { sendAdminEmail } from "@/lib/send-admin-email";
 import { createNotification } from "@/lib/create-notification";
+import { generateListingSlug } from "@/lib/generate-slug"; // ← NEW
 
 const TYPE_LABELS: Record<string, string> = {
   "self-con":  "Self Contained",
@@ -26,6 +27,21 @@ const VALID_AMENITIES = [
   "fence-compound", "good-road-access", "close-to-nysc", "good-network",
 ];
 const VALID_AGENCY_FEE = [5, 8, 10, 12, 15];
+
+// Generate a unique slug, retrying with a new random suffix if collision occurs
+async function generateUniqueSlug(type: string, lga: string, state: string): Promise<string> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const slug = generateListingSlug(type, lga, state);
+    const existing = await db
+      .select({ id: listing.id })
+      .from(listing)
+      .where(eq(listing.slug, slug))
+      .limit(1);
+    if (existing.length === 0) return slug;
+  }
+  // Extremely unlikely fallback — append timestamp
+  return `${generateListingSlug(type, lga, state)}-${Date.now()}`;
+}
 
 export async function POST(req: NextRequest) {
   // 1. Auth
@@ -90,7 +106,10 @@ export async function POST(req: NextRequest) {
   // 4. Auto-generate title
   const title = `${TYPE_LABELS[type]} in ${lga.trim()}`;
 
-  // 5. Sanitise amenities
+  // 5. Generate unique slug ← NEW
+  const slug = await generateUniqueSlug(type, lga.trim(), state.trim());
+
+  // 6. Sanitise amenities
   const sanitisedAmenities = amenities.filter(
     (a) => typeof a === "string" && VALID_AMENITIES.includes(a)
   );
@@ -99,7 +118,7 @@ export async function POST(req: NextRequest) {
     .map((a) => a.trim())
     .slice(0, 10);
 
-  // 6. Check for possible duplicates (soft — never blocks submission)
+  // 7. Check for possible duplicates (soft — never blocks submission)
   let possibleDuplicate = false;
   try {
     const dupes = await db
@@ -120,7 +139,7 @@ export async function POST(req: NextRequest) {
     // Silent — never block submission due to duplicate check failure
   }
 
-  // 7. Insert
+  // 8. Insert
   try {
     const listingId = nanoid();
     const now       = new Date();
@@ -129,6 +148,7 @@ export async function POST(req: NextRequest) {
       id:                  listingId,
       agentId:             session.user.id,
       title,
+      slug,                                // ← NEW
       description:         description.trim(),
       address:             address.trim(),
       landmark:            landmark.trim(),
@@ -151,7 +171,7 @@ export async function POST(req: NextRequest) {
       updatedAt:           now,
     });
 
-    // 8. Notify agent in-app
+    // 9. Notify agent in-app
     await createNotification({
       userId:  session.user.id,
       type:    "listing-under-review",
@@ -160,7 +180,7 @@ export async function POST(req: NextRequest) {
       link:    "/agent",
     });
 
-    // 9. Fetch agent for admin email
+    // 10. Fetch agent for admin email
     const agentRows = await db
       .select({ name: user.name, email: user.email, phone: user.phone })
       .from(user)
@@ -168,7 +188,7 @@ export async function POST(req: NextRequest) {
       .limit(1);
     const agent = agentRows[0];
 
-    // 10. Email admin — include duplicate warning if detected
+    // 11. Email admin — include duplicate warning if detected
     sendAdminEmail(
       `New Listing for Review${possibleDuplicate ? " ⚠️ Possible Duplicate" : ""} — ${title}`,
       `
@@ -220,7 +240,7 @@ export async function POST(req: NextRequest) {
       `
     ).catch((err) => console.error("[create listing] admin email failed:", err));
 
-    return NextResponse.json({ success: true, listingId, possibleDuplicate }, { status: 201 });
+    return NextResponse.json({ success: true, listingId, slug, possibleDuplicate }, { status: 201 });
   } catch (error) {
     console.error("[properties/create] DB error:", error);
     return NextResponse.json({ error: "Failed to create listing. Please try again." }, { status: 500 });

@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { listing, user, watchlist } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import PropertyDetailClient from "./property-detail-client";
@@ -21,19 +21,21 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 type Props = {
+  // Folder kept as [id] for minimal disruption — but the value can be
+  // either a slug ("self-contained-uyo-akwa-ibom-8fb0") or a raw legacy ID.
+  // We look up by BOTH so old shared links never break.
   params:       Promise<{ id: string }>;
   searchParams: Promise<{ action?: string }>;
 };
 
 // ─── DYNAMIC METADATA ────────────────────────────────────────────────────────
-// Each property page gets its own title, description and OG image
-// This is what shows when someone shares a listing on WhatsApp
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { id } = await params;
+  const { id: slugOrId } = await params;
 
   const [found] = await db
     .select({
       id:             listing.id,
+      slug:           listing.slug,
       title:          listing.title,
       description:    listing.description,
       address:        listing.address,
@@ -46,7 +48,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       status:         listing.status,
     })
     .from(listing)
-    .where(and(eq(listing.id, id), eq(listing.isActive, true)))
+    .where(
+      and(
+        or(eq(listing.slug, slugOrId), eq(listing.id, slugOrId)),
+        eq(listing.isActive, true)
+      )
+    )
     .limit(1);
 
   if (!found) return { title: "Property Not Found" };
@@ -59,7 +66,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const title       = `${typeLabel} in ${found.lga} — ${price}${found.listingPurpose === "rent" ? "/yr" : ""}`;
   const description = `Verified ${typeLabel.toLowerCase()} ${purpose} in ${location}. ${price}${found.listingPurpose === "rent" ? " per year" : ""}. ${found.description.slice(0, 120)}. Book an inspection on CorperNest — no scams.`;
-  const url         = `${BASE_URL}/properties/${id}`;
+
+  // Always use the clean slug for canonical/sharing URLs, even if accessed via old ID
+  const canonicalSlug = found.slug ?? found.id;
+  const url           = `${BASE_URL}/properties/${canonicalSlug}`;
 
   return {
     title,
@@ -93,15 +103,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 
 export default async function PropertyDetailPage({ params, searchParams }: Props) {
-  const { id }     = await params;
-  const { action } = await searchParams;
+  const { id: slugOrId } = await params;
+  const { action }       = await searchParams;
 
   const session = await auth.api.getSession({ headers: await headers() });
 
+  // Look up by slug OR raw id — supports both new clean links and old legacy links
   const [found] = await db
     .select()
     .from(listing)
-    .where(and(eq(listing.id, id), eq(listing.isActive, true)))
+    .where(
+      and(
+        or(eq(listing.slug, slugOrId), eq(listing.id, slugOrId)),
+        eq(listing.isActive, true)
+      )
+    )
     .limit(1);
 
   if (!found) notFound();
@@ -117,21 +133,20 @@ export default async function PropertyDetailPage({ params, searchParams }: Props
     const [wl] = await db
       .select({ id: watchlist.id })
       .from(watchlist)
-      .where(and(eq(watchlist.renterId, session.user.id), eq(watchlist.listingId, id)))
+      .where(and(eq(watchlist.renterId, session.user.id), eq(watchlist.listingId, found.id)))
       .limit(1);
     isWatchlisted = !!wl;
   }
 
   // ── JSON-LD Structured Data ──────────────────────────────────────────────
-  // This tells Google exactly what this page is — a real estate listing
-  // Enables rich results in search (price, location, availability shown directly)
-  const typeLabel  = TYPE_LABELS[found.type] ?? found.type;
+  const typeLabel      = TYPE_LABELS[found.type] ?? found.type;
+  const canonicalSlug  = found.slug ?? found.id;
   const jsonLd = {
     "@context":         "https://schema.org",
     "@type":            "RealEstateListing",
     "name":             found.title,
     "description":      found.description,
-    "url":              `${BASE_URL}/properties/${found.id}`,
+    "url":              `${BASE_URL}/properties/${canonicalSlug}`,
     "image":            found.images ?? [],
     "datePosted":       new Date(found.createdAt).toISOString(),
     "offers": {
@@ -157,7 +172,6 @@ export default async function PropertyDetailPage({ params, searchParams }: Props
 
   return (
     <>
-      {/* Inject JSON-LD into page head */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

@@ -89,6 +89,9 @@ export const listing = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     // Auto-generated from type + lga e.g. "Self Contained in Uyo"
     title: text("title").notNull(),
+    // URL-friendly slug e.g. "self-contained-uyo-akwa-ibom-x7k2"
+    // Generated on creation, used for public share links instead of raw ID
+    slug: text("slug").unique(),
     description: text("description").notNull(),
     address: text("address").notNull(),
     landmark:text("landmark"), 

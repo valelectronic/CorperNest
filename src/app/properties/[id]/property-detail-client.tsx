@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
@@ -29,6 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
   "mini-flat": "Mini Flat",
   "1-bed":     "1 Bedroom Flat",
   "2-bed":     "2 Bedroom Flat",
+  "3-bed":     "3 Bedroom Flat",
   "room":      "Single Room",
 };
 
@@ -57,8 +58,8 @@ type Listing = {
   amenities:       string[] | null;
   customAmenities: string[] | null;
   createdAt:       Date | string;
-  landmark?:       string | null;        // ← NEW
-  agencyFeePercent?: number | null;      // ← NEW
+  landmark?:       string | null;
+  agencyFeePercent?: number | null;
 };
 
 type Props = {
@@ -68,6 +69,110 @@ type Props = {
   isWatchlisted:   boolean;
   autoOpenBooking: boolean;
 };
+
+// ─── FULLSCREEN ZOOM VIEWER ───────────────────────────────────────────────────
+
+function ZoomViewer({
+  images, startIndex, onClose,
+}: {
+  images: string[]; startIndex: number; onClose: () => void;
+}) {
+  const [index, setIndex]   = useState(startIndex);
+  const [scale, setScale]   = useState(1);
+  const lastTapRef          = useRef(0);
+
+  function next(e?: React.MouseEvent) {
+    e?.stopPropagation();
+    setScale(1);
+    setIndex((prev) => (prev + 1) % images.length);
+  }
+  function prev(e?: React.MouseEvent) {
+    e?.stopPropagation();
+    setScale(1);
+    setIndex((prev) => (prev - 1 + images.length) % images.length);
+  }
+
+  // Double-tap / double-click to zoom in and out
+  function handleImageTap(e: React.MouseEvent) {
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      setScale((prev) => (prev === 1 ? 2.2 : 1));
+    }
+    lastTapRef.current = now;
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.95)", display: "flex", flexDirection: "column" }}
+      onClick={onClose}
+    >
+      {/* Top bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 8px", flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20 }}>
+          {index + 1} / {images.length}
+        </span>
+        <button onClick={(e) => { e.stopPropagation(); onClose(); }}
+          style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Image area */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
+        <img
+          src={images[index]}
+          alt={`Photo ${index + 1}`}
+          onClick={handleImageTap}
+          style={{
+            maxWidth: "100%", maxHeight: "100%", objectFit: "contain",
+            transform: `scale(${scale})`, transition: "transform 0.25s ease",
+            cursor: scale === 1 ? "zoom-in" : "zoom-out",
+          }}
+        />
+
+        {images.length > 1 && (
+          <>
+            <button onClick={prev}
+              style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button onClick={next}
+              style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18l6-6-6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Hint + thumbnail strip */}
+      <div style={{ flexShrink: 0, padding: "8px 16px 20px" }}>
+        <p style={{ textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "0 0 12px" }}>
+          Double-tap image to zoom
+        </p>
+        {images.length > 1 && (
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", justifyContent: "center" }}>
+            {images.map((img, i) => (
+              <button
+                key={i}
+                onClick={(e) => { e.stopPropagation(); setScale(1); setIndex(i); }}
+                style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: i === index ? "2px solid #fff" : "2px solid rgba(255,255,255,0.25)", cursor: "pointer", padding: 0 }}
+              >
+                <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── SET DATE SHEET ───────────────────────────────────────────────────────────
 
@@ -161,8 +266,12 @@ export default function PropertyDetailClient({
   const [verifying,         setVerifying]         = useState(false);
   const [bookingId,         setBookingId]         = useState<string | null>(null);
   const [showDateSheet,     setShowDateSheet]     = useState(false);
+  const [isPaused,          setIsPaused]          = useState(false);  // ← NEW
+  const [zoomOpen,          setZoomOpen]          = useState(false);  // ← NEW
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null); // ← NEW
 
   const images          = listing.images ?? [];
+  const hasMultiple      = images.length > 1; // ← NEW
   const badge           = statusStyle[listing.status] ?? statusStyle.available;
   const isAvailable     = listing.status === "available";
   const isForSale       = listing.listingPurpose === "sale";
@@ -170,10 +279,25 @@ export default function PropertyDetailClient({
   const allAmenities    = listing.amenities ?? [];
   const customAmenities = listing.customAmenities ?? [];
 
-  // Agency fee calculation
   const agencyFeeNaira = listing.agencyFeePercent && listing.price
     ? Math.round(listing.price * (listing.agencyFeePercent / 100))
     : null;
+
+  // ── Auto-swap carousel — pure client-side, zero extra cost ── ← NEW
+  useEffect(() => {
+    if (!hasMultiple || isPaused || zoomOpen) return;
+    intervalRef.current = setInterval(() => {
+      setActiveImage((prev) => (prev + 1) % images.length);
+    }, 3500);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [hasMultiple, isPaused, zoomOpen, images.length]);
+
+  function pauseThenResume() {
+    setIsPaused(true);
+    setTimeout(() => setIsPaused(false), 6000);
+  }
 
   const verifyPayment = useCallback(async (ref: string) => {
     setVerifying(true);
@@ -264,7 +388,6 @@ export default function PropertyDetailClient({
           {listing.title}
         </p>
         <div style={{ display: "flex", gap: 8 }}>
-          {/* Share */}
           <button
             onClick={async () => {
               const url  = `https://www.corpernest.com.ng/properties/${listing.id}`;
@@ -280,7 +403,6 @@ export default function PropertyDetailClient({
               <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </button>
-          {/* Watchlist */}
           <button onClick={handleWatchlistToggle} disabled={toggling}
             style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -299,19 +421,59 @@ export default function PropertyDetailClient({
         </div>
       )}
 
-      {/* ── IMAGE GALLERY ── */}
-      <div style={{ position: "relative", height: 280 }}>
+      {/* ── IMAGE GALLERY — auto-swap + tap to zoom ── */}
+      <div
+        style={{ position: "relative", height: 280, cursor: "zoom-in" }}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
         {images.length > 0 ? (
           <>
-            <img src={images[activeImage]} alt={`${listing.title} photo ${activeImage + 1}`}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img
+              src={images[activeImage]}
+              alt={`${listing.title} photo ${activeImage + 1}`}
+              onClick={() => setZoomOpen(true)}
+              style={{ width: "100%", height: "100%", objectFit: "cover", transition: "opacity 0.3s" }}
+            />
+
+            {/* Zoom hint icon */}
+            <div style={{ position: "absolute", top: 12, left: 12, width: 30, height: 30, borderRadius: "50%", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="7" stroke="white" strokeWidth="1.8" />
+                <path d="M21 21l-4.3-4.3M11 8v6M8 11h6" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </div>
+
             <span style={{ position: "absolute", bottom: 12, right: 12, fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "#fff", backdropFilter: "blur(4px)" }}>
               {activeImage + 1} / {images.length}
             </span>
+
+            {/* Carousel arrows */}
+            {hasMultiple && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setActiveImage((p) => (p - 1 + images.length) % images.length); pauseThenResume(); }}
+                  style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.4)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setActiveImage((p) => (p + 1) % images.length); pauseThenResume(); }}
+                  style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.4)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18l6-6-6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              </>
+            )}
+
+            {/* Thumbnail strip */}
             {images.length > 1 && (
               <div style={{ position: "absolute", bottom: 12, left: 12, display: "flex", gap: 6 }}>
                 {images.map((_, i) => (
-                  <button key={i} onClick={() => setActiveImage(i)}
+                  <button key={i}
+                    onClick={(e) => { e.stopPropagation(); setActiveImage(i); pauseThenResume(); }}
                     style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: i === activeImage ? "2px solid #fff" : "2px solid rgba(255,255,255,0.3)", cursor: "pointer", padding: 0 }}>
                     <img src={images[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
                   </button>
@@ -354,7 +516,7 @@ export default function PropertyDetailClient({
           </div>
         </div>
 
-        {/* Price card — now includes agency fee */}
+        {/* Price card */}
         <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
             <div>
@@ -367,7 +529,6 @@ export default function PropertyDetailClient({
                   {isForSale ? "one-time" : "/yr"}
                 </span>
               </p>
-              {/* Agency fee shown under price */}
               {agencyFeeNaira !== null && (
                 <div style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, background: "#FFF8E1", border: "1px solid #FAC775" }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -387,13 +548,12 @@ export default function PropertyDetailClient({
           </div>
         </div>
 
-        {/* Location — now includes landmark prominently */}
+        {/* Location */}
         <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 16 }}>
           <p style={{ fontFamily: "var(--font-heading)", fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 12px" }}>
             Location
           </p>
 
-          {/* Landmark — shown first and prominently when available */}
           {listing.landmark && (
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 12, background: "var(--color-light)", border: "1px solid var(--color-border)", marginBottom: 10 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -411,7 +571,6 @@ export default function PropertyDetailClient({
             </div>
           )}
 
-          {/* LGA + State */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="var(--color-text-muted)" strokeWidth="1.8" />
@@ -422,7 +581,6 @@ export default function PropertyDetailClient({
             </p>
           </div>
 
-          {/* Full address locked */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
               <rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.8" />
@@ -532,7 +690,6 @@ export default function PropertyDetailClient({
             Pay ₦5,000 to unlock agent contact and schedule a visit.
           </p>
 
-          {/* What you get */}
           <div style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 16, padding: "14px 16px", marginBottom: 20, display: "flex", flexDirection: "column", gap: 10 }}>
             {[
               "Agent's phone number revealed",
@@ -585,6 +742,11 @@ export default function PropertyDetailClient({
           onClose={() => { setShowDateSheet(false); router.push("/bookings"); }}
           onSuccess={() => { setShowDateSheet(false); router.push("/bookings"); }}
         />
+      )}
+
+      {/* ── FULLSCREEN ZOOM VIEWER ── */}
+      {zoomOpen && images.length > 0 && (
+        <ZoomViewer images={images} startIndex={activeImage} onClose={() => setZoomOpen(false)} />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

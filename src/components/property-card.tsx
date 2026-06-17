@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -64,8 +64,8 @@ export type PropertyCardData = {
   amenities:       string[] | null;
   customAmenities: string[] | null;
   createdAt:       Date | string;
-  landmark?:       string | null;         // ← NEW
-  agencyFeePercent?: number | null;       // ← NEW
+  landmark?:       string | null;
+  agencyFeePercent?: number | null;
 };
 
 type PropertyCardProps = {
@@ -84,20 +84,34 @@ export default function PropertyCard({
   isLoggedIn = false,
 }: PropertyCardProps) {
   const router = useRouter();
-  const [watching, setWatching] = useState(isWatchlisted);
-  const [toggling, setToggling] = useState(false);
+  const [watching, setWatching]     = useState(isWatchlisted);
+  const [toggling, setToggling]     = useState(false);
+  const [activeImg, setActiveImg]   = useState(0);
+  const [isPaused, setIsPaused]     = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const coverImage  = listing.images?.[0] ?? null;
-  const badge       = statusStyle[listing.status] ?? statusStyle.available;
-  const typeLabel   = TYPE_LABELS[listing.type] ?? listing.type;
-  const isForSale   = listing.listingPurpose === "sale";
-  const isAvailable = listing.status === "available";
-  const topAmenities = (listing.amenities ?? []).slice(0, 3);
+  const images       = listing.images ?? [];
+  const hasMultiple   = images.length > 1;
+  const badge         = statusStyle[listing.status] ?? statusStyle.available;
+  const typeLabel     = TYPE_LABELS[listing.type] ?? listing.type;
+  const isForSale     = listing.listingPurpose === "sale";
+  const isAvailable   = listing.status === "available";
+  const topAmenities  = (listing.amenities ?? []).slice(0, 3);
 
-  // Agency fee calc
   const agencyFeeNaira = listing.agencyFeePercent && listing.price
     ? Math.round(listing.price * (listing.agencyFeePercent / 100))
     : null;
+
+  // ── Auto-swap carousel — pure client-side, no API calls, zero DB cost ──────
+  useEffect(() => {
+    if (!hasMultiple || isPaused) return;
+    intervalRef.current = setInterval(() => {
+      setActiveImg((prev) => (prev + 1) % images.length);
+    }, 3000); // 3 seconds per image
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [hasMultiple, isPaused, images.length]);
 
   function handleViewProperty() {
     router.push(`/properties/${listing.id}`);
@@ -144,14 +158,45 @@ export default function PropertyCard({
     }
   }
 
+  // Manual navigation — clicking dots or arrows pauses auto-swap briefly
+  function goToImage(e: React.MouseEvent, index: number) {
+    e.stopPropagation();
+    setActiveImg(index);
+    setIsPaused(true);
+    setTimeout(() => setIsPaused(false), 6000); // resume after 6s of inactivity
+  }
+
+  function goNext(e: React.MouseEvent) {
+    e.stopPropagation();
+    setActiveImg((prev) => (prev + 1) % images.length);
+    setIsPaused(true);
+    setTimeout(() => setIsPaused(false), 6000);
+  }
+
+  function goPrev(e: React.MouseEvent) {
+    e.stopPropagation();
+    setActiveImg((prev) => (prev - 1 + images.length) % images.length);
+    setIsPaused(true);
+    setTimeout(() => setIsPaused(false), 6000);
+  }
+
   return (
     <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, overflow: "hidden" }}>
 
-      {/* ── COVER IMAGE ── */}
-      <div style={{ position: "relative", width: "100%", height: 210, cursor: "pointer" }} onClick={handleViewProperty}>
-        {coverImage ? (
-          <img src={coverImage} alt={listing.title} loading="lazy"
-            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+      {/* ── COVER IMAGE / CAROUSEL ── */}
+      <div
+        style={{ position: "relative", width: "100%", height: 210, cursor: "pointer" }}
+        onClick={handleViewProperty}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        {images.length > 0 ? (
+          <img
+            src={images[activeImg]}
+            alt={`${listing.title} photo ${activeImg + 1}`}
+            loading="lazy"
+            style={{ width: "100%", height: "100%", objectFit: "cover", transition: "opacity 0.3s" }}
+          />
         ) : (
           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#E8F5E9" }}>
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
@@ -186,6 +231,61 @@ export default function PropertyCard({
           </svg>
         </button>
 
+        {/* ── Carousel arrows — only when multiple images ── */}
+        {hasMultiple && (
+          <>
+            <button onClick={goPrev}
+              style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", width: 28, height: 28, borderRadius: "50%", backgroundColor: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              aria-label="Previous photo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+            <button onClick={goNext}
+              style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", width: 28, height: 28, borderRadius: "50%", backgroundColor: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+              aria-label="Next photo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18l6-6-6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </>
+        )}
+
+        {/* ── Dot indicators — only when multiple images ── */}
+        {hasMultiple && (
+          <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
+            {images.map((_, i) => (
+              <button
+                key={i}
+                onClick={(e) => goToImage(e, i)}
+                style={{
+                  width: i === activeImg ? 16 : 6, height: 6, borderRadius: 3,
+                  backgroundColor: i === activeImg ? "#fff" : "rgba(255,255,255,0.5)",
+                  border: "none", cursor: "pointer", padding: 0, transition: "width 0.2s",
+                }}
+                aria-label={`Photo ${i + 1}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Photo count badge — bottom right of image, replaces date when multiple */}
+        {hasMultiple && (
+          <span style={{
+            position: "absolute", bottom: 38, right: 10,
+            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 6,
+            backgroundColor: "rgba(0,0,0,0.55)", color: "#fff", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", gap: 3,
+          }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="white" strokeWidth="1.8" />
+              <circle cx="8.5" cy="8.5" r="1.5" stroke="white" strokeWidth="1.8" />
+              <path d="M21 15l-5-5L5 21" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {activeImg + 1}/{images.length}
+          </span>
+        )}
+
         {/* Bottom overlay — price + date */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "0 12px 12px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", pointerEvents: "none" }}>
           <p style={{ color: "#fff", fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 800, margin: 0, textShadow: "0 1px 4px rgba(0,0,0,0.6)", lineHeight: 1 }}>
@@ -208,7 +308,6 @@ export default function PropertyCard({
           <p style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, margin: 0, flex: 1, minWidth: 0, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", lineHeight: 1.4 }}>
             {listing.title}
           </p>
-          {/* Fixed: full label, white-space nowrap prevents truncation */}
           <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8, backgroundColor: "var(--color-light)", color: "var(--color-primary)", border: "1px solid var(--color-border)", flexShrink: 0, whiteSpace: "nowrap" }}>
             {typeLabel}
           </span>
@@ -225,7 +324,7 @@ export default function PropertyCard({
           </p>
         </div>
 
-        {/* Landmark — shown when available */}
+        {/* Landmark */}
         {listing.landmark && (
           <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 10 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -237,7 +336,7 @@ export default function PropertyCard({
           </div>
         )}
 
-        {/* Agency fee — shown when set */}
+        {/* Agency fee */}
         {agencyFeeNaira !== null && (
           <div style={{ marginBottom: 10, display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 8, background: "#FFF8E1", border: "1px solid #FAC775" }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none">

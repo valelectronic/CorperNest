@@ -46,6 +46,7 @@ const statusStyle: Record<string, { bg: string; color: string; dot: string }> = 
 type Listing = {
   id:              string;
   title:           string;
+  slug:            string | null;
   description:     string;
   address:         string;
   lga:             string;
@@ -390,7 +391,7 @@ export default function PropertyDetailClient({
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={async () => {
-              const url  = `https://www.corpernest.com.ng/properties/${listing.id}`;
+              const url  = `https://www.corpernest.com.ng/properties/${listing.slug ?? listing.id}`;
               const text = `🏠 ${listing.title}\n📍 ${listing.lga}, ${listing.state}\n💰 ₦${listing.price.toLocaleString()}/yr\n\nVerified listing on CorperNest — inspect before you pay rent.`;
               if (navigator.share) { try { await navigator.share({ title: listing.title, text, url }); } catch {} }
               else { window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n\n${url}`)}`, "_blank"); }

@@ -375,7 +375,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-1">
-            {[{ label: "Watchlist", href: "/watchlist" }, { label: "Bookings", href: "/bookings" }].map((item) => (
+            {[{ label: "Watchlist", href: "/watchlist" }, { label: "Bookings", href: "/bookings" }, { label: "About", href: "/about" }].map((item) => (
               <Link key={item.href} href={item.href} style={{ padding: "6px 12px", borderRadius: 10, fontSize: 13, fontWeight: pathname === item.href ? 600 : 400, color: pathname === item.href ? "var(--color-primary)" : "var(--color-text-secondary)", textDecoration: "none" }}>
                 {item.label}
               </Link>

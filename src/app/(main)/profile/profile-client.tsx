@@ -284,6 +284,38 @@ export default function ProfileClient({ user }: { user: User }) {
           </button>
         )}
 
+        {/* About CorperNest — links to /about, visible to everyone */}
+        <button
+          onClick={() => router.push("/about")}
+          style={{
+            width: "100%", padding: "14px 16px",
+            background: "var(--color-card)", border: "1px solid var(--color-border)",
+            borderRadius: 16, display: "flex", alignItems: "center", gap: 12,
+            cursor: "pointer", textAlign: "left",
+          }}
+        >
+          <div style={{
+            width: 34, height: 34, borderRadius: 10, background: "var(--color-light)",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="var(--color-primary)" strokeWidth="1.8" />
+              <path d="M12 8h.01M11 11h1v5h1" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
+              About CorperNest
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-text-muted)" }}>
+              Our mission, company info, and contact details
+            </p>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9 18l6-6-6-6" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+
         {/* Sign out */}
         <button
           onClick={() => setShowConfirm(true)}

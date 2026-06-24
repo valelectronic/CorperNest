@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropertyCard, { type PropertyCardData } from "@/components/property-card";
 import { getLGAs } from "@/lib/nigeria-location";
+import NetworkErrorState from "@/components/network-error-state";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ export default function HomeClient({
   const [page, setPage]               = useState(1);
   const [loading, setLoading]         = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError]     = useState(false); // ← NEW
   // true after user explicitly searches — hides initial server-fetched listings
   // while a new query runs
   const [hasSearched, setHasSearched] = useState(false);
@@ -123,25 +125,25 @@ export default function HomeClient({
   async function fetchListings(keyword = "", isLoadMore = false, currentPage = 1) {
     if (isLoadMore) setLoadingMore(true);
     else            setLoading(true);
+    setLoadError(false); // ← NEW — clear any previous error on a fresh attempt
 
     try {
       const pageNum = isLoadMore ? currentPage + 1 : 1;
       const res  = await fetch(`/api/properties/feed?${buildQuery(pageNum, keyword)}`);
+      if (!res.ok) throw new Error("Feed request failed");
       const data = await res.json();
 
-      if (res.ok) {
-        if (isLoadMore) {
-          setListings((prev) => [...prev, ...(data.listings ?? [])]);
-          setPage(pageNum);
-        } else {
-          setListings(data.listings ?? []);
-          setPage(1);
-        }
-        setHasMore(data.hasMore ?? false);
-        setHasSearched(true);
+      if (isLoadMore) {
+        setListings((prev) => [...prev, ...(data.listings ?? [])]);
+        setPage(pageNum);
+      } else {
+        setListings(data.listings ?? []);
+        setPage(1);
       }
+      setHasMore(data.hasMore ?? false);
+      setHasSearched(true);
     } catch {
-      // silent — user can retry
+      setLoadError(true); // ← NEW — show retry state instead of silently failing
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -182,6 +184,7 @@ export default function HomeClient({
   setMaxPrice("");
   setSearchInput("");
   setHasSearched(false);
+  setLoadError(false); // ← NEW
   setListings(initialListings);
   setHasMore(initialListings.length < totalCount);
   setPage(1);
@@ -226,6 +229,7 @@ export default function HomeClient({
               if (val === "" && hasSearched) {
                 filtersRef.current = { lga, type, purpose, minPrice, maxPrice };
                 setHasSearched(false);
+                setLoadError(false);
                 setListings(initialListings);
                 setHasMore(initialListings.length < totalCount);
                 setPage(1);
@@ -408,7 +412,7 @@ export default function HomeClient({
       <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
 
         {/* Welcome banner — only on initial load, hidden while searching */}
-        {!hasSearched && (
+        {!hasSearched && !loadError && (
           <div
             className="rounded-2xl px-4 py-4"
             style={{ background: "linear-gradient(135deg, #1B2E1B 0%, #2E7D32 100%)" }}
@@ -432,8 +436,16 @@ export default function HomeClient({
           </div>
         )}
 
+        {/* Network error state — request failed, distinct from "no results" */}
+        {!loading && loadError && (
+          <NetworkErrorState
+            onRetry={() => fetchListings(searchInput.trim(), false, page)}
+            retrying={loading}
+          />
+        )}
+
         {/* Listings */}
-        {!loading && (
+        {!loading && !loadError && (
           displayedListings.length === 0 ? (
             <div
               className="rounded-2xl p-10 flex flex-col items-center text-center"

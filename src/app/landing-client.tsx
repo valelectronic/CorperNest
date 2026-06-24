@@ -182,13 +182,23 @@ export default function LandingPageClient() {
         </div>
 
         {/* Bottom CTA */}
-        <div style={{ padding: "24px 20px 40px", textAlign: "center" }}>
+        <div style={{ padding: "24px 20px 24px", textAlign: "center" }}>
           <Link href="/properties" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", backgroundColor: "var(--color-primary)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, textDecoration: "none", marginBottom: 12 }}>
             Browse listings now →
           </Link>
           <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
             Already have an account?{" "}
             <Link href="/signin" style={{ color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>Sign in</Link>
+          </p>
+        </div>
+
+        {/* Mobile footer — About link + copyright */}
+        <div style={{ padding: "16px 20px 32px", textAlign: "center", borderTop: "1px solid var(--color-border)" }}>
+          <Link href="/about" style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none", fontWeight: 600 }}>
+            About CorperNest
+          </Link>
+          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "10px 0 0" }}>
+            © {new Date().getFullYear()} Bridgenest Limited
           </p>
         </div>
       </div>
@@ -202,6 +212,9 @@ export default function LandingPageClient() {
         <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 64px", borderBottom: "1px solid var(--color-border)", background: "var(--color-card)", position: "sticky", top: 0, zIndex: 30 }}>
           <Logo variant="dark" />
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Link href="/about" style={{ fontSize: 13, fontWeight: 600, padding: "9px 14px", color: "var(--color-text-secondary)", textDecoration: "none" }}>
+              About
+            </Link>
             <Link href="/properties" style={{ fontSize: 13, fontWeight: 700, padding: "9px 18px", color: "#fff", textDecoration: "none", borderRadius: 12, background: "var(--color-action)", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="white" strokeWidth="2" />
@@ -362,16 +375,27 @@ export default function LandingPageClient() {
         </div>
 
         {/* Footer CTA */}
-        <div style={{ background: "#1B2E1B", padding: "56px 64px", textAlign: "center" }}>
+        <div style={{ background: "#1B2E1B", padding: "56px 64px 32px", textAlign: "center" }}>
           <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 32, fontWeight: 900, color: "#E8F5E9", margin: "0 0 12px", letterSpacing: "-1px" }}>
             Ready to find your home in Eket?
           </h2>
           <p style={{ fontSize: 15, color: "#7A9A7A", margin: "0 0 32px" }}>
             Browse verified listings in Eket, Akwa Ibom — no account needed.
           </p>
-          <Link href="/properties" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "15px 36px", backgroundColor: "var(--color-action)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
+          <Link href="/properties" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "15px 36px", backgroundColor: "var(--color-action)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none", marginBottom: 32 }}>
             Browse listings →
           </Link>
+
+          {/* Desktop footer — About link + copyright */}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <Link href="/about" style={{ fontSize: 13, color: "#7A9A7A", textDecoration: "none", fontWeight: 600 }}>
+              About CorperNest
+            </Link>
+            <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+            <p style={{ fontSize: 13, color: "#7A9A7A", margin: 0 }}>
+              © {new Date().getFullYear()} Bridgenest Limited
+            </p>
+          </div>
         </div>
       </div>
 

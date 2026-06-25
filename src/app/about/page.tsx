@@ -65,6 +65,7 @@ export default function AboutPage() {
           <div style={{ marginBottom: 14 }}>
             <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 2px" }}>Operated by</p>
             <p style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", margin: 0 }}>Bridgenest Limited</p>
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "2px 0 0" }}>RC 9630078</p>
           </div>
 
           <div style={{ marginBottom: 14 }}>

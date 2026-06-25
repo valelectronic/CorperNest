@@ -8,9 +8,11 @@ function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const type  = searchParams.get("type");
-  const email = searchParams.get("email") ?? "";
-  const name  = searchParams.get("name") ?? "";
+  const type    = searchParams.get("type");
+  const email   = searchParams.get("email") ?? "";
+  const channel = searchParams.get("channel") ?? "email"; // "sms" or "email"
+  const phone   = searchParams.get("phone") ?? "";
+  const name    = searchParams.get("name") ?? "";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -19,6 +21,7 @@ function VerifyForm() {
   const [countdown, setCountdown] = useState(30);
   const [canResend, setCanResend] = useState(false);
   const [inputsLocked, setInputsLocked] = useState(false);
+  const [currentChannel, setCurrentChannel] = useState(channel); // can change on resend
 
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const hasAttempted = useRef(false);
@@ -40,7 +43,6 @@ function VerifyForm() {
 
   const handleVerify = useCallback(async (code: string) => {
 
-
     if (code.length < 6) {
       setError("Enter the full 6-digit code.");
       return;
@@ -49,23 +51,37 @@ function VerifyForm() {
     setLoading(true);
     setError("");
 
-  if (type === "signup") {
-  const { error } = await authClient.signIn.emailOtp({ email, otp: code });
+    // ── New custom signup flow — phone-first with email fallback ──────────
+    if (type === "customSignup") {
+      try {
+        const res = await fetch("/api/auth/custom-signup/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, code }),
+        });
+        const data = await res.json();
 
-      if (error) {
-        setError(error.message ?? "Invalid or expired code.");
+        if (!res.ok) {
+          setError(data.error ?? "Invalid or expired code.");
+          setLoading(false);
+          setInputsLocked(true);
+          setCountdown(30);
+          setCanResend(false);
+          return;
+        }
+
+        // Account created and logged in — now set their real PIN
+        router.push("/set-pin");
+        return;
+      } catch {
+        setError("Network error. Please try again.");
         setLoading(false);
-        setInputsLocked(true);
-        setCountdown(30);
-        setCanResend(false);
         return;
       }
-
-      if (name) await authClient.updateUser({ name });
-      router.push("/role");
-      return;
     }
-      
+
+    // ── Existing email-OTP sign-in — unchanged, still used by current
+    // signin page for accounts without a PIN yet ───────────────────────────
     if (type === "signin") {
       const { error } = await authClient.signIn.emailOtp({ email, otp: code });
 
@@ -81,7 +97,7 @@ function VerifyForm() {
       router.push("/home");
       return;
     }
-  }, [email, name, type, router]);
+  }, [email, type, router]);
 
   // Auto-verify when all 6 digits filled
   useEffect(() => {
@@ -130,8 +146,36 @@ function VerifyForm() {
     setOtp(["", "", "", "", "", ""]);
     setTimeout(() => inputs.current[0]?.focus(), 50);
 
-    const otpType = "sign-in";
-    await authClient.emailOtp.sendVerificationOtp({ email, type: otpType });
+    if (type === "customSignup") {
+      // Re-runs the start step with the same details — fully retries SMS
+      // first, falls back to email if needed, no retyping required.
+      try {
+        const res = await fetch("/api/auth/custom-signup/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, phone, email }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          setError(data.error ?? "Could not resend code. Try again.");
+          setResending(false);
+          return;
+        }
+
+        setCurrentChannel(data.channel);
+        setCountdown(30);
+        setCanResend(false);
+        setResending(false);
+        return;
+      } catch {
+        setError("Network error. Please try again.");
+        setResending(false);
+        return;
+      }
+    }
+
+    await authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" });
 
     setCountdown(30);
     setCanResend(false);
@@ -139,6 +183,11 @@ function VerifyForm() {
   }
 
   const isDisabled = loading || inputsLocked;
+
+  const destinationText =
+    type === "customSignup" && currentChannel === "sms"
+      ? "your phone"
+      : email || "your email";
 
   return (
     <div
@@ -171,7 +220,7 @@ function VerifyForm() {
         <p className="text-sm mb-6 leading-relaxed" style={{ color: "var(--color-text-muted)" }}>
           We sent a 6-digit code to{" "}
           <span className="break-all" style={{ color: "var(--color-primary)", fontWeight: 600 }}>
-            {email || "your email"}
+            {destinationText}
           </span>
         </p>
 

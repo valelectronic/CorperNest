@@ -50,9 +50,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Get client details
+  // Get client details — now also fetching phone for the SMS path
   const renterResult = await db
-    .select({ email: user.email, name: user.name })
+    .select({ email: user.email, name: user.name, phone: user.phone })
     .from(user)
     .where(eq(user.id, theBooking.renterId))
     .limit(1);
@@ -84,8 +84,14 @@ export async function POST(req: NextRequest) {
     used: false,
   });
 
-  // Send code to client email
-  await sendOTP({ to: renter.email, code, type: "viewing-verification" });
+  // Send code — uses SMS if OTP_PROVIDER is "sms" AND the renter has a phone
+  // on file, otherwise falls back to email automatically. Never breaks.
+  await sendOTP({
+    to: renter.email,
+    phone: renter.phone ?? undefined,
+    code,
+    type: "viewing-verification",
+  });
 
   // Admin email — CNV code generated
   await sendAdminEmail(

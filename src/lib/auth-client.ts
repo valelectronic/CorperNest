@@ -1,9 +1,9 @@
 import { createAuthClient } from "better-auth/react";
-import { emailOTPClient } from "better-auth/client/plugins";
+import { emailOTPClient, phoneNumberClient } from "better-auth/client/plugins";
 
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_APP_URL ?? "https://www.corpernest.com.ng",
-  plugins: [emailOTPClient()],
+  plugins: [emailOTPClient(), phoneNumberClient()],
 });
 
 export const {

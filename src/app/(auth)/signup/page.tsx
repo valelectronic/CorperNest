@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
 
 export default function SignupPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -17,44 +17,29 @@ export default function SignupPage() {
     setError("");
 
     try {
-      const checkRes = await fetch("/api/auth/check-email", {
+      const res = await fetch("/api/auth/custom-signup/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.toLowerCase().trim() }),
+        body: JSON.stringify({ name, phone, email }),
       });
+      const data = await res.json();
 
-      if (!checkRes.ok) throw new Error("Check failed");
-
-      const { exists } = await checkRes.json();
-
-      if (exists) {
-        setError("An account with this email already exists. Sign in instead.");
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong. Try again.");
         setLoading(false);
         return;
       }
+
+      // channel tells the verify page whether to say "check your phone"
+      // or "check your email" — whichever one actually worked. Phone and
+      // name are passed too, so a resend doesn't require retyping anything.
+      router.push(
+        `/verify?type=customSignup&email=${encodeURIComponent(data.email)}&channel=${data.channel}&phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`
+      );
     } catch {
-      setError("Could not verify email. Check your connection and try again.");
+      setError("Network error. Check your connection and try again.");
       setLoading(false);
-      return;
     }
-
-    const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
-      email,
-      type: "sign-in", 
-    });
-
-    if (otpError) {
-      setError(otpError.message ?? "Something went wrong. Try again.");
-      setLoading(false);
-      return;
-    }
-
-    
-
-    // Pass email + name via URL — localStorage fails silently in some production browsers
-    router.push(
-      `/verify?type=signup&email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`
-    );
   }
 
   return (
@@ -85,7 +70,7 @@ export default function SignupPage() {
           Create your account
         </h1>
         <p className="text-sm mb-8" style={{ color: "var(--color-text-muted)" }}>
-          We will send a verification code to your email
+          We will text you a code — if that fails, we will email it instead
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -101,6 +86,30 @@ export default function SignupPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Valentine Odo"
+              required
+              className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
+              style={{
+                border: "1px solid var(--color-border)",
+                backgroundColor: "var(--color-bg)",
+                color: "var(--color-text)",
+                fontFamily: "var(--font-body)",
+              }}
+            />
+          </div>
+
+          <div>
+            <label
+              className="block text-sm font-medium mb-1"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
+              Phone number
+            </label>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="08012345678"
               required
               className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
               style={{
@@ -143,7 +152,7 @@ export default function SignupPage() {
               border: "1px solid var(--color-border)",
             }}
           >
-            Your email is only used for verification. We will never share it.
+            We'll use this to verify your property visits — never for spam.
           </div>
 
           {error && (

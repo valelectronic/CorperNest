@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { emailOTP } from "better-auth/plugins";
+import { emailOTP, phoneNumber } from "better-auth/plugins";
 import { db } from "./db";
 import { sendOTP, type OTPType } from "./otp-sender";
 
@@ -17,6 +17,18 @@ export const auth = betterAuth({
   "https://corper-nest-l5iz8x6rs-valelectronics-projects.vercel.app",
   "http://localhost:3000",
 ],
+
+  // ── Enables password/PIN-based sign-in for email, and is also required
+  // for auth.api.setPassword to work (the PIN-setup step after OTP signup).
+  // minPasswordLength is lowered to 4 so the real PIN can be stored
+  // directly. No maxPasswordLength override — the signup flow uses a much
+  // longer throwaway password before the real PIN is set, so capping the
+  // max length here would block account creation itself.
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: 4,
+  },
+
   plugins: [
     emailOTP({
   async sendVerificationOTP({ email, otp, type }) {
@@ -37,6 +49,22 @@ export const auth = betterAuth({
   otpLength: 6,
   expiresIn: 300,
 }),
+
+    // ── Phone plugin — used for RETURNING users signing in with
+    // phone + PIN (authClient.signIn.phoneNumber). NOT used for the
+    // signup verification step itself — that's handled by our own
+    // custom route, since this plugin's sendOTP callback has no access
+    // to the user's email and so can't do the SMS-to-email fallback.
+    phoneNumber({
+      sendOTP: async ({ phoneNumber, code }) => {
+        // Only used for phone-based "forgot PIN" resets going forward.
+        // Deliberately SMS-only here, no fallback — if this fails, the
+        // calling code (forgot-PIN route) catches the error itself.
+        await sendOTP({ to: "", phone: phoneNumber, code, type: "forget-password" });
+      },
+      otpLength: 6,
+      expiresIn: 300,
+    }),
   ],
 
   user: {
@@ -44,6 +72,20 @@ export const auth = betterAuth({
       phone: {
         type: "string",
         required: false,
+      },
+      // ── New, OTP-verified phone field managed alongside the phoneNumber
+      // plugin. Kept separate from the older, unverified `phone` field above
+      // so nothing that currently reads `phone` directly breaks.
+      phoneNumber: {
+        type: "string",
+        required: false,
+        returned: true,
+      },
+      phoneNumberVerified: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        returned: true,
       },
       role: {
         type: "string",

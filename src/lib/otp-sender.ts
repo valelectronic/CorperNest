@@ -10,18 +10,43 @@ export type OTPType =
   | "viewing-verification";
 
 interface SendOTPParams {
-  to: string;
+  to: string;        // email — always required, used for email path AND as the automatic fallback
+  phone?: string;     // optional — used for the SMS attempt, when available
   code: string;
   type: OTPType;
 }
 
-export async function sendOTP({ to, code, type }: SendOTPParams) {
+interface SendOTPResult {
+  channel: "sms" | "email";
+}
 
-  if (process.env.OTP_PROVIDER === "sms") {
-    await sendViaSMS(to, code);
-  } else {
+export async function sendOTP({ to, phone, code, type }: SendOTPParams): Promise<SendOTPResult> {
+
+  // ── "change-email" is the one exception — always email, no fallback logic ──
+  // The whole point of this type is proving ownership of a NEW email address.
+  // Sending it by SMS would prove nothing about that email, so it always
+  // goes directly to `to` regardless of phone or OTP_PROVIDER.
+  if (type === "change-email") {
     await sendViaEmail(to, code, type);
+    return { channel: "email" };
   }
+
+  const shouldAttemptSMS = process.env.OTP_PROVIDER === "sms" && !!phone;
+
+  if (shouldAttemptSMS) {
+    try {
+      await sendViaSMS(phone!, code);
+      return { channel: "sms" };
+    } catch (err) {
+      // SMS failed for any reason — wrong number, Termii downtime, low
+      // balance, sender ID issue. Fall back to email automatically instead
+      // of leaving the user stuck with no code at all.
+      console.error(`[OTP] SMS failed for type=${type}, falling back to email:`, err);
+    }
+  }
+
+  await sendViaEmail(to, code, type);
+  return { channel: "email" };
 }
 
 async function sendViaEmail(to: string, code: string, type: OTPType) {
@@ -62,8 +87,8 @@ console.log(`[EMAIL] Sending ${type} OTP to ${to} from noreply@contact.corpernes
 }
 
 
-async function sendViaSMS(to: string, code: string) {
-  await fetch("https://api.ng.termii.com/api/sms/send", {
+async function sendViaSMS(to: string, code: string): Promise<void> {
+  const res = await fetch("https://api.ng.termii.com/api/sms/send", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -75,4 +100,17 @@ async function sendViaSMS(to: string, code: string) {
       api_key: process.env.TERMII_API_KEY,
     }),
   });
+
+  if (!res.ok) {
+    throw new Error(`Termii request failed with HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+
+  // Termii returns { "code": "ok", "message_id": "...", "message": "Successfully Sent", ... }
+  // on success. Anything else means the send did not actually succeed, even
+  // though the HTTP request itself returned 200.
+  if (data.code !== "ok") {
+    throw new Error(`Termii reported failure: ${JSON.stringify(data)}`);
+  }
 }

@@ -15,6 +15,8 @@ export const user = pgTable("user", {
     .notNull(),
   phone: text("phone"),
   role: text("role").default("user"),
+  phoneNumber: text("phone_number").unique(),
+phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
   verificationLevel: text("verification_level").default("basic"),
   ninVerified: boolean("nin_verified").default(false),
   state: text("state"),

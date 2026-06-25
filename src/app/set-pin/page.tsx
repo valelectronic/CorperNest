@@ -4,12 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
-export default function SigninPage() {
+export default function ForgotPinPage() {
   const router = useRouter();
   const [method, setMethod] = useState<"phone" | "email">("phone");
   const [identifier, setIdentifier] = useState("");
-  const [pin, setPin] = useState("");
-  const [showPin, setShowPin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -18,36 +16,67 @@ export default function SigninPage() {
     setLoading(true);
     setError("");
 
+    const trimmed = identifier.trim();
+
     try {
-      const { error: signInError, data } =
-        method === "phone"
-          ? await authClient.signIn.phoneNumber({ phoneNumber: identifier.trim(), password: pin })
-          : await authClient.signIn.email({ email: identifier.trim().toLowerCase(), password: pin });
+      const checkRes = await fetch("/api/auth/check-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          method === "phone" ? { phone: trimmed } : { email: trimmed.toLowerCase() }
+        ),
+      });
+      const checkData = await checkRes.json();
 
-      if (signInError) {
-        // Deliberately doesn't confirm which identifier exists or which
-        // part was wrong — protects against account enumeration, which
-        // matters more for CorperNest than most apps, since confirmed
-        // working phone numbers could be harvested for scam-targeting.
-        // Still nudges genuinely confused users toward the right fix.
-        setError("We couldn't sign you in. Try the other method (phone/email), double-check your PIN, or reset it below.");
+      if (!checkRes.ok || !checkData.exists) {
+        setError("No account found with these details. Create one instead.");
         setLoading(false);
         return;
       }
 
-      // ── Phone sign-in succeeded, but only allow it through if this
-      // number was actually proven reachable via SMS at some point. A
-      // phone number that only ever went through the email fallback path
-      // shouldn't be treated as a trusted login identity. ─────────────────
-      const userData = data?.user as { phoneNumberVerified?: boolean } | undefined;
-      if (method === "phone" && !userData?.phoneNumberVerified) {
-        await authClient.signOut();
-        setError("This phone number hasn't been verified yet. Please sign in with your email instead.");
+      const accountEmail = checkData.email;
+      const accountPhone = checkData.phoneNumber;
+
+      // ── Phone first — using the dedicated reset-password request, not
+      // a generic OTP send. Falls back to email automatically if it fails.
+      if (method === "phone" && accountPhone) {
+        try {
+          const { error: smsError } = await authClient.phoneNumber.requestPasswordReset({
+            phoneNumber: accountPhone,
+          });
+
+          if (!smsError) {
+            router.push(
+              `/reset-pin?channel=sms&phone=${encodeURIComponent(accountPhone)}&email=${encodeURIComponent(accountEmail ?? "")}`
+            );
+            return;
+          }
+        } catch {
+          // falls through to email fallback below
+        }
+      }
+
+      if (!accountEmail) {
+        setError("Could not send a reset code. Please contact support.");
         setLoading(false);
         return;
       }
 
-      router.push("/home");
+      // ── Email path — must use type "forget-password" specifically, not
+      // "sign-in". resetPassword() only validates against an OTP that was
+      // sent for this exact purpose.
+      const { error: emailError } = await authClient.emailOtp.sendVerificationOtp({
+        email: accountEmail,
+        type: "forget-password",
+      });
+
+      if (emailError) {
+        setError(emailError.message ?? "Could not send a reset code. Try again.");
+        setLoading(false);
+        return;
+      }
+
+      router.push(`/reset-pin?channel=email&email=${encodeURIComponent(accountEmail)}`);
     } catch {
       setError("Network error. Check your connection and try again.");
       setLoading(false);
@@ -79,13 +108,12 @@ export default function SigninPage() {
           className="text-2xl font-bold mb-1"
           style={{ fontFamily: "var(--font-heading)", color: "var(--color-text)" }}
         >
-          Welcome back
+          Reset your PIN
         </h1>
         <p className="text-sm mb-6" style={{ color: "var(--color-text-muted)" }}>
-          Sign in with your phone or email
+          We'll send a code to verify it's you
         </p>
 
-        {/* Method toggle */}
         <div
           className="flex rounded-xl p-1 mb-6"
           style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)" }}
@@ -132,51 +160,13 @@ export default function SigninPage() {
             />
           </div>
 
-          <div>
-            <label
-              className="block text-sm font-medium mb-1"
-              style={{ color: "var(--color-text-secondary)" }}
-            >
-              PIN
-            </label>
-            <input
-              type={showPin ? "text" : "password"}
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-              placeholder="••••"
-              required
-              className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none tracking-widest"
-              style={{
-                border: "1px solid var(--color-border)",
-                backgroundColor: "var(--color-bg)",
-                color: "var(--color-text)",
-                fontFamily: "var(--font-mono)",
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPin((s) => !s)}
-              className="text-xs font-medium mt-1.5"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              {showPin ? "Hide PIN" : "Show PIN"}
-            </button>
-          </div>
-
           {error && (
-            <div>
-              <p className="text-sm mb-2" style={{ color: "#E53935" }}>{error}</p>
-              <a href="/forgot-pin" className="text-sm font-medium" style={{ color: "var(--color-primary)" }}>
-                Forgot PIN?
-              </a>
-            </div>
+            <p className="text-sm" style={{ color: "#E53935" }}>{error}</p>
           )}
 
           <button
             type="submit"
-            disabled={loading || pin.length < 4}
+            disabled={loading}
             className="w-full font-semibold py-3 rounded-xl transition-opacity disabled:opacity-50"
             style={{
               backgroundColor: "var(--color-action)",
@@ -184,22 +174,14 @@ export default function SigninPage() {
               fontFamily: "var(--font-heading)",
             }}
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Sending code..." : "Send code"}
           </button>
         </form>
 
-        {!error && (
-          <p className="text-center text-sm mt-4">
-            <a href="/forgot-pin" className="font-medium" style={{ color: "var(--color-text-muted)" }}>
-              Forgot PIN?
-            </a>
-          </p>
-        )}
-
-        <p className="text-center text-sm mt-4" style={{ color: "var(--color-text-muted)" }}>
-          No account yet?{" "}
-          <a href="/signup" className="font-medium" style={{ color: "var(--color-primary)" }}>
-            Create one
+        <p className="text-center text-sm mt-6" style={{ color: "var(--color-text-muted)" }}>
+          Remembered your PIN?{" "}
+          <a href="/signin" className="font-medium" style={{ color: "var(--color-primary)" }}>
+            Sign in
           </a>
         </p>
       </div>

@@ -145,6 +145,7 @@ export const inspectionPayment = pgTable(
     agentId: text("agent_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    listingId: text("listing_id").references(() => listing.id, { onDelete: "set null" }),
     // Paystack payment reference — null until Phase 5 payment is built
     paystackRef: text("paystack_ref"),
     // Fixed platform fee in kobo (500000 = ₦5,000)
@@ -347,6 +348,57 @@ export const watchlist = pgTable(
   ],
 );
 
+// ─── PROPERTY REQUEST ────────────────────────────────────────────────────────
+export const propertyRequest = pgTable(
+  "property_request",
+  {
+    id:         text("id").primaryKey(),
+    renterId:   text("renter_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    lga:        text("lga").notNull(),
+    state:      text("state").notNull(),
+    type:       text("type").notNull(),
+    listingPurpose: text("listing_purpose").default("rent").notNull(),
+    landmark:   text("landmark"),
+    minBudget:  integer("min_budget"),
+    maxBudget:  integer("max_budget"),
+    notes:      text("notes"),
+    status:     text("status").default("open").notNull(),
+    createdAt:  timestamp("created_at").defaultNow().notNull(),
+    expiresAt:  timestamp("expires_at").notNull(),
+    updatedAt:  timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("property_request_renterId_idx").on(table.renterId),
+    index("property_request_status_idx").on(table.status),
+    index("property_request_lga_idx").on(table.lga),
+  ],
+);
+
+export const requestMatch = pgTable(
+  "request_match",
+  {
+    id:          text("id").primaryKey(),
+    requestId:   text("request_id")
+      .notNull()
+      .references(() => propertyRequest.id, { onDelete: "cascade" }),
+    listingId:   text("listing_id")
+      .notNull()
+      .references(() => listing.id, { onDelete: "cascade" }),
+    note:        text("note"),
+    matchedBy:   text("matched_by").notNull(),
+    createdAt:   timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("request_match_requestId_idx").on(table.requestId),
+    index("request_match_listingId_idx").on(table.listingId),
+  ],
+);
+
 //  NOTIFICATION ───────────────────────────────────────────────────────────────
 
 export const notification = pgTable(
@@ -516,6 +568,7 @@ export const userRelations = relations(user, ({ many }) => ({
   bookingsAsAgent: many(booking, { relationName: "agentBookings" }),
   bookingsAsRenter: many(booking, { relationName: "renterBookings" }),
   watchlist: many(watchlist),
+  propertyRequests: many(propertyRequest),
   inspectionPaymentsAsRenter: many(inspectionPayment, { relationName: "renterPayments" }),
   inspectionPaymentsAsAgent: many(inspectionPayment, { relationName: "agentPayments" }),
   referralsAsReferring: many(referral, { relationName: "referringAgent" }),
@@ -528,6 +581,16 @@ reviewsReceived: many(review, { relationName: "reviewsReceived" }),
 rentRecords:     many(rentRecord),
 }));
 
+
+export const propertyRequestRelations = relations(propertyRequest, ({ one, many }) => ({
+  renter:  one(user, { fields: [propertyRequest.renterId], references: [user.id] }),
+  matches: many(requestMatch),
+}));
+
+export const requestMatchRelations = relations(requestMatch, ({ one }) => ({
+  request: one(propertyRequest, { fields: [requestMatch.requestId], references: [propertyRequest.id] }),
+  listing: one(listing, { fields: [requestMatch.listingId], references: [listing.id] }),
+}));
 
 
 export const agentKycRequestRelations = relations(agentKycRequest, ({ one }) => ({

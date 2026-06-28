@@ -45,8 +45,8 @@ const statusStyle: Record<string, { bg: string; color: string; dot: string }> = 
 
 type Listing = {
   id:              string;
+  slug?:           string | null;   // ← ADDED
   title:           string;
-  slug:            string | null;
   description:     string;
   address:         string;
   lga:             string;
@@ -93,7 +93,6 @@ function ZoomViewer({
     setIndex((prev) => (prev - 1 + images.length) % images.length);
   }
 
-  // Double-tap / double-click to zoom in and out
   function handleImageTap(e: React.MouseEvent) {
     e.stopPropagation();
     const now = Date.now();
@@ -108,7 +107,6 @@ function ZoomViewer({
       style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(0,0,0,0.95)", display: "flex", flexDirection: "column" }}
       onClick={onClose}
     >
-      {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 8px", flexShrink: 0 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20 }}>
           {index + 1} / {images.length}
@@ -121,7 +119,6 @@ function ZoomViewer({
         </button>
       </div>
 
-      {/* Image area */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
         <img
           src={images[index]}
@@ -152,7 +149,6 @@ function ZoomViewer({
         )}
       </div>
 
-      {/* Hint + thumbnail strip */}
       <div style={{ flexShrink: 0, padding: "8px 16px 20px" }}>
         <p style={{ textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.5)", margin: "0 0 12px" }}>
           Double-tap image to zoom
@@ -259,6 +255,9 @@ export default function PropertyDetailClient({
   const router       = useRouter();
   const searchParams = useSearchParams();
 
+  // Use slug for all URLs when available, fall back to raw id for older listings ← ADDED
+  const linkPath = listing.slug ?? listing.id;
+
   const [activeImage,       setActiveImage]       = useState(0);
   const [watching,          setWatching]          = useState(isWatchlisted);
   const [toggling,          setToggling]          = useState(false);
@@ -267,12 +266,12 @@ export default function PropertyDetailClient({
   const [verifying,         setVerifying]         = useState(false);
   const [bookingId,         setBookingId]         = useState<string | null>(null);
   const [showDateSheet,     setShowDateSheet]     = useState(false);
-  const [isPaused,          setIsPaused]          = useState(false);  // ← NEW
-  const [zoomOpen,          setZoomOpen]          = useState(false);  // ← NEW
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null); // ← NEW
+  const [isPaused,          setIsPaused]          = useState(false);
+  const [zoomOpen,          setZoomOpen]          = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const images          = listing.images ?? [];
-  const hasMultiple      = images.length > 1; // ← NEW
+  const hasMultiple      = images.length > 1;
   const badge           = statusStyle[listing.status] ?? statusStyle.available;
   const isAvailable     = listing.status === "available";
   const isForSale       = listing.listingPurpose === "sale";
@@ -284,7 +283,6 @@ export default function PropertyDetailClient({
     ? Math.round(listing.price * (listing.agencyFeePercent / 100))
     : null;
 
-  // ── Auto-swap carousel — pure client-side, zero extra cost ── ← NEW
   useEffect(() => {
     if (!hasMultiple || isPaused || zoomOpen) return;
     intervalRef.current = setInterval(() => {
@@ -326,16 +324,16 @@ export default function PropertyDetailClient({
     const paymentStatus = searchParams.get("payment");
     const ref           = searchParams.get("ref");
     if (paymentStatus === "success" && ref) {
-      window.history.replaceState({}, "", `/properties/${listing.id}`);
+      window.history.replaceState({}, "", `/properties/${linkPath}`);
       verifyPayment(ref);
     }
-  }, [searchParams, listing.id, verifyPayment]);
+  }, [searchParams, linkPath, verifyPayment]);
 
   useEffect(() => {
     if (autoOpenBooking && !isLoggedIn) {
-      router.push(`/signin?callbackUrl=/properties/${listing.id}?action=book`);
+      router.push(`/signin?callbackUrl=/properties/${linkPath}?action=book`);
     }
-  }, [autoOpenBooking, isLoggedIn, router, listing.id]);
+  }, [autoOpenBooking, isLoggedIn, router, linkPath]);
 
   async function handlePay() {
     if (payLoading) return;
@@ -347,18 +345,27 @@ export default function PropertyDetailClient({
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Could not start payment. Try again."); return; }
+
+      // Already paid this agent — booking was created directly, no Paystack needed
+      if (data.alreadyPaid && data.bookingId) {
+        toast.success("Already paid for this agent — booking created, no new charge!");
+        setBookingId(data.bookingId);
+        setShowDateSheet(true);
+        return;
+      }
+
       window.location.href = data.authorizationUrl;
     } catch { toast.error("Network error. Please try again."); }
     finally { setPayLoading(false); }
   }
 
   function handleBookInspection() {
-    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${listing.id}?action=book`); return; }
+    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${linkPath}?action=book`); return; }
     setBookingSheetOpen(true);
   }
 
   async function handleWatchlistToggle() {
-    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${listing.id}`); return; }
+    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${linkPath}`); return; }
     if (toggling) return;
     setToggling(true);
     const newWatching = !watching;
@@ -391,7 +398,7 @@ export default function PropertyDetailClient({
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={async () => {
-              const url  = `https://www.corpernest.com.ng/properties/${listing.slug ?? listing.id}`;
+              const url  = `https://www.corpernest.com.ng/properties/${linkPath}`; {/* ← FIXED */}
               const text = `🏠 ${listing.title}\n📍 ${listing.lga}, ${listing.state}\n💰 ₦${listing.price.toLocaleString()}/yr\n\nVerified listing on CorperNest — inspect before you pay rent.`;
               if (navigator.share) { try { await navigator.share({ title: listing.title, text, url }); } catch {} }
               else { window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n\n${url}`)}`, "_blank"); }
@@ -437,7 +444,6 @@ export default function PropertyDetailClient({
               style={{ width: "100%", height: "100%", objectFit: "cover", transition: "opacity 0.3s" }}
             />
 
-            {/* Zoom hint icon */}
             <div style={{ position: "absolute", top: 12, left: 12, width: 30, height: 30, borderRadius: "50%", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <circle cx="11" cy="11" r="7" stroke="white" strokeWidth="1.8" />
@@ -449,7 +455,6 @@ export default function PropertyDetailClient({
               {activeImage + 1} / {images.length}
             </span>
 
-            {/* Carousel arrows */}
             {hasMultiple && (
               <>
                 <button
@@ -469,7 +474,6 @@ export default function PropertyDetailClient({
               </>
             )}
 
-            {/* Thumbnail strip */}
             {images.length > 1 && (
               <div style={{ position: "absolute", bottom: 12, left: 12, display: "flex", gap: 6 }}>
                 {images.map((_, i) => (

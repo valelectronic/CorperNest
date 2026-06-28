@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import MatchSelectionSheet from "@/components/match-selection-sheet";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,20 @@ type IncomingBooking = {
   renterEmail: string;
 };
 
+type PropertyRequestItem = {
+  id:         string;
+  renterName: string;
+  lga:        string;
+  state:      string;
+  type:       string;
+  landmark:   string | null;
+  minBudget:  number | null;
+  maxBudget:  number | null;
+  notes:      string | null;
+  matchCount: number;
+  daysLeft:   number;
+};
+
 type Props = {
   agentName:        string;
   listings:         Listing[];
@@ -58,6 +73,15 @@ const statusStyle: Record<string, { bg: string; color: string; dot: string }> = 
   "temp-unavailable": { bg: "#F3F4F6", color: "#4B5563", dot: "#9CA3AF" },
   reserved:           { bg: "#EEF2FF", color: "#3730A3", dot: "#6366F1" },
   "under-review":     { bg: "#FFF8E1", color: "#92400E", dot: "#F59E0B" },
+};
+
+const REQUEST_TYPE_LABELS: Record<string, string> = {
+  "self-con":  "Self Contained",
+  "mini-flat": "Mini Flat",
+  "1-bed":     "1 Bedroom",
+  "2-bed":     "2 Bedroom",
+  "3-bed":     "3 Bedroom",
+  "room":      "Single Room",
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -205,7 +229,6 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
       <div style={{ height: 3, background: isVerified ? "#43A047" : isScheduled ? "#6366F1" : "#F59E0B" }} />
       <div style={{ padding: 16 }}>
 
-        {/* Client row */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
           <div style={{
             width: 40, height: 40, borderRadius: 12, background: "var(--color-light)",
@@ -226,7 +249,6 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
           <BookingStatusPill status={booking.status} />
         </div>
 
-        {/* Info grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
           <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)" }}>
             <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
@@ -256,7 +278,6 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
           </div>
         </div>
 
-        {/* Verify section */}
         {isScheduled && vs.step === "idle" && (
           <button onClick={handleSendCode} style={{
             width: "100%", padding: "13px", borderRadius: 14,
@@ -343,11 +364,121 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
   );
 }
 
+// ─── PROPERTY REQUEST ROW — chat-list style, collapses/expands ──────────────
+
+function PropertyRequestRow(props: {
+  request:      PropertyRequestItem;
+  isOpen:       boolean;
+  onToggle:     () => void;
+  onMatchClick: () => void;
+}) {
+  const { request, isOpen, onToggle, onMatchClick } = props;
+  const initial = request.renterName?.charAt(0).toUpperCase() ?? "?";
+  const isFull  = request.matchCount >= 3;
+  const urgent  = request.daysLeft <= 1;
+
+  return (
+    <div style={{
+      background: "var(--color-card)", border: "1px solid var(--color-border)",
+      borderRadius: 18, overflow: "hidden",
+    }}>
+      <div style={{ height: 3, background: isFull ? "#9CA3AF" : urgent ? "#E53935" : "#6366F1" }} />
+
+      <button
+        onClick={onToggle}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 12,
+          padding: "14px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left",
+        }}
+      >
+        <div style={{
+          width: 40, height: 40, borderRadius: 12, background: "var(--color-light)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16,
+          color: "var(--color-primary)", flexShrink: 0,
+        }}>
+          {initial}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)" }}>
+            {request.renterName}
+          </p>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.lga}
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: urgent ? "#E53935" : "var(--color-text-muted)" }}>
+            {request.daysLeft === 0 ? "Today" : `${request.daysLeft}d`}
+          </span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+            background: isFull ? "#F3F4F6" : "var(--color-light)",
+            color: isFull ? "var(--color-text-muted)" : "var(--color-primary)",
+          }}>
+            {request.matchCount}/3
+          </span>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+          <path d="M6 9l6 6 6-6" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div style={{ padding: "0 16px 16px" }}>
+          <div style={{ height: 1, background: "var(--color-border)", marginBottom: 14 }} />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+            <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)" }}>
+              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Budget
+              </p>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>
+                {request.minBudget && request.maxBudget
+                  ? `₦${request.minBudget.toLocaleString()} - ₦${request.maxBudget.toLocaleString()}/yr`
+                  : "Not specified"}
+              </p>
+            </div>
+            <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)" }}>
+              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Landmark
+              </p>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>
+                {request.landmark ?? "Not specified"}
+              </p>
+            </div>
+          </div>
+
+          {request.notes && (
+            <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 14 }}>
+              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Notes
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: "var(--color-text)", lineHeight: 1.5 }}>{request.notes}</p>
+            </div>
+          )}
+
+          <button
+            onClick={onMatchClick}
+            disabled={isFull}
+            style={{
+              width: "100%", padding: "13px", borderRadius: 14, fontSize: 14, fontWeight: 700,
+              background: isFull ? "var(--color-border)" : "var(--color-primary)",
+              color: "#fff", border: "none", cursor: isFull ? "not-allowed" : "pointer",
+              fontFamily: "var(--font-heading)",
+            }}
+          >
+            {isFull ? "Match limit reached" : "I have this — Find Match"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── LISTING CARD ─────────────────────────────────────────────────────────────
 
-function ListingCard({
-  listing, currentStatus, updatingId, deletingId, onStatusChange, onMenuOpen,
-}: {
+function ListingCard(props: {
   listing:        Listing;
   currentStatus:  string;
   updatingId:     string | null;
@@ -355,6 +486,7 @@ function ListingCard({
   onStatusChange: (id: string, status: string) => void;
   onMenuOpen:     (id: string) => void;
 }) {
+  const { listing, currentStatus, updatingId, deletingId, onStatusChange, onMenuOpen } = props;
   const badge      = statusStyle[currentStatus] ?? statusStyle.available;
   const coverImage = listing.images?.[0] ?? null;
   const isDeleting = deletingId === listing.id;
@@ -365,7 +497,6 @@ function ListingCard({
       borderRadius: 18, overflow: "hidden",
       opacity: isDeleting ? 0.5 : 1, transition: "opacity 0.2s",
     }}>
-      {/* Image */}
       <div style={{ position: "relative", height: 172 }}>
         {coverImage ? (
           <img src={coverImage} alt={listing.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -380,7 +511,6 @@ function ListingCard({
         )}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 100%)" }} />
 
-        {/* Status badge */}
         <span style={{
           position: "absolute", top: 12, left: 12,
           fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20,
@@ -391,7 +521,6 @@ function ListingCard({
           {currentStatus.replace(/-/g, " ")}
         </span>
 
-        {/* Menu */}
         <button
           onClick={() => onMenuOpen(listing.id)}
           disabled={isDeleting}
@@ -414,7 +543,6 @@ function ListingCard({
           )}
         </button>
 
-        {/* Price */}
         <p style={{
           position: "absolute", bottom: 12, left: 12, margin: 0,
           fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 16, color: "#fff",
@@ -424,7 +552,6 @@ function ListingCard({
         </p>
       </div>
 
-      {/* Details */}
       <div style={{ padding: "14px 16px" }}>
         <p style={{ margin: "0 0 2px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)" }}>
           {listing.title}
@@ -458,14 +585,8 @@ function ListingCard({
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
-export default function AgentDashboardClient({
-  agentName,
-  listings,
-  incomingBookings,
-  expiringListings,
-  staleListings,
-  completedCount,
-}: Props) {
+export default function AgentDashboardClient(mainProps: Props) {
+  const { agentName, listings, incomingBookings, expiringListings, staleListings, completedCount } = mainProps;
   const router = useRouter();
 
   const [statusMap, setStatusMap]           = useState<Record<string, string>>(
@@ -476,7 +597,33 @@ export default function AgentDashboardClient({
   const [sheetListingId, setSheetListingId] = useState<string | null>(null);
   const [deletingId, setDeletingId]         = useState<string | null>(null);
   const [bookings, setBookings]             = useState(incomingBookings);
-  const [activeTab, setActiveTab]           = useState<"bookings" | "listings">("bookings");
+  const [activeTab, setActiveTab]           = useState<"bookings" | "listings" | "requests">("bookings");
+
+  const [propertyRequests, setPropertyRequests] = useState<PropertyRequestItem[]>([]);
+  const [requestsLoading, setRequestsLoading]   = useState(true);
+  const [openRequestId, setOpenRequestId]       = useState<string | null>(null);
+  const [matchSheetId, setMatchSheetId]         = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchRequests();
+    // Fire-and-forget housekeeping — never awaited, never blocks the UI,
+    // and only ever runs because someone happened to open this page, not
+    // on any schedule.
+    fetch("/api/listings/cleanup-stale", { method: "POST" }).catch(() => {});
+  }, []);
+
+  async function fetchRequests() {
+    setRequestsLoading(true);
+    try {
+      const res  = await fetch("/api/property-requests/list");
+      const data = await res.json();
+      if (res.ok) setPropertyRequests(data.requests ?? []);
+    } catch {
+      toast.error("Could not load requests.");
+    } finally {
+      setRequestsLoading(false);
+    }
+  }
 
   const initial         = agentName ? agentName.charAt(0).toUpperCase() : "A";
   const visibleListings = listings.filter((l) => !deletedIds.has(l.id));
@@ -486,6 +633,7 @@ export default function AgentDashboardClient({
   const visibleStale    = staleListings.filter((l) => !deletedIds.has(l.id));
   const visibleExpiring = expiringListings.filter((l) => !deletedIds.has(l.id));
   const alertCount      = activeBookings.length + visibleExpiring.length + visibleStale.length;
+  const activeMatchSheetRequest = propertyRequests.find((r) => r.id === matchSheetId);
 
   async function handleDelete(listingId: string, mode: "temporary" | "permanent") {
     setSheetListingId(null);
@@ -531,14 +679,11 @@ export default function AgentDashboardClient({
   return (
     <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }}>
 
-      {/* ── HEADER ── */}
       <header style={{ background: "#1B2E1B", padding: "16px 16px 0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
 
-          {/* Top row */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
 
-            {/* Agent info */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 12,
@@ -559,10 +704,8 @@ export default function AgentDashboardClient({
               </div>
             </div>
 
-            {/* Right side — back to site + stats */}
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
 
-              {/* Back to site */}
               <button
                 onClick={() => router.push("/home")}
                 style={{
@@ -582,7 +725,6 @@ export default function AgentDashboardClient({
                 </span>
               </button>
 
-              {/* Stats */}
               <div style={{ display: "flex", gap: 14 }}>
                 {[
                   { num: activeBookings.length,  label: "Active",   color: "#FAC775" },
@@ -602,11 +744,12 @@ export default function AgentDashboardClient({
             </div>
           </div>
 
-          {/* Tab bar */}
           <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-            {(["bookings", "listings"] as const).map((tab) => {
+            {(["bookings", "listings", "requests"] as const).map((tab) => {
               const isActive = activeTab === tab;
-              const badge    = tab === "bookings" ? activeBookings.length : visibleListings.length;
+              const badge    = tab === "bookings" ? activeBookings.length
+                             : tab === "listings" ? visibleListings.length
+                             : propertyRequests.length;
               return (
                 <button
                   key={tab}
@@ -642,10 +785,8 @@ export default function AgentDashboardClient({
         </div>
       </header>
 
-      {/* ── CONTENT ── */}
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px 16px 100px" }}>
 
-        {/* Alerts banner */}
         {alertCount > 0 && (
           <div style={{
             background: "#FAEEDA", border: "1px solid #FAC775",
@@ -671,11 +812,9 @@ export default function AgentDashboardClient({
           </div>
         )}
 
-        {/* ── BOOKINGS TAB ── */}
         {activeTab === "bookings" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
-            {/* Stale listings reminder */}
             {visibleStale.length > 0 && (
               <div>
                 <SectionHeader label="Availability reminder" />
@@ -704,7 +843,6 @@ export default function AgentDashboardClient({
               </div>
             )}
 
-            {/* Active bookings */}
             <div>
               <SectionHeader label="Active Bookings" count={activeBookings.length} />
               {activeBookings.length === 0 ? (
@@ -721,7 +859,6 @@ export default function AgentDashboardClient({
               )}
             </div>
 
-            {/* Verified visits */}
             {doneBookings.length > 0 && (
               <div>
                 <SectionHeader label="Verified Visits" count={doneBookings.length} />
@@ -735,11 +872,9 @@ export default function AgentDashboardClient({
           </div>
         )}
 
-        {/* ── LISTINGS TAB ── */}
         {activeTab === "listings" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
-            {/* Expiring soon */}
             {visibleExpiring.length > 0 && (
               <div>
                 <SectionHeader label="Expiring Soon" count={visibleExpiring.length} />
@@ -770,7 +905,6 @@ export default function AgentDashboardClient({
               </div>
             )}
 
-            {/* All listings */}
             <div>
               <SectionHeader label="My Listings" count={visibleListings.length} />
               {visibleListings.length === 0 ? (
@@ -795,7 +929,6 @@ export default function AgentDashboardClient({
               )}
             </div>
 
-            {/* Add listing CTA */}
             <Link href="/agent/listings/new" style={{
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               padding: "15px", borderRadius: 16, background: "var(--color-primary)",
@@ -809,15 +942,42 @@ export default function AgentDashboardClient({
             </Link>
           </div>
         )}
+
+        {activeTab === "requests" && (
+          <div>
+            <SectionHeader label="Open Requests" count={propertyRequests.length} />
+
+            {requestsLoading && (
+              <p style={{ fontSize: 13, color: "var(--color-text-muted)", textAlign: "center", padding: 24 }}>Loading…</p>
+            )}
+
+            {!requestsLoading && propertyRequests.length === 0 && (
+              <EmptyState
+                message="No open requests"
+                sub="When renters ask for something specific, it'll show up here for you to match."
+              />
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {propertyRequests.map((r) => (
+                <PropertyRequestRow
+                  key={r.id}
+                  request={r}
+                  isOpen={openRequestId === r.id}
+                  onToggle={() => setOpenRequestId(openRequestId === r.id ? null : r.id)}
+                  onMatchClick={() => setMatchSheetId(r.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* ── BOTTOM SHEET BACKDROP ── */}
       {sheetListingId && (
         <div onClick={() => setSheetListingId(null)}
           style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(0,0,0,0.5)" }} />
       )}
 
-      {/* ── BOTTOM SHEET ── */}
       <div style={{
         position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
         borderRadius: "22px 22px 0 0", background: "var(--color-card)",
@@ -875,6 +1035,18 @@ export default function AgentDashboardClient({
           </button>
         </div>
       </div>
+
+      {activeMatchSheetRequest && (
+        <MatchSelectionSheet
+          request={activeMatchSheetRequest}
+          onClose={() => setMatchSheetId(null)}
+          onMatched={() => {
+            setMatchSheetId(null);
+            setOpenRequestId(null);
+            fetchRequests();
+          }}
+        />
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

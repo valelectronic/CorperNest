@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import PropertyCard, { type PropertyCardData } from "@/components/property-card";
 import { getLGAs } from "@/lib/nigeria-location";
 import NetworkErrorState from "@/components/network-error-state";
@@ -58,7 +59,7 @@ export default function HomeClient({
   totalCount,
   watchlistedIds,
 }: Props) {
-  const firstName = userName?.split(" ")[0] ?? "Corper";
+  void userName; // no longer shown directly — banner is depersonalized
 
   // ── Listings state ────────────────────────────────────────────────────────
   const [listings, setListings]       = useState<PropertyCardData[]>(initialListings);
@@ -67,9 +68,7 @@ export default function HomeClient({
   const [page, setPage]               = useState(1);
   const [loading, setLoading]         = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [loadError, setLoadError]     = useState(false); // ← NEW
-  // true after user explicitly searches — hides initial server-fetched listings
-  // while a new query runs
+  const [loadError, setLoadError]     = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   // ── Filter state ──────────────────────────────────────────────────────────
@@ -83,19 +82,16 @@ export default function HomeClient({
   const [maxPrice, setMaxPrice]       = useState("");
   const [searchInput, setSearchInput] = useState("");
 
-  // Always Akwa Ibom on the home page — state filter not exposed
   const STATE = "Akwa Ibom";
   const lgaOptions = getLGAs(STATE);
 
   const activeFilterCount = [lga, type, purpose, minPrice, maxPrice].filter(Boolean).length;
 
-  // ── filtersRef — avoids stale closures inside fetch ───────────────────────
   const filtersRef = useRef({ lga, type, purpose, minPrice, maxPrice });
   useEffect(() => {
     filtersRef.current = { lga, type, purpose, minPrice, maxPrice };
   }, [lga, type, purpose, minPrice, maxPrice]);
 
-  // ── Debounce price inputs ─────────────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setMinPrice(minPriceRaw), 800);
     return () => clearTimeout(t);
@@ -106,7 +102,6 @@ export default function HomeClient({
     return () => clearTimeout(t);
   }, [maxPriceRaw]);
 
-  // ── Build query string ────────────────────────────────────────────────────
   function buildQuery(pageNum: number, keyword: string) {
     const f = filtersRef.current;
     const params = new URLSearchParams();
@@ -121,11 +116,10 @@ export default function HomeClient({
     return params.toString();
   }
 
-  // ── Core fetch ────────────────────────────────────────────────────────────
   async function fetchListings(keyword = "", isLoadMore = false, currentPage = 1) {
     if (isLoadMore) setLoadingMore(true);
     else            setLoading(true);
-    setLoadError(false); // ← NEW — clear any previous error on a fresh attempt
+    setLoadError(false);
 
     try {
       const pageNum = isLoadMore ? currentPage + 1 : 1;
@@ -143,19 +137,17 @@ export default function HomeClient({
       setHasMore(data.hasMore ?? false);
       setHasSearched(true);
     } catch {
-      setLoadError(true); // ← NEW — show retry state instead of silently failing
+      setLoadError(true);
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
   }
 
-  // ── Search handler ────────────────────────────────────────────────────────
   function handleSearch() {
     fetchListings(searchInput.trim());
   }
 
-  // ── Re-fetch when select filters change (only after first search) ─────────
   useEffect(() => {
     if (hasSearched) fetchListings(searchInput.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -166,7 +158,6 @@ export default function HomeClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minPrice, maxPrice]);
 
-  // ── Clear all ─────────────────────────────────────────────────────────────
   function clearFilters() {
   filtersRef.current = {
     lga:      "",
@@ -184,13 +175,12 @@ export default function HomeClient({
   setMaxPrice("");
   setSearchInput("");
   setHasSearched(false);
-  setLoadError(false); // ← NEW
+  setLoadError(false);
   setListings(initialListings);
   setHasMore(initialListings.length < totalCount);
   setPage(1);
 }
 
-  // ── Watchlist toggle callback (passed to PropertyCard) ────────────────────
   const handleWatchlistChange = useCallback((listingId: string, watching: boolean) => {
     setWatchedIds((prev) => {
       const next = new Set(prev);
@@ -199,7 +189,6 @@ export default function HomeClient({
     });
   }, []);
 
-  // Which listings to render — filtered set after a search, initial set otherwise
   const displayedListings = hasSearched ? listings : initialListings;
 
   return (
@@ -210,7 +199,6 @@ export default function HomeClient({
         className="sticky top-0 z-30 px-4 py-3 space-y-3"
         style={{ backgroundColor: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}
       >
-        {/* Search row — input flex-1, search icon btn 44px, filter icon btn 44px */}
         <div className="flex gap-2">
           <div
             className="flex items-center gap-2 flex-1 min-w-0 px-3 py-2.5 rounded-xl"
@@ -253,7 +241,6 @@ export default function HomeClient({
             )}
           </div>
 
-          {/* Search — icon only, fixed 44x44, same size as filter btn */}
           <button
             onClick={handleSearch}
             className="flex items-center justify-center rounded-xl shrink-0"
@@ -271,7 +258,6 @@ export default function HomeClient({
             </svg>
           </button>
 
-          {/* Filter toggle — fixed 44x44 */}
           <button
             onClick={() => setFiltersOpen(!filtersOpen)}
             className="relative flex items-center justify-center rounded-xl shrink-0"
@@ -305,7 +291,6 @@ export default function HomeClient({
           </button>
         </div>
 
-        {/* Filter panel */}
         {filtersOpen && (
           <div
             className="rounded-2xl p-4 space-y-3"
@@ -393,7 +378,6 @@ export default function HomeClient({
           </div>
         )}
 
-        {/* Result count row */}
         <div className="flex items-center justify-between">
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {loading
@@ -411,22 +395,50 @@ export default function HomeClient({
       {/* ── MAIN CONTENT ── */}
       <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
 
-        {/* Welcome banner — only on initial load, hidden while searching */}
+        {/* Welcome banner — trimmed, no personal name */}
         {!hasSearched && !loadError && (
           <div
             className="rounded-2xl px-4 py-4"
             style={{ background: "linear-gradient(135deg, #1B2E1B 0%, #2E7D32 100%)" }}
           >
-            <p className="text-xs mb-0.5" style={{ color: "#7A9A7A", letterSpacing: "0.5px" }}>
+            <p className="text-xs mb-1" style={{ color: "#7A9A7A", letterSpacing: "0.5px" }}>
               FIND YOUR HOME
             </p>
-            <p className="text-lg font-bold" style={{ color: "#E8F5E9", fontFamily: "var(--font-heading)" }}>
-              Welcome, {firstName} 👋
-            </p>
-            <p className="text-xs mt-1" style={{ color: "#A5C8A5" }}>
+            <p className="text-xs" style={{ color: "#A5C8A5" }}>
               Verified properties in Akwa Ibom — inspect before you pay rent.
             </p>
           </div>
+        )}
+
+        {/* Request a Property — proactive, visible before anyone even searches */}
+        {!hasSearched && !loadError && (
+          <Link
+            href="/request-property"
+            className="rounded-2xl px-4 py-3.5 flex items-center gap-3"
+            style={{ backgroundColor: "var(--color-light)", border: "1px solid var(--color-border)", textDecoration: "none" }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ backgroundColor: "var(--color-card)" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="8" stroke="var(--color-primary)" strokeWidth="1.8" />
+                <path d="M21 21l-4.35-4.35" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" />
+                <path d="M11 8v6M8 11h6" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold" style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
+                Can't find what you want?
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                Tell us what you're looking for — we'll hunt for it
+              </p>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+              <path d="M9 18l6-6-6-6" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
         )}
 
         {/* Skeleton loader */}
@@ -436,7 +448,7 @@ export default function HomeClient({
           </div>
         )}
 
-        {/* Network error state — request failed, distinct from "no results" */}
+        {/* Network error state */}
         {!loading && loadError && (
           <NetworkErrorState
             onRetry={() => fetchListings(searchInput.trim(), false, page)}
@@ -470,15 +482,24 @@ export default function HomeClient({
                   ? "No listings match your filters. Try adjusting them."
                   : "No listings available in Akwa Ibom right now."}
               </p>
-              {(activeFilterCount > 0 || searchInput) && (
-                <button
-                  onClick={clearFilters}
-                  className="text-xs font-semibold px-4 py-2 rounded-xl"
-                  style={{ backgroundColor: "var(--color-light)", color: "var(--color-primary)" }}
+              <div className="flex flex-col gap-2 w-full">
+                {(activeFilterCount > 0 || searchInput) && (
+                  <button
+                    onClick={clearFilters}
+                    className="text-xs font-semibold px-4 py-2.5 rounded-xl"
+                    style={{ backgroundColor: "var(--color-light)", color: "var(--color-primary)" }}
+                  >
+                    Clear filters
+                  </button>
+                )}
+                <Link
+                  href="/request-property"
+                  className="text-xs font-semibold px-4 py-2.5 rounded-xl"
+                  style={{ backgroundColor: "var(--color-primary)", color: "#fff", textDecoration: "none" }}
                 >
-                  Clear filters
-                </button>
-              )}
+                  Request this property instead →
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">

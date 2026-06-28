@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import ReceiptUploadSheet from "@/components/receipt-upload-sheet";
+import MyRequestsTab, { type RequestItem } from "./my-requests-tab";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -454,7 +455,6 @@ function BookingCard({
               <span style={{ fontSize: 13, fontWeight: 600, color: "#2E7D32" }}>Visit verified successfully</span>
             </div>
 
-            {/* Receipt upload CTA — only if no rent record yet */}
             {!hasRentRecord && (
               <button
                 onClick={() => onUploadReceipt(booking)}
@@ -508,12 +508,13 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  const [bookings,          setBookings]          = useState<Booking[]>([]);
-  const [rentRecords,       setRentRecords]        = useState<RentRecord[]>([]);
-  const [loading,           setLoading]            = useState(true);
-  const [activeDateSheet,   setActiveDateSheet]    = useState<Booking | null>(null);
+  const [bookings,           setBookings]           = useState<Booking[]>([]);
+  const [rentRecords,        setRentRecords]        = useState<RentRecord[]>([]);
+  const [requests,           setRequests]           = useState<RequestItem[]>([]);
+  const [loading,            setLoading]            = useState(true);
+  const [activeDateSheet,    setActiveDateSheet]    = useState<Booking | null>(null);
   const [activeReceiptSheet, setActiveReceiptSheet] = useState<Booking | null>(null);
-  const [activeTab,         setActiveTab]          = useState<"bookings" | "rent">("bookings");
+  const [activeTab,          setActiveTab]          = useState<"bookings" | "rent" | "requests">("bookings");
 
   void currentUserId;
   void currentUserName;
@@ -540,10 +541,21 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
     }
   }, []);
 
+  const fetchRequests = useCallback(async () => {
+    try {
+      const res  = await fetch("/api/property-requests/mine");
+      const data = await res.json();
+      setRequests(data.requests ?? []);
+    } catch {
+      console.error("Failed to load requests");
+    }
+  }, []);
+
   useEffect(() => {
     fetchBookings();
     fetchRentRecords();
-  }, [fetchBookings, fetchRentRecords]);
+    fetchRequests();
+  }, [fetchBookings, fetchRentRecords, fetchRequests]);
 
   // Handle return from Paystack after rent record payment
   useEffect(() => {
@@ -561,8 +573,8 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
     (b) => b.status === "verified" && !b.hasReview
   );
 
-  // Build a set of bookingIds that already have a rent record
   const rentRecordBookingIds = new Set(rentRecords.map((r) => r.bookingId));
+  const activeRequestCount   = requests.filter((r) => ["open", "matched"].includes(r.status)).length;
 
   if (loading) {
     return (
@@ -601,6 +613,7 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
       <div style={{ display: "flex", borderBottom: "1px solid var(--color-border)", margin: "16px 0 0", padding: "0 16px" }}>
         {([
           { key: "bookings", label: "Bookings",     count: bookings.length     },
+          { key: "requests", label: "Requests",     count: activeRequestCount },
           { key: "rent",     label: "Rent Records", count: rentRecords.filter(r => r.feePaid).length },
         ] as const).map((tab) => {
           const isActive = activeTab === tab.key;
@@ -629,7 +642,6 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
         {/* ── BOOKINGS TAB ── */}
         {activeTab === "bookings" && (
           <>
-            {/* Review prompts */}
             {pendingReviews.length > 0 && (
               <div style={{ marginBottom: 8 }}>
                 <p style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 10px", fontFamily: "var(--font-heading)" }}>
@@ -653,6 +665,11 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
               />
             ))}
           </>
+        )}
+
+        {/* ── REQUESTS TAB ── */}
+        {activeTab === "requests" && (
+          <MyRequestsTab requests={requests} onRefetch={fetchRequests} />
         )}
 
         {/* ── RENT RECORDS TAB ── */}

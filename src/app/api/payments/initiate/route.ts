@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
-import { inspectionPayment, listing } from "@/db/schema";
+import { inspectionPayment, listing, booking } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { createNotification } from "@/lib/create-notification";
 
 export const dynamic = "force-dynamic";
 
@@ -98,10 +99,65 @@ export async function POST(req: NextRequest) {
     .limit(1);
 
   if (existing.length > 0 && existing[0].status === "paid") {
-    return NextResponse.json(
-      { error: "You have already paid to inspect this agent's properties." },
-      { status: 400 }
-    );
+    // Already paid this agent — no new payment needed. Create the booking
+    // for THIS listing directly under the existing payment, instead of
+    // blocking. This is what makes "tour all properties by this agent"
+    // actually work when they want to visit a second one later.
+
+    // Prevent a duplicate booking if they've already booked this exact listing
+    const existingBookingForThisListing = await db
+      .select({ id: booking.id })
+      .from(booking)
+      .where(
+        and(
+          eq(booking.renterId, renterId),
+          eq(booking.listingId, listingId),
+        )
+      )
+      .limit(1);
+
+    if (existingBookingForThisListing.length > 0) {
+      return NextResponse.json(
+        { error: "You've already booked this property." },
+        { status: 400 }
+      );
+    }
+
+    const bookingId   = nanoid();
+    const bookingCode = `BK-${nanoid(6).toUpperCase()}`;
+
+    await db.insert(booking).values({
+      id:                  bookingId,
+      listingId,
+      renterId,
+      agentId,
+      inspectionPaymentId: existing[0].id,
+      bookingCode,
+      renterContact:       renterEmail,
+      renterContactType:   "email",
+      status:              "pending",
+      confirmationStatus:  "pending",
+      createdAt:           new Date(),
+      updatedAt:           new Date(),
+    });
+
+    await db
+      .update(listing)
+      .set({ status: "reserved", lastStatusUpdate: new Date(), updatedAt: new Date() })
+      .where(eq(listing.id, listingId));
+
+    await createNotification({
+      userId:  agentId,
+      type:    "booking-created",
+      title:   "New Inspection Booked!",
+      message: `A corper wants to inspect your ${theListing.title} too — already paid, no new charge.`,
+      link:    "/agent",
+    });
+
+    return NextResponse.json({
+      alreadyPaid: true,
+      bookingId,
+    });
   }
 
   // ── 6. Generate Paystack reference ───────────────────────────────────────
@@ -113,6 +169,9 @@ export async function POST(req: NextRequest) {
     id:          paymentId,
     renterId,
     agentId,
+    listingId,   // ← which specific listing triggered this payment — this is
+                 //   what lets the webhook book the EXACT property the
+                 //   renter clicked from, instead of guessing
     paystackRef,
     amount:      500000, // ₦5,000 in kobo
     status:      "pending",

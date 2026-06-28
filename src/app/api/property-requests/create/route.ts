@@ -85,10 +85,12 @@ export async function POST(req: NextRequest) {
   // Admin always gets emailed — this is the actual core of the workflow:
   // you (or an agent) go hunt for it and link a match by hand when found.
   const renterRow = await db
-    .select({ name: user.name, email: user.email })
+    .select({ name: user.name, email: user.email, phoneNumber: user.phoneNumber, phone: user.phone })
     .from(user)
     .where(eq(user.id, session.user.id))
     .limit(1);
+
+  const renterPhone = renterRow[0]?.phoneNumber ?? renterRow[0]?.phone ?? "Not provided";
 
   sendAdminEmail(
     `New Property Request — ${lga.trim()}`,
@@ -96,7 +98,9 @@ export async function POST(req: NextRequest) {
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
         <h2 style="color:#1B2E1B;margin:0 0 4px">New property request</h2>
         <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:16px">
-          <tr><td style="padding:8px 0;color:#7A9A7A;width:140px">Renter</td><td style="padding:8px 0">${renterRow[0]?.name ?? "Unknown"} (${renterRow[0]?.email ?? "—"})</td></tr>
+          <tr><td style="padding:8px 0;color:#7A9A7A;width:140px">Renter</td><td style="padding:8px 0">${renterRow[0]?.name ?? "Unknown"}</td></tr>
+          <tr><td style="padding:8px 0;color:#7A9A7A">Renter Phone</td><td style="padding:8px 0">${renterPhone}</td></tr>
+          <tr><td style="padding:8px 0;color:#7A9A7A">Renter Email</td><td style="padding:8px 0">${renterRow[0]?.email ?? "—"}</td></tr>
           <tr><td style="padding:8px 0;color:#7A9A7A">LGA</td><td style="padding:8px 0">${lga.trim()}, ${state.trim()}</td></tr>
           <tr><td style="padding:8px 0;color:#7A9A7A">Type</td><td style="padding:8px 0">${type}</td></tr>
           <tr><td style="padding:8px 0;color:#7A9A7A">Landmark</td><td style="padding:8px 0">${landmark?.trim() || "—"}</td></tr>

@@ -1,7 +1,7 @@
 // src/app/api/payments/webhook/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { inspectionPayment, booking, listing } from "@/db/schema";
+import { inspectionPayment, booking, listing, user } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createHmac } from "crypto";
@@ -151,13 +151,28 @@ export async function POST(req: NextRequest) {
       link:    "/agent",
     });
 
+    // ── Fetch both parties' contact info — this is what actually lets
+    // admin pick up the phone and call either of them directly
+    const [agentRow, renterRow] = await Promise.all([
+      db.select({ name: user.name, phoneNumber: user.phoneNumber, phone: user.phone })
+        .from(user).where(eq(user.id, payment.agentId)).limit(1),
+      db.select({ name: user.name, phoneNumber: user.phoneNumber, phone: user.phone })
+        .from(user).where(eq(user.id, payment.renterId)).limit(1),
+    ]);
+    const agentPhone  = agentRow[0]?.phoneNumber ?? agentRow[0]?.phone ?? "Not provided";
+    const renterPhone = renterRow[0]?.phoneNumber ?? renterRow[0]?.phone ?? "Not provided";
+
     await sendAdminEmail(
       `New Booking — ${bookingCode}`,
       `
         <h2>New Inspection Booking</h2>
         <table cellpadding="6">
           <tr><td><b>Booking Code</b></td><td>${bookingCode}</td></tr>
+          <tr><td><b>Renter Name</b></td><td>${renterRow[0]?.name ?? "Unknown"}</td></tr>
+          <tr><td><b>Renter Phone</b></td><td>${renterPhone}</td></tr>
           <tr><td><b>Renter Email</b></td><td>${event.data.customer.email}</td></tr>
+          <tr><td><b>Agent Name</b></td><td>${agentRow[0]?.name ?? "Unknown"}</td></tr>
+          <tr><td><b>Agent Phone</b></td><td>${agentPhone}</td></tr>
           <tr><td><b>Listing</b></td><td>${theListing.title}</td></tr>
           <tr><td><b>Amount Paid</b></td><td>₦5,000</td></tr>
           <tr><td><b>Time</b></td><td>${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}</td></tr>

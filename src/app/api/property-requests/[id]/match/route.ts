@@ -125,11 +125,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // If an agent matched it without you, this is exactly when you need to
   // know, so you can make your verification call.
   if (!isAdmin) {
-    const agentRow = await db
-      .select({ name: user.name, email: user.email })
-      .from(user)
-      .where(eq(user.id, session.user.id))
-      .limit(1);
+    const [agentRow, renterRow] = await Promise.all([
+      db.select({ name: user.name, email: user.email, phoneNumber: user.phoneNumber, phone: user.phone })
+        .from(user).where(eq(user.id, session.user.id)).limit(1),
+      db.select({ name: user.name, phoneNumber: user.phoneNumber, phone: user.phone })
+        .from(user).where(eq(user.id, requestRow[0].renterId)).limit(1),
+    ]);
+
+    const agentPhone  = agentRow[0]?.phoneNumber ?? agentRow[0]?.phone ?? "Not provided";
+    const renterPhone = renterRow[0]?.phoneNumber ?? renterRow[0]?.phone ?? "Not provided";
 
     sendAdminEmail(
       `Agent Matched a Request — ${requestRow[0].id}`,
@@ -139,6 +143,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           <p style="color:#3B6D11"><i>Call the agent to verify before the renter visits.</i></p>
           <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:16px">
             <tr><td style="padding:8px 0;color:#7A9A7A;width:140px">Agent</td><td style="padding:8px 0">${agentRow[0]?.name ?? "Unknown"} (${agentRow[0]?.email ?? "—"})</td></tr>
+            <tr><td style="padding:8px 0;color:#7A9A7A">Agent Phone</td><td style="padding:8px 0">${agentPhone}</td></tr>
+            <tr><td style="padding:8px 0;color:#7A9A7A">Renter Phone</td><td style="padding:8px 0">${renterPhone}</td></tr>
             <tr><td style="padding:8px 0;color:#7A9A7A">Listing ID</td><td style="padding:8px 0">${listingId}</td></tr>
             <tr><td style="padding:8px 0;color:#7A9A7A">Note from agent</td><td style="padding:8px 0">${note?.trim() || "—"}</td></tr>
           </table>

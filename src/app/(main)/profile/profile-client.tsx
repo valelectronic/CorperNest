@@ -16,6 +16,7 @@ interface User {
   state?: string | null;
   callUpNumber?: string | null;
   emailVerified?: boolean;
+  phoneNumberVerified?: boolean;
 }
 
 function InlineAvatar({ name, size = 52 }: { name: string; size?: number }) {
@@ -35,6 +36,26 @@ function InlineAvatar({ name, size = 52 }: { name: string; size?: number }) {
         {initial}
       </span>
     </div>
+  );
+}
+
+// Small green "Verified" pill — only ever shown when something genuinely
+// is verified. Absence of this badge simply means not yet verified,
+// rather than showing a separate "unverified" warning everywhere.
+function VerifiedBadge() {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 3,
+      padding: "1px 8px", borderRadius: 20,
+      fontSize: 10, fontWeight: 700,
+      background: "#E8F5E9", color: "#2E7D32",
+      marginLeft: 8,
+    }}>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+        <path d="M20 6L9 17l-5-5" stroke="#2E7D32" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      Verified
+    </span>
   );
 }
 
@@ -65,6 +86,45 @@ export default function ProfileClient({ user }: { user: User }) {
   function handleBecomeAgent() {
     router.push("/agent/kyc");
   }
+
+  // ── Info rows — Email and Phone now carry a verified badge next to
+  // their value when that specific field is actually verified. ───────────
+  const infoRows = [
+    {
+      label: "Email", value: user.email, verified: user.emailVerified ?? false,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M4 6h16a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V7a1 1 0 011-1Z" stroke="var(--color-text-muted)" strokeWidth="1.6" fill="none" />
+          <path d="M3 7l9 6 9-6" stroke="var(--color-text-muted)" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+    },
+    {
+      label: "Phone", value: user.phone ?? "Not set", verified: user.phoneNumberVerified ?? false,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M6.6 10.8a15.15 15.15 0 006.6 6.6l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.58.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1C10.86 21 3 13.14 3 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.58.11.35.03.74-.24 1.02L6.6 10.8Z" fill="var(--color-text-muted)" />
+        </svg>
+      ),
+    },
+    ...(user.state ? [{
+      label: "State", value: user.state, verified: false,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" fill="var(--color-text-muted)" />
+        </svg>
+      ),
+    }] : []),
+    ...(user.callUpNumber ? [{
+      label: "Call-Up Number", value: user.callUpNumber, verified: false,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <rect x="4" y="2" width="16" height="20" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.8" fill="none" />
+          <path d="M8 10h8M8 14h5" stroke="var(--color-text-muted)" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      ),
+    }] : []),
+  ];
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--color-bg)", paddingBottom: 88 }}>
@@ -122,35 +182,9 @@ export default function ProfileClient({ user }: { user: User }) {
           </div>
         </div>
 
-        {/* Info rows */}
+        {/* Info rows — Email and Phone carry the verified badge */}
         <div style={{ background: "var(--color-card)", borderRadius: 16, border: "1px solid var(--color-border)", overflow: "hidden" }}>
-          {[
-            {
-              label: "Phone", value: user.phone ?? "Not set",
-              icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M6.6 10.8a15.15 15.15 0 006.6 6.6l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.58.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1C10.86 21 3 13.14 3 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.58.11.35.03.74-.24 1.02L6.6 10.8Z" fill="var(--color-text-muted)" />
-                </svg>
-              ),
-            },
-            ...(user.state ? [{
-              label: "State", value: user.state,
-              icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z" fill="var(--color-text-muted)" />
-                </svg>
-              ),
-            }] : []),
-            ...(user.callUpNumber ? [{
-              label: "Call-Up Number", value: user.callUpNumber,
-              icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <rect x="4" y="2" width="16" height="20" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.8" fill="none" />
-                  <path d="M8 10h8M8 14h5" stroke="var(--color-text-muted)" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-              ),
-            }] : []),
-          ].map((row, i, arr) => (
+          {infoRows.map((row, i, arr) => (
             <div key={row.label} style={{
               padding: "14px 16px", display: "flex", alignItems: "center", gap: 12,
               borderBottom: i < arr.length - 1 ? "1px solid var(--color-border)" : "none",
@@ -161,13 +195,16 @@ export default function ProfileClient({ user }: { user: User }) {
               }}>
                 {row.icon}
               </div>
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   {row.label}
                 </p>
-                <p style={{ margin: "2px 0 0", fontSize: 14, color: "var(--color-text)", fontWeight: 500 }}>
-                  {row.value}
-                </p>
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+                  <p style={{ margin: "2px 0 0", fontSize: 14, color: "var(--color-text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {row.value}
+                  </p>
+                  {row.verified && <VerifiedBadge />}
+                </div>
               </div>
             </div>
           ))}

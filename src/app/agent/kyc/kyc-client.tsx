@@ -1,21 +1,12 @@
 // src/app/agent/kyc/kyc-client.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { STATE_NAMES, getLGAs } from "@/lib/nigeria-location";
-
-// Nigerian banks list
-const NIGERIAN_BANKS = [
-  "Access Bank", "Citibank", "Ecobank", "Fidelity Bank", "First Bank",
-  "First City Monument Bank (FCMB)", "Guaranty Trust Bank (GTBank)",
-  "Heritage Bank", "Keystone Bank", "Polaris Bank", "Providus Bank",
-  "Stanbic IBTC Bank", "Standard Chartered Bank", "Sterling Bank",
-  "Suntrust Bank", "Union Bank", "United Bank for Africa (UBA)",
-  "Unity Bank", "Wema Bank", "Zenith Bank", "Kuda Bank", "Opay",
-  "Palmpay", "Moniepoint", "Carbon", "VFD Microfinance Bank",
-];
+import { authClient } from "@/lib/auth-client";
+import PhoneVerificationModal from "@/components/phone-verification-modal";
 
 type ExistingRequest = {
   id:        string;
@@ -29,6 +20,8 @@ type Props = {
   existingRequest: ExistingRequest;
 };
 
+type Bank = { name: string; code: string };
+
 export default function KycClient({ agentName, agentPhone, existingRequest }: Props) {
   const router  = useRouter();
   const isPending  = existingRequest?.status === "pending";
@@ -40,26 +33,92 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
   const [whatsapp,      setWhatsapp]      = useState("");
   const [state,         setState]         = useState("Akwa Ibom");
   const [lga,           setLga]           = useState("");
-  const [bankName,      setBankName]      = useState("");
+  const [bankCode,      setBankCode]      = useState("");
   const [accountNumber, setAccountNumber] = useState("");
-  const [accountName,   setAccountName]   = useState("");
+  const [accountName,   setAccountName]   = useState(""); // now always Paystack-verified, never typed
   const [loading,       setLoading]       = useState(false);
   const [submitted,     setSubmitted]     = useState(false);
 
+  // ── Dynamic bank list, live from Paystack ───────────────────────────────
+  const [banks, setBanks]               = useState<Bank[]>([]);
+  const [banksLoading, setBanksLoading] = useState(true);
+
+  // ── Live account resolution state ───────────────────────────────────────
+  const [resolving, setResolving]   = useState(false);
+  const [resolveError, setResolveError] = useState("");
+
+  // ── Phone verification gate ─────────────────────────────────────────────
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false);
+  const { data: session } = authClient.useSession();
+  const phoneNumberVerified = (session?.user as { phoneNumberVerified?: boolean } | undefined)?.phoneNumberVerified ?? false;
+
   const lgaOptions = getLGAs(state);
+
+  useEffect(() => {
+    fetch("/api/banks/list")
+      .then((r) => r.json())
+      .then((data) => setBanks(data.banks ?? []))
+      .catch(() => toast.error("Could not load bank list"))
+      .finally(() => setBanksLoading(false));
+  }, []);
+
+  // ── Auto-resolve the moment both bank + a full 10-digit number are set ──
+  useEffect(() => {
+    if (!bankCode || accountNumber.length !== 10) {
+      setAccountName("");
+      setResolveError("");
+      return;
+    }
+
+    let cancelled = false;
+    setResolving(true);
+    setResolveError("");
+    setAccountName("");
+
+    fetch(`/api/banks/resolve?accountNumber=${accountNumber}&bankCode=${bankCode}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.error) {
+          setResolveError(data.error);
+        } else {
+          setAccountName(data.accountName);
+        }
+      })
+      .catch(() => { if (!cancelled) setResolveError("Could not verify account. Try again."); })
+      .finally(() => { if (!cancelled) setResolving(false); });
+
+    return () => { cancelled = true; };
+  }, [bankCode, accountNumber]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!lga) { toast.error("Please select your LGA"); return; }
-    if (!bankName) { toast.error("Please select your bank"); return; }
+    if (!bankCode) { toast.error("Please select your bank"); return; }
     if (!/^\d{10}$/.test(accountNumber.trim())) {
       toast.error("Account number must be exactly 10 digits");
       return;
     }
+    if (!accountName) {
+      toast.error("We couldn't verify this account yet. Check your bank and account number.");
+      return;
+    }
 
+    // ── Phone verification gate — checked right before actually submitting
+    if (!phoneNumberVerified) {
+      setShowPhoneVerify(true);
+      return;
+    }
+
+    await actuallySubmit();
+  }
+
+  async function actuallySubmit() {
     setLoading(true);
     try {
+      const bankName = banks.find((b) => b.code === bankCode)?.name ?? "";
+
       const res = await fetch("/api/agent/kyc/submit", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,6 +140,11 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
     } finally {
       setLoading(false);
     }
+  }
+
+  function handlePhoneVerified() {
+    setShowPhoneVerify(false);
+    actuallySubmit();
   }
 
   // ── PENDING STATE ─────────────────────────────────────────────────────────
@@ -148,11 +212,6 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
       </div>
     );
   }
-
-
-  
-  // ── DECLINED STATE ────────────────────────────────────────────────────────
-  // Show declined notice at top but still allow resubmission
 
   // ── FORM ──────────────────────────────────────────────────────────────────
   return (
@@ -223,7 +282,6 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
               Contact Details
             </p>
 
-            {/* Full name */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                 Full Name *
@@ -242,7 +300,6 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
               />
             </div>
 
-            {/* Phone */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                 Phone Number * <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(we'll call this)</span>
@@ -262,7 +319,6 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
               />
             </div>
 
-            {/* WhatsApp */}
             <div>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                 WhatsApp Number <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(if different)</span>
@@ -332,7 +388,7 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
             </div>
           </div>
 
-          {/* ── SECTION: Bank Details ── */}
+          {/* ── SECTION: Bank Details — now with live verification ── */}
           <div style={{
             background: "var(--color-card)", border: "1px solid var(--color-border)",
             borderRadius: 16, padding: 16,
@@ -341,18 +397,18 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
               Bank Details
             </p>
             <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 14px" }}>
-              For receiving your 80% payout after successful inspections.
+              For receiving your 80% payout after successful inspections. We verify this lives up against your real bank — nothing typed here is taken on trust.
             </p>
 
-            {/* Bank name */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                 Bank Name *
               </label>
               <select
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
+                value={bankCode}
+                onChange={(e) => setBankCode(e.target.value)}
                 required
+                disabled={banksLoading}
                 style={{
                   width: "100%", padding: "12px 14px", borderRadius: 12,
                   border: "1.5px solid var(--color-border)", fontSize: 13,
@@ -360,12 +416,11 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
                   boxSizing: "border-box",
                 }}
               >
-                <option value="">Select bank</option>
-                {NIGERIAN_BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
+                <option value="">{banksLoading ? "Loading banks…" : "Select bank"}</option>
+                {banks.map((b) => <option key={b.code} value={b.code}>{b.name}</option>)}
               </select>
             </div>
 
-            {/* Account number */}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                 Account Number * <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(10 digits)</span>
@@ -386,24 +441,37 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
               />
             </div>
 
-            {/* Account name */}
+            {/* Verified account name — read-only, never typed */}
             <div>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                Account Name * <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(as it appears on your bank)</span>
+                Account Name <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(verified automatically)</span>
               </label>
-              <input
-                type="text"
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                placeholder="John Doe"
-                required
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 12,
-                  border: "1.5px solid var(--color-border)", fontSize: 14,
-                  color: "var(--color-text)", background: "var(--color-bg)",
-                  boxSizing: "border-box", fontFamily: "var(--font-body)",
-                }}
-              />
+              <div style={{
+                width: "100%", padding: "12px 14px", borderRadius: 12,
+                border: `1.5px solid ${accountName ? "#43A047" : "var(--color-border)"}`,
+                fontSize: 14, background: accountName ? "#E8F5E9" : "var(--color-bg)",
+                color: accountName ? "#2E7D32" : "var(--color-text-muted)",
+                boxSizing: "border-box", minHeight: 44, display: "flex", alignItems: "center", gap: 8,
+              }}>
+                {resolving ? (
+                  <>
+                    <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                    Verifying account…
+                  </>
+                ) : accountName ? (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M20 6L9 17l-5-5" stroke="#2E7D32" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    {accountName}
+                  </>
+                ) : (
+                  "Enter bank and account number above"
+                )}
+              </div>
+              {resolveError && (
+                <p style={{ fontSize: 12, color: "#E53935", margin: "6px 0 0" }}>{resolveError}</p>
+              )}
             </div>
           </div>
 
@@ -422,16 +490,15 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
             </p>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || resolving || !accountName}
             style={{
               width: "100%", padding: "15px",
-              background: loading ? "var(--color-border)" : "var(--color-primary)",
+              background: (loading || resolving || !accountName) ? "var(--color-border)" : "var(--color-primary)",
               color: "#fff", border: "none", borderRadius: 14,
               fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15,
-              cursor: loading ? "not-allowed" : "pointer",
+              cursor: (loading || resolving || !accountName) ? "not-allowed" : "pointer",
               transition: "background 0.2s",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
@@ -452,6 +519,13 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
           </button>
         </form>
       </div>
+
+      {showPhoneVerify && (
+        <PhoneVerificationModal
+          onClose={() => setShowPhoneVerify(false)}
+          onVerified={handlePhoneVerified}
+        />
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { authClient } from "@/lib/auth-client";
 import ReceiptUploadSheet from "@/components/receipt-upload-sheet";
+import PhoneVerificationModal from "@/components/phone-verification-modal";
 import MyRequestsTab, { type RequestItem } from "./my-requests-tab";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -515,6 +517,31 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
   const [activeDateSheet,    setActiveDateSheet]    = useState<Booking | null>(null);
   const [activeReceiptSheet, setActiveReceiptSheet] = useState<Booking | null>(null);
   const [activeTab,          setActiveTab]          = useState<"bookings" | "rent" | "requests">("bookings");
+  const [showPhoneVerify,    setShowPhoneVerify]    = useState(false);
+  const [pendingDateBooking, setPendingDateBooking] = useState<Booking | null>(null);
+
+  const { data: session } = authClient.useSession();
+  const phoneNumberVerified = (session?.user as { phoneNumberVerified?: boolean } | undefined)?.phoneNumberVerified ?? false;
+
+  // Gate: setting a visit date requires a genuinely verified phone number,
+  // since the agent and platform need a real, reachable contact for the
+  // visit itself. Shows the verification modal first if not yet verified.
+  function handleRequestSetDate(booking: Booking) {
+    if (!phoneNumberVerified) {
+      setPendingDateBooking(booking);
+      setShowPhoneVerify(true);
+      return;
+    }
+    setActiveDateSheet(booking);
+  }
+
+  function handlePhoneVerified() {
+    setShowPhoneVerify(false);
+    if (pendingDateBooking) {
+      setActiveDateSheet(pendingDateBooking);
+      setPendingDateBooking(null);
+    }
+  }
 
   void currentUserId;
   void currentUserName;
@@ -659,7 +686,7 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
               <BookingCard
                 key={b.id}
                 booking={b}
-                onSetDate={setActiveDateSheet}
+                onSetDate={handleRequestSetDate}
                 onUploadReceipt={setActiveReceiptSheet}
                 hasRentRecord={rentRecordBookingIds.has(b.id)}
               />
@@ -700,6 +727,14 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
           </>
         )}
       </div>
+
+      {/* Phone verification gate — shown before set-date if not yet verified */}
+      {showPhoneVerify && (
+        <PhoneVerificationModal
+          onClose={() => { setShowPhoneVerify(false); setPendingDateBooking(null); }}
+          onVerified={handlePhoneVerified}
+        />
+      )}
 
       {/* Set date sheet */}
       {activeDateSheet && (

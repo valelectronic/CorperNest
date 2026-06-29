@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   // ── Generate code, try SMS first, fall back to email automatically ─────
   const code = generateCode();
   const identifier = `custom-signup:${normalisedEmail}`;
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes — matches Termii's approved SMS sample exactly
 
   // Clear any previous pending signup attempt for this email
   await db.delete(verification).where(eq(verification.identifier, identifier));

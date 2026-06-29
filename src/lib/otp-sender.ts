@@ -21,6 +21,7 @@ interface SendOTPResult {
 }
 
 export async function sendOTP({ to, phone, code, type }: SendOTPParams): Promise<SendOTPResult> {
+  console.log(`[OTP] sendOTP called — type=${type}, hasPhone=${!!phone}, OTP_PROVIDER=${process.env.OTP_PROVIDER}`);
 
   // ── "change-email" is the one exception — always email, no fallback logic ──
   // The whole point of this type is proving ownership of a NEW email address.
@@ -35,7 +36,7 @@ export async function sendOTP({ to, phone, code, type }: SendOTPParams): Promise
 
   if (shouldAttemptSMS) {
     try {
-      await sendViaSMS(phone!, code);
+      await sendViaSMS(phone!, code, type);
       return { channel: "sms" };
     } catch (err) {
       // SMS failed for any reason — wrong number, Termii downtime, low
@@ -79,7 +80,7 @@ console.log(`[EMAIL] Sending ${type} OTP to ${to} from noreply@contact.corpernes
             ${code}
           </span>
         </div>
-        <p style="font-size: 14px; color: #6b7280;">This code expires in 5 minutes. Do not share it with anyone.</p>
+        <p style="font-size: 14px; color: #6b7280;">This code expires in 10 minutes. Do not share it with anyone.</p>
         <p style="font-size: 14px; color: #6b7280;">If you did not request this, ignore this email.</p>
       </div>
     `,
@@ -87,14 +88,43 @@ console.log(`[EMAIL] Sending ${type} OTP to ${to} from noreply@contact.corpernes
 }
 
 
-async function sendViaSMS(to: string, code: string): Promise<void> {
+// Termii expects international format (234XXXXXXXXXX, no leading +, no
+// leading 0) — but every phone number in our system is stored in local
+// Nigerian format (0XXXXXXXXXX), since that's what signup validates
+// against. Converting here, right before the actual API call, means
+// nothing else in the codebase needs to change or worry about this.
+function toTermiiFormat(localPhone: string): string {
+  const digitsOnly = localPhone.replace(/\D/g, "");
+  if (digitsOnly.startsWith("0")) {
+    return "234" + digitsOnly.slice(1);
+  }
+  return digitsOnly; // already looks international — leave as is
+}
+
+async function sendViaSMS(to: string, code: string, type: OTPType): Promise<void> {
+  const formattedNumber = toTermiiFormat(to);
+  console.log(`[SMS] Attempting Termii send — type=${type}, to=${formattedNumber}`);
+
+  // ── Most types share the exact Termii-approved sample wording. ───────────
+  // viewing-verification is the one exception — it's genuinely valid for
+  // 2 hours (travel time to the property), not minutes, so using the same
+  // "Expires in 10 minutes" text would tell renters something false. Same
+  // business name and one-time-use framing kept, just an honest number.
+  const messages: Record<OTPType, string> = {
+    "email-verification":  `Your CorperNest verification code is ${code}. Expires in 10 minutes, one-time use only.`,
+    "sign-in":              `Your CorperNest verification code is ${code}. Expires in 10 minutes, one-time use only.`,
+    "forget-password":      `Your CorperNest verification code is ${code}. Expires in 10 minutes, one-time use only.`,
+    "change-email":         `Your CorperNest verification code is ${code}. Expires in 10 minutes, one-time use only.`,
+    "viewing-verification": `Your CorperNest viewing verification code is ${code}. Valid for 2 hours during your scheduled visit, one-time use only.`,
+  };
+
   const res = await fetch("https://api.ng.termii.com/api/sms/send", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      to,
+      to: formattedNumber,
       from: process.env.TERMII_SENDER_ID,
-      sms: `Your CorperNest OTP is ${code}. Valid for 5 minutes. Do not share.`,
+      sms: messages[type],
       type: "plain",
       channel: "dnd",
       api_key: process.env.TERMII_API_KEY,
@@ -113,4 +143,6 @@ async function sendViaSMS(to: string, code: string): Promise<void> {
   if (data.code !== "ok") {
     throw new Error(`Termii reported failure: ${JSON.stringify(data)}`);
   }
+
+  console.log(`[SMS] Termii confirmed send — type=${type}, message_id=${data.message_id ?? "unknown"}`);
 }

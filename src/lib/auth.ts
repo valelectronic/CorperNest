@@ -1,7 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, phoneNumber } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
 import { db } from "./db";
+import { user } from "@/db/schema";
 import { sendOTP, type OTPType } from "./otp-sender";
 
 
@@ -45,9 +47,9 @@ export const auth = betterAuth({
       throw err;
     }
   },
-  sendVerificationOnSignUp: true,
+  sendVerificationOnSignUp: false, // we handle our own verification via custom-signup flow; email verification will be a separate profile feature later
   otpLength: 6,
-  expiresIn: 300,
+  expiresIn: 600, // 10 minutes — matches Termii's approved SMS sample exactly
 }),
 
     // ── Phone plugin — used for RETURNING users signing in with
@@ -58,12 +60,44 @@ export const auth = betterAuth({
     phoneNumber({
       sendOTP: async ({ phoneNumber, code }) => {
         // Only used for phone-based "forgot PIN" resets going forward.
-        // Deliberately SMS-only here, no fallback — if this fails, the
-        // calling code (forgot-PIN route) catches the error itself.
-        await sendOTP({ to: "", phone: phoneNumber, code, type: "forget-password" });
+        // Look up the real email ourselves — without this, if SMS fails,
+        // our hybrid sender's fallback tries to email an empty address
+        // and silently fails too, leaving the user with nothing on either
+        // channel. Same select pattern used everywhere else in the app.
+        const matchedUser = await db
+          .select({ email: user.email })
+          .from(user)
+          .where(eq(user.phoneNumber, phoneNumber))
+          .limit(1);
+
+        await sendOTP({
+          to: matchedUser[0]?.email ?? "",
+          phone: phoneNumber,
+          code,
+          type: "forget-password",
+        });
+      },
+      // ── This is the actual fix — a SEPARATE callback from sendOTP above,
+      // specifically for the password-reset flow. requestPasswordReset()
+      // was calling this, not sendOTP, which we never configured — meaning
+      // it succeeded at the Better Auth level but never actually sent
+      // anything anywhere. Same lookup-and-send logic as above.
+      sendPasswordResetOTP: async ({ phoneNumber, code }) => {
+        const matchedUser = await db
+          .select({ email: user.email })
+          .from(user)
+          .where(eq(user.phoneNumber, phoneNumber))
+          .limit(1);
+
+        await sendOTP({
+          to: matchedUser[0]?.email ?? "",
+          phone: phoneNumber,
+          code,
+          type: "forget-password",
+        });
       },
       otpLength: 6,
-      expiresIn: 300,
+      expiresIn: 600, // 10 minutes — matches Termii's approved SMS sample exactly
     }),
   ],
 

@@ -41,6 +41,14 @@ const AMENITIES = [
   { slug: "good-network",     label: "Good network coverage",     icon: "📶" },
 ];
 
+const TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  PROPERTY_TYPES.map((t) => [t.value, t.label])
+);
+
+const AMENITY_LABELS: Record<string, string> = Object.fromEntries(
+  AMENITIES.map((a) => [a.slug, a.label])
+);
+
 const inputStyle = {
   border: "1.5px solid var(--color-border)",
   backgroundColor: "var(--color-bg)",
@@ -60,6 +68,37 @@ type DuplicateWarning = {
   count:    number;
   examples: { title: string; landmark: string; status: string }[];
 };
+
+// ─── AUTO-GENERATED DESCRIPTION ────────────────────────────────────────────
+// Replaces the old free-text description field. Built entirely from
+// structured data the agent already provides (type, landmark, amenities)
+// — removing the "blank page" burden of writing prose from scratch, while
+// still giving every listing a real, readable description on the detail
+// page and in search results, since the backend and detail page both
+// expect this field to exist.
+function buildAutoDescription(
+  type: string,
+  purpose: "rent" | "sale",
+  landmark: string,
+  amenitySlugs: string[],
+  customAmenities: string[]
+): string {
+  const typeLabel = TYPE_LABELS[type] ?? type;
+  const allAmenityLabels = [
+    ...amenitySlugs.map((s) => AMENITY_LABELS[s]).filter(Boolean),
+    ...customAmenities,
+  ];
+
+  let text = `${typeLabel} available ${purpose === "sale" ? "for sale" : "for rent"}`;
+  if (landmark.trim()) text += `, near ${landmark.trim()}`;
+  text += ".";
+
+  if (allAmenityLabels.length > 0) {
+    text += ` Comes with: ${allAmenityLabels.join(", ")}.`;
+  }
+
+  return text;
+}
 
 // ─── REUSABLE COMPONENTS ─────────────────────────────────────────────────────
 
@@ -113,10 +152,9 @@ export default function NewListingPage() {
   const router           = useRouter();
   const fileInputRef     = useRef<HTMLInputElement>(null);
   const customAmenityRef = useRef<HTMLInputElement>(null);
-  const dupTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null); // ← NEW
+  const dupTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState({
-    description:      "",
     address:          "",
     landmark:         "",
     lga:              "",
@@ -138,7 +176,6 @@ export default function NewListingPage() {
   const [error,             setError]             = useState("");
   const [uploadProgress,    setUploadProgress]    = useState("");
 
-  // ── Duplicate check state ── ← NEW
   const [duplicateWarning,    setDuplicateWarning]    = useState<DuplicateWarning | null>(null);
   const [checkingDuplicate,   setCheckingDuplicate]   = useState(false);
 
@@ -149,7 +186,6 @@ export default function NewListingPage() {
     setForm((prev) => name === "state" ? { ...prev, state: value, lga: "" } : { ...prev, [name]: value });
   }
 
-  // ── Duplicate check with debounce ── ← NEW
   function triggerDuplicateCheck(landmarkVal: string, lgaVal: string, typeVal: string) {
     if (dupTimerRef.current) clearTimeout(dupTimerRef.current);
     if (!landmarkVal || landmarkVal.trim().length < 5 || !lgaVal || !typeVal) {
@@ -225,8 +261,12 @@ export default function NewListingPage() {
     if (!form.lga)             { setError("Please select your LGA."); return; }
     if (!form.landmark.trim()) { setError("Please enter the nearest landmark — this helps clients find the property."); return; }
     if (!priceNum || priceNum <= 0) { setError("Please enter a valid price."); return; }
-    if (form.description.trim().length < 50) { setError("Description is too short. Please describe the property properly (at least 50 characters)."); return; }
     if (images.length < 2)    { setError("Please upload at least 2 photos."); return; }
+
+    // Auto-built from type + landmark + amenities — no manual writing required
+    const description = buildAutoDescription(
+      form.type, form.listingPurpose, form.landmark, selectedAmenities, customAmenities
+    );
 
     setLoading(true);
     try {
@@ -248,6 +288,7 @@ export default function NewListingPage() {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({
           ...form,
+          description,
           price:            priceNum,
           images:           imageUrls,
           amenities:        selectedAmenities,
@@ -315,7 +356,6 @@ export default function NewListingPage() {
                   <button key={t.value} type="button"
                     onClick={() => {
                       setForm((prev) => ({ ...prev, type: t.value }));
-                      // Re-check duplicate when type changes ← NEW
                       triggerDuplicateCheck(form.landmark, form.lga, t.value);
                     }}
                     style={{ padding: "12px 14px", borderRadius: 12, fontSize: 13, fontWeight: 600, textAlign: "left", cursor: "pointer", border: "1.5px solid", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: form.type === t.value ? "var(--color-light)" : "var(--color-bg)", color: form.type === t.value ? "var(--color-primary)" : "var(--color-text-secondary)", borderColor: form.type === t.value ? "var(--color-primary)" : "var(--color-border)" }}>
@@ -381,7 +421,6 @@ export default function NewListingPage() {
               <select name="lga" value={form.lga}
                 onChange={(e) => {
                   handleChange(e);
-                  // Re-check duplicate when LGA changes ← NEW
                   triggerDuplicateCheck(form.landmark, e.target.value, form.type);
                 }}
                 required style={inputStyle}>
@@ -395,14 +434,12 @@ export default function NewListingPage() {
               <input name="landmark" type="text" value={form.landmark}
                 onChange={(e) => {
                   handleChange(e);
-                  // Trigger duplicate check as agent types ← NEW
                   triggerDuplicateCheck(e.target.value, form.lga, form.type);
                 }}
                 required
                 placeholder="e.g. Behind NYSC secretariat Eket, Opposite Eket market, Close to Total filling station Eket"
                 style={inputStyle} />
 
-              {/* Live landmark preview */}
               {form.landmark.trim() && !duplicateWarning && !checkingDuplicate && (
                 <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -413,7 +450,6 @@ export default function NewListingPage() {
                 </div>
               )}
 
-              {/* Checking indicator ← NEW */}
               {checkingDuplicate && (
                 <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "8px 0 0", display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ width: 10, height: 10, borderRadius: "50%", border: "1.5px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
@@ -421,7 +457,6 @@ export default function NewListingPage() {
                 </p>
               )}
 
-              {/* Duplicate warning ← NEW */}
               {duplicateWarning && !checkingDuplicate && (
                 <div style={{ marginTop: 8, padding: "12px 14px", borderRadius: 12, background: "#FFF8E1", border: "1px solid #FAC775" }}>
                   <p style={{ margin: "0 0 6px", fontSize: 12, fontWeight: 700, color: "#92400E" }}>
@@ -450,28 +485,11 @@ export default function NewListingPage() {
             </Field>
           </SectionCard>
 
-          {/* ── 4. DESCRIPTION ── */}
-          <SectionCard num="4" title="Describe the property"
-            subtitle="Write what you'd tell a client face to face. Be honest — clients who get surprises leave bad reviews.">
-
-            <Field label="Description"
-              hint="Include: condition of the property, floor level, water supply, electricity situation, what comes with it, and any things the client should know before visiting.">
-              <textarea name="description" value={form.description}
-                onChange={handleChange} required rows={6}
-                placeholder="e.g. Spacious self-contained on ground floor. Tiled throughout with prepaid meter and borehole water supply. Bathroom inside. Compound is fully fenced with security gate. Very close to NYSC secretariat — about 3 minutes walk. The landlord lives on the same compound and is cooperative."
-                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>{form.description.length} characters</p>
-                <p style={{ fontSize: 11, margin: 0, color: form.description.length >= 50 ? "var(--color-primary)" : "var(--color-text-muted)" }}>
-                  {form.description.length < 50 ? `${50 - form.description.length} more to go` : "✓ Good length"}
-                </p>
-              </div>
-            </Field>
-          </SectionCard>
-
-          {/* ── 5. AMENITIES ── */}
-          <SectionCard num="5" title="Amenities"
-            subtitle="Tick only what is actually available. Honest listings build more trust and get more bookings.">
+          {/* ── 4. AMENITIES — description removed, this now does ALL the descriptive
+               work. The agent just ticks what's actually there; we build the
+               readable description automatically from this before saving. ── */}
+          <SectionCard num="4" title="What does this property have?"
+            subtitle="Tick only what is actually available — this is what clients see, no need to write anything extra.">
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {AMENITIES.map((a) => {
@@ -529,8 +547,8 @@ export default function NewListingPage() {
             </div>
           </SectionCard>
 
-          {/* ── 6. PHOTOS ── */}
-          <SectionCard num="6" title="Photos"
+          {/* ── 5. PHOTOS ── */}
+          <SectionCard num="5" title="Photos"
             subtitle="Upload clear photos of: living room, bedroom, bathroom, kitchen, and compound. Good photos = more bookings.">
 
             {images.length > 0 && (
@@ -589,8 +607,8 @@ export default function NewListingPage() {
             )}
           </SectionCard>
 
-          {/* ── 7. LANDLORD DETAILS (OPTIONAL) ── */}
-          <SectionCard num="7" title="Landlord details"
+          {/* ── 6. LANDLORD DETAILS (OPTIONAL) ── */}
+          <SectionCard num="6" title="Landlord details"
             subtitle="Optional — helps us resolve disputes faster if they arise. We will not contact the landlord without your knowledge.">
 
             <Field label="Landlord / Caretaker name" optional>
@@ -623,7 +641,7 @@ export default function NewListingPage() {
               <>
                 Submit listing for review
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
                 </svg>
               </>
             )}

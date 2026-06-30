@@ -12,10 +12,13 @@ interface ListingOption {
 }
 
 interface PropertyRequestSummary {
-  id:       string;
-  type:     string;
-  lga:      string;
-  state:    string;
+  id:        string;
+  type:      string;
+  lga:       string;
+  state:     string;
+  minBudget?: number | null;
+  maxBudget?: number | null;
+  landmark?:  string | null;
 }
 
 type Props = {
@@ -69,13 +72,20 @@ export default function MatchSelectionSheet({ request, onClose, onMatched }: Pro
         setSubmitting(false);
         return;
       }
-      toast.success("Matched! Renter has been notified.");
+      // Match route returns status: "pending" for agents, "approved" for admin
+      toast.success(
+        data.status === "pending"
+          ? "Submitted for review — admin will confirm before the renter sees it."
+          : "Matched! Renter has been notified."
+      );
       onMatched();
     } catch {
       toast.error("Network error. Try again.");
       setSubmitting(false);
     }
   }
+
+  const hasBudget = !!(request.minBudget && request.maxBudget);
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
@@ -94,8 +104,22 @@ export default function MatchSelectionSheet({ request, onClose, onMatched }: Pro
             Find a match
           </p>
           <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
-            Showing approved listings only · pick up to 3 total per request
+            Showing approved listings only · admin reviews before the renter sees it
           </p>
+          {(hasBudget || request.landmark) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+              {hasBudget && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: "var(--color-light)", color: "var(--color-primary)" }}>
+                  Budget: ₦{request.minBudget!.toLocaleString()} – ₦{request.maxBudget!.toLocaleString()}
+                </span>
+              )}
+              {request.landmark && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: "var(--color-light)", color: "var(--color-primary)" }}>
+                  Near: {request.landmark}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
@@ -112,38 +136,56 @@ export default function MatchSelectionSheet({ request, onClose, onMatched }: Pro
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {listings.map((l) => {
               const isSelected = selectedId === l.id;
+              // Fit check — shown right on the card so the agent can see
+              // before picking, not just after, whether this genuinely
+              // fits the renter's stated budget.
+              const withinBudget = hasBudget
+                ? l.price >= request.minBudget! && l.price <= request.maxBudget!
+                : null;
+
               return (
                 <button
                   key={l.id}
                   onClick={() => setSelectedId(l.id)}
                   style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: 10,
+                    display: "flex", flexDirection: "column", gap: 6, padding: 10,
                     borderRadius: 12, textAlign: "left", cursor: "pointer",
                     border: isSelected ? "1.5px solid var(--color-primary)" : "1px solid var(--color-border)",
                     backgroundColor: isSelected ? "var(--color-light)" : "var(--color-bg)",
                   }}
                 >
-                  <div style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: "var(--color-card)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {l.images?.[0] ? (
-                      <img src={l.images[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                        <rect x="3" y="3" width="18" height="18" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.4" />
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: "var(--color-card)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {l.images?.[0] ? (
+                        <img src={l.images[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                          <rect x="3" y="3" width="18" height="18" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.4" />
+                        </svg>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {l.title}
+                      </p>
+                      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>
+                        ₦{l.price.toLocaleString()}/yr · {l.lga}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                        <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     )}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {l.title}
-                    </p>
-                    <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>
-                      ₦{l.price.toLocaleString()}/yr · {l.lga}
-                    </p>
-                  </div>
-                  {isSelected && (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-                      <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                  {withinBudget !== null && (
+                    <span style={{
+                      alignSelf: "flex-start", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
+                      background: withinBudget ? "#E8F5E9" : "#FEF2F2",
+                      color: withinBudget ? "#2E7D32" : "#C62828",
+                    }}>
+                      {withinBudget ? "✓ Within renter's budget" : "⚠ Outside renter's budget"}
+                    </span>
                   )}
                 </button>
               );
@@ -177,7 +219,7 @@ export default function MatchSelectionSheet({ request, onClose, onMatched }: Pro
               cursor: !selectedId || submitting ? "not-allowed" : "pointer",
             }}
           >
-            {submitting ? "Matching…" : "Confirm Match"}
+            {submitting ? "Submitting…" : "Submit Match"}
           </button>
         </div>
       </div>

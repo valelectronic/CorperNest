@@ -387,7 +387,7 @@ function PropertyRequestRow(props: {
       <button
         onClick={onToggle}
         style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 12,
+          width: "100%", display: "flex", alignItems: "flex-start", gap: 12,
           padding: "14px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left",
         }}
       >
@@ -395,7 +395,7 @@ function PropertyRequestRow(props: {
           width: 40, height: 40, borderRadius: 12, background: "var(--color-light)",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16,
-          color: "var(--color-primary)", flexShrink: 0,
+          color: "var(--color-primary)", flexShrink: 0, marginTop: 2,
         }}>
           {initial}
         </div>
@@ -406,8 +406,24 @@ function PropertyRequestRow(props: {
           <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.lga}
           </p>
+          {/* Budget + landmark surfaced here, no click needed — this is the
+              info an agent actually needs to judge fit at a glance */}
+          {(request.minBudget && request.maxBudget) || request.landmark ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              {request.minBudget && request.maxBudget && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "var(--color-light)", color: "var(--color-primary)" }}>
+                  ₦{(request.minBudget / 1000).toFixed(0)}k – ₦{(request.maxBudget / 1000).toFixed(0)}k/yr
+                </span>
+              )}
+              {request.landmark && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
+                  📍 {request.landmark}
+                </span>
+              )}
+            </div>
+          ) : null}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, marginTop: 2 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: urgent ? "#E53935" : "var(--color-text-muted)" }}>
             {request.daysLeft === 0 ? "Today" : `${request.daysLeft}d`}
           </span>
@@ -419,7 +435,7 @@ function PropertyRequestRow(props: {
             {request.matchCount}/3
           </span>
         </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 4, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
           <path d="M6 9l6 6 6-6" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
@@ -427,27 +443,6 @@ function PropertyRequestRow(props: {
       {isOpen && (
         <div style={{ padding: "0 16px 16px" }}>
           <div style={{ height: 1, background: "var(--color-border)", marginBottom: 14 }} />
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-            <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)" }}>
-              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Budget
-              </p>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>
-                {request.minBudget && request.maxBudget
-                  ? `₦${request.minBudget.toLocaleString()} - ₦${request.maxBudget.toLocaleString()}/yr`
-                  : "Not specified"}
-              </p>
-            </div>
-            <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)" }}>
-              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Landmark
-              </p>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>
-                {request.landmark ?? "Not specified"}
-              </p>
-            </div>
-          </div>
 
           {request.notes && (
             <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 14 }}>
@@ -564,7 +559,6 @@ function ListingCard(props: {
           <select
             value={currentStatus}
             onChange={(e) => onStatusChange(listing.id, e.target.value)}
-            disabled={updatingId === listing.id}
             style={{
               flex: 1, padding: "8px 12px", borderRadius: 10, fontSize: 12,
               border: "1.5px solid var(--color-border)", background: "var(--color-bg)",
@@ -831,7 +825,6 @@ export default function AgentDashboardClient(mainProps: Props) {
                         <select
                           value={statusMap[l.id] ?? l.status}
                           onChange={(e) => handleStatusUpdate(l.id, e.target.value)}
-                          disabled={updatingId === l.id}
                           style={{ fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #97C459", background: "#fff", color: "#27500A", flexShrink: 0 }}
                         >
                           {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}

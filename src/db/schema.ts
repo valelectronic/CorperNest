@@ -386,6 +386,10 @@ export const requestMatch = pgTable(
     requestId:   text("request_id")
       .notNull()
       .references(() => propertyRequest.id, { onDelete: "cascade" }),
+       status: text("status").notNull().default("pending"),
+        reviewedAt: timestamp("reviewed_at"),
+        reviewedBy: text("reviewed_by").references(() => user.id, { onDelete: "set null" }),
+        rejectionReason: text("rejection_reason"),
     listingId:   text("listing_id")
       .notNull()
       .references(() => listing.id, { onDelete: "cascade" }),

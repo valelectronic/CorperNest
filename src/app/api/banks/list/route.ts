@@ -1,9 +1,10 @@
 // src/app/api/banks/list/route.ts
 //
-// Fetches the live Nigerian bank list from Paystack — same account already
-// used for payments, no new service needed. This replaces a hardcoded
-// list, and importantly gives us each bank's CODE, which is required for
-// the account-resolution call right after.
+// Fetches the live Nigerian bank list from Paystack. Paystack's own data
+// contains duplicate bank codes (likely from legacy/merged entries) —
+// confirmed via a real React key-collision warning during testing. Since
+// two banks sharing a code would behave identically when resolving an
+// account anyway, we dedupe by code, keeping the first occurrence.
 
 import { NextResponse } from "next/server";
 
@@ -20,9 +21,18 @@ export async function GET() {
     }
 
     const data = await res.json();
-    const banks = (data.data ?? [])
-      .map((b: { name: string; code: string }) => ({ name: b.name, code: b.code }))
-      .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
+    const raw: { name: string; code: string }[] = data.data ?? [];
+
+    // Dedupe by code — keep the first occurrence of each unique code
+    const seen = new Set<string>();
+    const banks = raw
+      .filter((b) => {
+        if (seen.has(b.code)) return false;
+        seen.add(b.code);
+        return true;
+      })
+      .map((b) => ({ name: b.name, code: b.code }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     return NextResponse.json({ banks });
   } catch (err) {

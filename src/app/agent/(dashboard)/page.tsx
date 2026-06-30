@@ -16,9 +16,19 @@ export default async function AgentPage() {
   const agentId   = session.user.id;
   const agentName = session.user.name;
 
-  // ── Unverified agent → send to KYC ───────────────────────────────────────
-  const sessionUser = session.user as { agentVerified?: boolean | null };
-  if (!sessionUser.agentVerified) redirect("/agent/kyc");
+  // ── Read agentVerified from the database directly, never the cached
+  // session value. The session can go stale relative to the real DB state
+  // (e.g. right after an admin approval, or after earlier test data), and
+  // trusting it here caused this page and /agent/kyc to disagree with each
+  // other and loop between one another. Both pages now check the same
+  // live source of truth.
+  const dbUser = await db
+    .select({ agentVerified: user.agentVerified })
+    .from(user)
+    .where(eq(user.id, agentId))
+    .limit(1);
+
+  if (!dbUser[0]?.agentVerified) redirect("/agent/kyc");
 
   // ── All active listings for this agent ───────────────────────────────────
   const listings = await db
@@ -27,8 +37,6 @@ export default async function AgentPage() {
     .where(and(eq(listing.agentId, agentId), eq(listing.isActive, true)));
 
   // ── Auto-expire reserved listings older than 24hrs ────────────────────────
-  // If a listing has been reserved for 24+ hours, flip it back to available
-  // This handles cases where visit day passed without CNV verification
   const twentyFourHoursAgo = new Date();
   twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
@@ -43,7 +51,6 @@ export default async function AgentPage() {
       .set({ status: "available", lastStatusUpdate: new Date(), updatedAt: new Date() })
       .where(inArray(listing.id, expireIds));
 
-    // Update in-memory array so the dashboard shows correct status
     toExpire.forEach((l) => { l.status = "available"; });
   }
 
@@ -65,28 +72,23 @@ export default async function AgentPage() {
     .innerJoin(user, eq(booking.renterId, user.id))
     .where(eq(booking.agentId, agentId));
 
-  // Filter in JS — show pending + scheduled only
   const activeBookings = allBookings.filter(
     (b) => b.status === "pending" || b.status === "scheduled"
   );
 
   // ── Listing health checks ─────────────────────────────────────────────────
-
-  // Expiring soon — lastStatusUpdate older than 7 days
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const expiringListings = listings.filter(
     (l) => new Date(l.lastStatusUpdate) <= sevenDaysAgo
   );
 
-  // Stale — not updated in 5+ days (for availability reminder)
   const fiveDaysAgo = new Date();
   fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
   const staleListings = listings.filter(
     (l) => new Date(l.lastStatusUpdate) <= fiveDaysAgo
   );
 
-  // ── Completed bookings count ──────────────────────────────────────────────
   const completedBookings = await db
     .select({ id: booking.id })
     .from(booking)

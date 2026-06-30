@@ -12,6 +12,7 @@ interface User {
   name: string;
   email: string;
   phone?: string | null;
+  phoneNumber?: string | null;
   role?: string | null;
   state?: string | null;
   callUpNumber?: string | null;
@@ -100,7 +101,11 @@ export default function ProfileClient({ user }: { user: User }) {
       ),
     },
     {
-      label: "Phone", value: user.phone ?? "Not set", verified: user.phoneNumberVerified ?? false,
+      // ── Prefer the new, verification-modal-managed `phoneNumber` field —
+      // that's the one actually written to when someone verifies. The
+      // legacy `phone` field is only ever a fallback for older accounts
+      // that pre-date this flow, same pattern used in every admin email.
+      label: "Phone", value: user.phoneNumber ?? user.phone ?? "Not set", verified: user.phoneNumberVerified ?? false,
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <path d="M6.6 10.8a15.15 15.15 0 006.6 6.6l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.58.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1C10.86 21 3 13.14 3 4c0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.58.11.35.03.74-.24 1.02L6.6 10.8Z" fill="var(--color-text-muted)" />

@@ -2,6 +2,7 @@
 import { db } from "@/lib/db";
 import { user, listing, agentKycRequest } from "@/db/schema";
 import { eq, desc, count, sql } from "drizzle-orm";
+import RevokeAgentButton from "@/components/revoke-agent-button";
 
 export const revalidate = 30;
 
@@ -12,6 +13,7 @@ async function getAgents() {
       name:          user.name,
       email:         user.email,
       phone:         user.phone,
+      phoneNumber:   user.phoneNumber,
       state:         user.state,
       agentVerified: user.agentVerified,
       createdAt:     user.createdAt,
@@ -85,8 +87,8 @@ function AgentCard({ agent, verified }: {
             )}
           </div>
           <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 2px" }}>{agent.email}</p>
-          {agent.phone && (
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>{agent.phone}</p>
+          {(agent.phoneNumber ?? agent.phone) && (
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>{agent.phoneNumber ?? agent.phone}</p>
           )}
         </div>
 
@@ -122,16 +124,19 @@ function AgentCard({ agent, verified }: {
         </div>
       )}
 
-      {/* Footer: dates */}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>
-          Joined {formatDate(agent.createdAt)}
-        </p>
-        {agent.kyc?.reviewedAt && (
+      {/* Footer: dates + revoke action */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>
-            Verified {formatDate(agent.kyc.reviewedAt)}
+            Joined {formatDate(agent.createdAt)}
           </p>
-        )}
+          {agent.kyc?.reviewedAt && (
+            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>
+              Verified {formatDate(agent.kyc.reviewedAt)}
+            </p>
+          )}
+        </div>
+        {verified && <RevokeAgentButton agentId={agent.id} agentName={agent.name} />}
       </div>
     </div>
   );
@@ -199,6 +204,11 @@ export default async function AdminAgentsPage() {
                   <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {a.email}
                   </p>
+                  {(a.phoneNumber ?? a.phone) && (
+                    <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "2px 0 0" }}>
+                      {a.phoneNumber ?? a.phone}
+                    </p>
+                  )}
                 </div>
                 <a
                   href="/admin/kyc?status=pending"

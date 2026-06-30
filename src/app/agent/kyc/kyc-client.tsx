@@ -1,7 +1,7 @@
 // src/app/agent/kyc/kyc-client.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { STATE_NAMES, getLGAs } from "@/lib/nigeria-location";
@@ -34,6 +34,8 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
   const [state,         setState]         = useState("Akwa Ibom");
   const [lga,           setLga]           = useState("");
   const [bankCode,      setBankCode]      = useState("");
+  const [bankSearch,    setBankSearch]    = useState(""); // typed filter text
+  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName,   setAccountName]   = useState(""); // now always Paystack-verified, never typed
   const [loading,       setLoading]       = useState(false);
@@ -53,6 +55,23 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
   const phoneNumberVerified = (session?.user as { phoneNumberVerified?: boolean } | undefined)?.phoneNumberVerified ?? false;
 
   const lgaOptions = getLGAs(state);
+  const bankDropdownRef = useRef<HTMLDivElement>(null);
+
+  const selectedBank   = banks.find((b) => b.code === bankCode);
+  const filteredBanks  = bankSearch.trim()
+    ? banks.filter((b) => b.name.toLowerCase().includes(bankSearch.trim().toLowerCase()))
+    : banks;
+
+  // Close the dropdown when clicking anywhere outside it
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (bankDropdownRef.current && !bankDropdownRef.current.contains(e.target as Node)) {
+        setBankDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetch("/api/banks/list")
@@ -400,25 +419,83 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
               For receiving your 80% payout after successful inspections. We verify this lives up against your real bank — nothing typed here is taken on trust.
             </p>
 
-            <div style={{ marginBottom: 12 }}>
+            <div style={{ marginBottom: 12, position: "relative" }} ref={bankDropdownRef}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                 Bank Name *
               </label>
-              <select
-                value={bankCode}
-                onChange={(e) => setBankCode(e.target.value)}
-                required
+
+              <button
+                type="button"
+                onClick={() => !banksLoading && setBankDropdownOpen((o) => !o)}
                 disabled={banksLoading}
                 style={{
                   width: "100%", padding: "12px 14px", borderRadius: 12,
                   border: "1.5px solid var(--color-border)", fontSize: 13,
-                  color: "var(--color-text)", background: "var(--color-bg)",
-                  boxSizing: "border-box",
+                  color: selectedBank ? "var(--color-text)" : "var(--color-text-muted)",
+                  background: "var(--color-bg)", boxSizing: "border-box",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  cursor: banksLoading ? "not-allowed" : "pointer", textAlign: "left",
                 }}
               >
-                <option value="">{banksLoading ? "Loading banks…" : "Select bank"}</option>
-                {banks.map((b) => <option key={b.code} value={b.code}>{b.name}</option>)}
-              </select>
+                <span>{banksLoading ? "Loading banks…" : selectedBank?.name ?? "Select bank"}</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, transform: bankDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+                  <path d="M6 9l6 6 6-6" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {bankDropdownOpen && (
+                <div style={{
+                  position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, zIndex: 30,
+                  background: "var(--color-card)", border: "1.5px solid var(--color-border)",
+                  borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                  maxHeight: 280, display: "flex", flexDirection: "column", overflow: "hidden",
+                }}>
+                  <div style={{ padding: 8, borderBottom: "1px solid var(--color-border)" }}>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={bankSearch}
+                      onChange={(e) => setBankSearch(e.target.value)}
+                      placeholder="Type to filter, e.g. GTBank, Access…"
+                      style={{
+                        width: "100%", padding: "9px 12px", borderRadius: 9,
+                        border: "1px solid var(--color-border)", fontSize: 13,
+                        color: "var(--color-text)", background: "var(--color-bg)",
+                        boxSizing: "border-box", outline: "none",
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ overflowY: "auto" }}>
+                    {filteredBanks.length === 0 ? (
+                      <p style={{ padding: "14px", fontSize: 12, color: "var(--color-text-muted)", textAlign: "center", margin: 0 }}>
+                        No banks match "{bankSearch}"
+                      </p>
+                    ) : (
+                      filteredBanks.map((b) => (
+                        <button
+                          key={b.code}
+                          type="button"
+                          onClick={() => {
+                            setBankCode(b.code);
+                            setBankDropdownOpen(false);
+                            setBankSearch("");
+                          }}
+                          style={{
+                            width: "100%", padding: "10px 14px", textAlign: "left",
+                            background: b.code === bankCode ? "var(--color-light)" : "transparent",
+                            border: "none", cursor: "pointer", fontSize: 13,
+                            color: b.code === bankCode ? "var(--color-primary)" : "var(--color-text)",
+                            fontWeight: b.code === bankCode ? 600 : 400,
+                          }}
+                        >
+                          {b.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ marginBottom: 12 }}>

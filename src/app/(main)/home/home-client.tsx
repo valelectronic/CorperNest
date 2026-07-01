@@ -410,54 +410,37 @@ export default function HomeClient({
           </div>
         )}
 
-        {/* Request a Property — bold, high-contrast, impossible to miss.
-            Previously used var(--color-light) background which looked
-            identical to every other card and got scrolled past entirely.
-            Now uses a vivid gradient that visually shouts "this is an
-            action, tap it" — deliberately distinct from listing cards. */}
         {!hasSearched && !loadError && (
           <Link
             href="/request-property"
             style={{
               display: "block", textDecoration: "none",
               background: "linear-gradient(135deg, #2E7D32 0%, #1B5E20 100%)",
-              borderRadius: 18,
-              padding: "20px 18px",
-              border: "2px solid #43A047",
-              boxShadow: "0 4px 20px rgba(46,125,50,0.35)",
+              borderRadius: 14,
+              padding: "14px 16px",
+              border: "1.5px solid #43A047",
+              boxShadow: "0 2px 12px rgba(46,125,50,0.25)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="11" cy="11" r="8" stroke="#fff" strokeWidth="2" />
-                  <path d="M21 21l-4.35-4.35" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-                  <path d="M11 8v6M8 11h6" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="8" stroke="#fff" strokeWidth="1.8" />
+                  <path d="M21 21l-4.35-4.35" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+                  <path d="M11 8v6M8 11h6" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontSize: 17, fontWeight: 800, color: "#fff", margin: "0 0 4px", lineHeight: 1.2 }}>
+                <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "#fff", margin: "0 0 2px", lineHeight: 1.2 }}>
                   Can't find what you want?
                 </p>
-                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", margin: 0, lineHeight: 1.5 }}>
-                  Tell us exactly what you need — we'll hunt for it
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", margin: 0 }}>
+                  Tell us — we'll hunt for it. Free to request.
                 </p>
               </div>
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 18l6-6-6-6" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-            </div>
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.15)", display: "flex", flexWrap: "wrap", gap: "8px 14px" }}>
-              {["Free to request", "7-day window", "No payment until you book"].map((t) => (
-                <div key={t} style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M20 6L9 17l-5-5" stroke="#A5D6A7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.75)" }}>{t}</span>
-                </div>
-              ))}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M9 18l6-6-6-6" stroke="rgba(255,255,255,0.8)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
           </Link>
         )}

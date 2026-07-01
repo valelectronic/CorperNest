@@ -31,9 +31,10 @@ type IncomingBooking = {
   agreedTime:  string | null;
   listingId:   string;
   renterId:    string;
-  renterName:  string;
-  renterPhone: string | null;
-  renterEmail: string;
+  renterName:                string;
+  renterPhone:               string | null;
+  renterPhoneNumberVerified: boolean | null;
+  renterEmail:               string;
 };
 
 type PropertyRequestItem = {
@@ -266,10 +267,14 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
             <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
               Contact
             </p>
-            {booking.renterPhone ? (
+            {booking.renterPhone && booking.renterPhoneNumberVerified ? (
               <a href={`tel:${booking.renterPhone}`} style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none", display: "block" }}>
                 {booking.renterPhone}
               </a>
+            ) : booking.renterPhone && !booking.renterPhoneNumberVerified ? (
+              <p style={{ margin: 0, fontSize: 12, color: "#B45309", fontWeight: 600 }}>
+                ⚠ Phone not verified yet
+              </p>
             ) : (
               <a href={`mailto:${booking.renterEmail}`} style={{ margin: 0, fontSize: 11, color: "var(--color-primary)", textDecoration: "none", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {booking.renterEmail}
@@ -673,69 +678,72 @@ export default function AgentDashboardClient(mainProps: Props) {
   return (
     <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }}>
 
-      <header style={{ background: "#1B2E1B", padding: "16px 16px 0", position: "sticky", top: 0, zIndex: 50 }}>
+      <header style={{ background: "#1B2E1B", padding: "14px 16px 0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
 
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* ── Row 1: Identity + Home button ── */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               <div style={{
-                width: 40, height: 40, borderRadius: 12,
+                width: 38, height: 38, borderRadius: 11, flexShrink: 0,
                 background: "var(--color-primary)", border: "2px solid #43A047",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16,
-                color: "#E8F5E9", flexShrink: 0,
+                fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "#E8F5E9",
               }}>
                 {initial}
               </div>
-              <div>
+              <div style={{ minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: 10, color: "#7A9A7A", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   Agent Dashboard
                 </p>
-                <p style={{ margin: "2px 0 0", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "#E8F5E9" }}>
+                <p style={{ margin: "1px 0 0", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "#E8F5E9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {agentName}
                 </p>
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {/* Home — icon only on mobile to save space */}
+            <button
+              onClick={() => router.push("/home")}
+              style={{
+                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                cursor: "pointer",
+              }}
+              aria-label="Go to Home"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"
+                  stroke="#A5D6A7" strokeWidth="1.8" strokeLinejoin="round" />
+              </svg>
+            </button>
+          </div>
 
-              <button
-                onClick={() => router.push("/home")}
-                style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  padding: "7px 11px", borderRadius: 10, flexShrink: 0,
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: "#A5D6A7", cursor: "pointer",
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"
-                    stroke="#A5D6A7" strokeWidth="1.8" strokeLinejoin="round" />
-                </svg>
-                <span style={{ fontSize: 11, fontWeight: 600, fontFamily: "var(--font-heading)" }}>
-                  Home
-                </span>
-              </button>
-
-              <div style={{ display: "flex", gap: 14 }}>
-                {[
-                  { num: activeBookings.length,  label: "Active",   color: "#FAC775" },
-                  { num: visibleListings.length, label: "Listings", color: "#A5D6A7" },
-                  { num: completedCount,         label: "Done",     color: "#7A9A7A" },
-                ].map((s) => (
-                  <div key={s.label} style={{ textAlign: "center" }}>
-                    <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 20, color: s.color, lineHeight: 1 }}>
-                      {s.num}
-                    </p>
-                    <p style={{ margin: "2px 0 0", fontSize: 9, color: "#7A9A7A", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      {s.label}
-                    </p>
-                  </div>
-                ))}
+          {/* ── Row 2: Stats strip — full width, evenly spaced ── */}
+          <div style={{
+            display: "flex", justifyContent: "space-around",
+            background: "rgba(255,255,255,0.05)", borderRadius: 12,
+            padding: "10px 0", marginBottom: 12,
+          }}>
+            {[
+              { num: activeBookings.length,  label: "Active",   color: "#FAC775" },
+              { num: visibleListings.length, label: "Listings", color: "#A5D6A7" },
+              { num: completedCount,         label: "Done",     color: "#7A9A7A" },
+            ].map((s, i, arr) => (
+              <div key={s.label} style={{
+                textAlign: "center", flex: 1,
+                borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
+              }}>
+                <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 22, color: s.color, lineHeight: 1 }}>
+                  {s.num}
+                </p>
+                <p style={{ margin: "3px 0 0", fontSize: 9, color: "#7A9A7A", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {s.label}
+                </p>
               </div>
-            </div>
+            ))}
           </div>
 
           <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>

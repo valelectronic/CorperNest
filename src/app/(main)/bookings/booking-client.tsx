@@ -69,11 +69,11 @@ function daysUntil(iso: string) {
 
 function StatusPill({ status }: { status: Booking["status"] }) {
   const map: Record<Booking["status"], { label: string; bg: string; color: string }> = {
-    pending:   { label: "Pending",   bg: "#FFF8E1", color: "#F59E0B" },
-    scheduled: { label: "Scheduled", bg: "#E8F5E9", color: "#2E7D32" },
-    verified:  { label: "Verified",  bg: "#E8F5E9", color: "#2E7D32" },
-    completed: { label: "Completed", bg: "#F3F4F6", color: "#6B7280" },
-    cancelled: { label: "Cancelled", bg: "#FEE2E2", color: "#DC2626" },
+    pending:   { label: "Awaiting Visit", bg: "#EEF2FF", color: "#4338CA" },
+    scheduled: { label: "Awaiting Visit", bg: "#EEF2FF", color: "#4338CA" },
+    verified:  { label: "Visit Verified", bg: "#E8F5E9", color: "#2E7D32" },
+    completed: { label: "Completed",      bg: "#F3F4F6", color: "#6B7280" },
+    cancelled: { label: "Cancelled",      bg: "#FEE2E2", color: "#DC2626" },
   };
   const s = map[status] ?? map.pending;
   return (
@@ -121,7 +121,7 @@ function StarInput({ value, onChange }: { value: number; onChange: (v: number) =
 
 // ─── REVIEW PROMPT CARD ───────────────────────────────────────────────────────
 
-function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmitted: () => void }) {
+function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmitted: (bookingId: string) => void }) {
   const [rating,     setRating]     = useState(0);
   const [comment,    setComment]    = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -140,7 +140,7 @@ function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmit
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Failed to submit review"); return; }
       toast.success("Review submitted. Thank you!");
-      onSubmitted();
+      onSubmitted(booking.id);
     } catch {
       toast.error("Network error. Try again.");
     } finally {
@@ -186,9 +186,9 @@ function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmit
 // ─── RENT RECORD CARD ─────────────────────────────────────────────────────────
 
 function RentRecordCard({ record }: { record: RentRecord }) {
-  const days        = daysUntil(record.renewalDate);
+  const days           = daysUntil(record.renewalDate);
   const isExpiringSoon = days <= 30 && days > 0;
-  const isExpired   = days <= 0;
+  const isExpired      = days <= 0;
 
   return (
     <div style={{
@@ -215,9 +215,7 @@ function RentRecordCard({ record }: { record: RentRecord }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
         <div style={{ background: "var(--color-bg)", borderRadius: 10, padding: "8px 10px", border: "1px solid var(--color-border)" }}>
           <p style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "0 0 2px" }}>Rent Paid</p>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)", margin: 0, fontFamily: "var(--font-heading)" }}>
-            {formatPrice(record.rentAmount)}
-          </p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--color-primary)", margin: 0, fontFamily: "var(--font-heading)" }}>{formatPrice(record.rentAmount)}</p>
         </div>
         <div style={{ background: "var(--color-bg)", borderRadius: 10, padding: "8px 10px", border: "1px solid var(--color-border)" }}>
           <p style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", margin: "0 0 2px" }}>Duration</p>
@@ -249,128 +247,26 @@ function RentRecordCard({ record }: { record: RentRecord }) {
   );
 }
 
-// ─── CUSTOM TIME PICKER ───────────────────────────────────────────────────────
-
-function TimePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [hour, setHour]   = useState("8");
-  const [minute, setMinute] = useState("00");
-  const [ampm, setAmpm]   = useState("AM");
-
-  useEffect(() => {
-    if (value) {
-      const match = value.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
-      if (match) { setHour(match[1]); setMinute(match[2]); setAmpm(match[3].toUpperCase()); }
-    }
-  }, []);
-
-  function update(h: string, m: string, a: string) { onChange(`${h}:${m} ${a}`); }
-  const hours   = Array.from({ length: 12 }, (_, i) => String(i + 1));
-  const minutes = ["00", "15", "30", "45"];
-
-  return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      <select value={hour} onChange={(e) => { setHour(e.target.value); update(e.target.value, minute, ampm); }}
-        style={{ flex: 1, padding: "13px 10px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 16, fontWeight: 700, color: "var(--color-text)", background: "var(--color-bg)", textAlign: "center", fontFamily: "var(--font-mono)" }}>
-        {hours.map((h) => <option key={h} value={h}>{h}</option>)}
-      </select>
-      <span style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text-muted)" }}>:</span>
-      <select value={minute} onChange={(e) => { setMinute(e.target.value); update(hour, e.target.value, ampm); }}
-        style={{ flex: 1, padding: "13px 10px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 16, fontWeight: 700, color: "var(--color-text)", background: "var(--color-bg)", textAlign: "center", fontFamily: "var(--font-mono)" }}>
-        {minutes.map((m) => <option key={m} value={m}>{m}</option>)}
-      </select>
-      <div style={{ display: "flex", borderRadius: 12, overflow: "hidden", border: "1.5px solid var(--color-border)", flexShrink: 0 }}>
-        {["AM", "PM"].map((a) => (
-          <button key={a} type="button" onClick={() => { setAmpm(a); update(hour, minute, a); }}
-            style={{ padding: "13px 16px", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 700, background: ampm === a ? "var(--color-primary)" : "var(--color-bg)", color: ampm === a ? "#fff" : "var(--color-text-muted)", transition: "background 0.15s" }}>
-            {a}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── SET DATE BOTTOM SHEET ────────────────────────────────────────────────────
-
-function SetDateSheet({ booking, onClose, onSuccess }: { booking: Booking; onClose: () => void; onSuccess: () => void }) {
-  const [date, setDate]   = useState("");
-  const [time, setTime]   = useState("8:00 AM");
-  const [loading, setLoading] = useState(false);
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split("T")[0];
-
-  async function handleSubmit() {
-    if (!date) { toast.error("Please select a visit date"); return; }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/bookings/set-date", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId: booking.id, agreedDate: date, agreedTime: time }),
-      });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error ?? "Failed"); }
-      toast.success("Visit scheduled! Agent details are now visible.");
-      onSuccess();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally { setLoading(false); }
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} />
-      <div style={{ position: "relative", background: "var(--color-card)", borderRadius: "22px 22px 0 0", padding: "8px 20px 40px" }}>
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--color-border)", margin: "8px auto 20px" }} />
-        <div style={{ width: 52, height: 52, borderRadius: 16, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="4" width="18" height="18" rx="2" stroke="var(--color-primary)" strokeWidth="1.8" />
-            <path d="M16 2V6M8 2V6M3 10H21" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" />
-            <circle cx="12" cy="15" r="2" fill="var(--color-primary)" />
-          </svg>
-        </div>
-        <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>Schedule your visit</p>
-        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px" }}>
-          Pick when you want to tour with <strong>{booking.agentName ?? "the agent"}</strong>. They'll show you this property and any other available options in one visit.
-        </p>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>Visit Date</label>
-        <input type="date" value={date} min={minDate} onChange={(e) => setDate(e.target.value)}
-          style={{ width: "100%", padding: "13px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", marginBottom: 16, boxSizing: "border-box" }} />
-        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 8, display: "block" }}>Preferred Time</label>
-        <div style={{ marginBottom: 24 }}>
-          <TimePicker value={time} onChange={setTime} />
-        </div>
-        {date && time && (
-          <div style={{ background: "var(--color-light)", borderRadius: 12, padding: "10px 14px", marginBottom: 16, textAlign: "center" }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--color-primary)" }}>
-              📅 {new Date(date).toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long" })} at {time}
-            </p>
-          </div>
-        )}
-        <button onClick={handleSubmit} disabled={loading || !date}
-          style={{ width: "100%", padding: "15px", background: loading || !date ? "var(--color-border)" : "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: loading || !date ? "not-allowed" : "pointer", marginBottom: 10 }}>
-          {loading ? "Scheduling…" : "Confirm Visit Date"}
-        </button>
-        <button onClick={onClose}
-          style={{ width: "100%", padding: "15px", background: "var(--color-bg)", color: "var(--color-text-muted)", border: "1px solid var(--color-border)", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15, cursor: "pointer" }}>
-          I'll do this later
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── BOOKING CARD ─────────────────────────────────────────────────────────────
+// Date setting removed entirely. Contacts are revealed immediately after
+// payment. If the renter's phone is not verified, a prominent banner
+// prompts them to verify — and the agent cannot see their number until
+// they do. OTP visit verification is unchanged.
 
 function BookingCard({
-  booking, onSetDate, onUploadReceipt, hasRentRecord,
+  booking,
+  phoneNumberVerified,
+  onVerifyPhone,
+  onUploadReceipt,
+  hasRentRecord,
 }: {
-  booking:         Booking;
-  onSetDate:       (b: Booking) => void;
-  onUploadReceipt: (b: Booking) => void;
-  hasRentRecord:   boolean;
+  booking:              Booking;
+  phoneNumberVerified:  boolean;
+  onVerifyPhone:        () => void;
+  onUploadReceipt:      (b: Booking) => void;
+  hasRentRecord:        boolean;
 }) {
-  const isScheduled = booking.status !== "pending";
+  const isVisited = booking.status === "verified" || booking.status === "completed";
 
   return (
     <div style={{ background: "var(--color-card)", borderRadius: 18, border: "1px solid var(--color-border)", overflow: "hidden", marginBottom: 14 }}>
@@ -393,19 +289,34 @@ function BookingCard({
       <div style={{ height: 1, background: "var(--color-border)" }} />
 
       <div style={{ padding: "12px 16px" }}>
+
+        {/* Booking code */}
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Booking code</span>
           <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-text)" }}>{booking.bookingCode}</span>
         </div>
 
-        {booking.agreedDate && (
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Visit date</span>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>{formatDate(booking.agreedDate)} · {booking.agreedTime}</span>
+        {/* ── Phone not verified — must verify before agent can reach them ── */}
+        {!phoneNumberVerified && !isVisited && (
+          <div style={{
+            background: "#FFF8E1", border: "1.5px solid #FAC775",
+            borderRadius: 12, padding: "12px 14px", marginBottom: 12,
+          }}>
+            <p style={{ margin: "0 0 4px", fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 700, color: "#92400E" }}>
+              ⚠ Verify your phone number
+            </p>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#B45309", lineHeight: 1.5 }}>
+              The agent cannot see your phone number yet. Verify it so they can contact you about your visit.
+            </p>
+            <button onClick={onVerifyPhone}
+              style={{ width: "100%", padding: "11px", borderRadius: 10, background: "#92400E", color: "#fff", border: "none", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+              Verify Phone Number Now
+            </button>
           </div>
         )}
 
-        {isScheduled && booking.listingAddress && (
+        {/* Property address — revealed immediately after payment */}
+        {booking.listingAddress && (
           <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 10 }}>
             <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Property Address</p>
             <p style={{ margin: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.5 }}>{booking.listingAddress}</p>
@@ -421,7 +332,8 @@ function BookingCard({
           </div>
         )}
 
-        {isScheduled && booking.agentName && (
+        {/* Agent contact — revealed immediately after payment */}
+        {booking.agentName && (
           <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 10 }}>
             <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Agent Contact</p>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -430,25 +342,21 @@ function BookingCard({
                 <a href={`/agent/${booking.agentId}`} style={{ fontSize: 11, color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>View profile →</a>
               )}
             </div>
-            {booking.agentPhone && (
+            {booking.agentPhone ? (
               <a href={`tel:${booking.agentPhone}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="currentColor" strokeWidth="1.8" fill="none" />
                 </svg>
                 {booking.agentPhone}
               </a>
+            ) : (
+              <p style={{ margin: 0, fontSize: 12, color: "var(--color-text-muted)" }}>Call details will be shared by the agent</p>
             )}
           </div>
         )}
 
-        {booking.status === "pending" && (
-          <button onClick={() => onSetDate(booking)}
-            style={{ width: "100%", padding: "13px", background: "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: "pointer", marginTop: 4 }}>
-            Schedule Visit Date
-          </button>
-        )}
-
-        {booking.status === "verified" && (
+        {/* Visit verified */}
+        {isVisited && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "#E8F5E9", border: "1px solid var(--color-border)" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -458,15 +366,8 @@ function BookingCard({
             </div>
 
             {!hasRentRecord && (
-              <button
-                onClick={() => onUploadReceipt(booking)}
-                style={{
-                  width: "100%", padding: "12px", borderRadius: 12,
-                  background: "var(--color-bg)", border: "1.5px solid var(--color-border)",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  cursor: "pointer", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 13,
-                  color: "var(--color-text-secondary)",
-                }}>
+              <button onClick={() => onUploadReceipt(booking)}
+                style={{ width: "100%", padding: "12px", borderRadius: 12, background: "var(--color-bg)", border: "1.5px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 13, color: "var(--color-text-secondary)" }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                   <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -510,41 +411,20 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
   const router       = useRouter();
   const searchParams = useSearchParams();
 
+  void currentUserId;
+  void currentUserName;
+
   const [bookings,           setBookings]           = useState<Booking[]>([]);
   const [rentRecords,        setRentRecords]        = useState<RentRecord[]>([]);
   const [requests,           setRequests]           = useState<RequestItem[]>([]);
   const [loading,            setLoading]            = useState(true);
-  const [activeDateSheet,    setActiveDateSheet]    = useState<Booking | null>(null);
   const [activeReceiptSheet, setActiveReceiptSheet] = useState<Booking | null>(null);
   const [activeTab,          setActiveTab]          = useState<"bookings" | "rent" | "requests">("bookings");
   const [showPhoneVerify,    setShowPhoneVerify]    = useState(false);
-  const [pendingDateBooking, setPendingDateBooking] = useState<Booking | null>(null);
+  const [dismissedReviewIds, setDismissedReviewIds] = useState<Set<string>>(new Set());
 
   const { data: session } = authClient.useSession();
   const phoneNumberVerified = (session?.user as { phoneNumberVerified?: boolean } | undefined)?.phoneNumberVerified ?? false;
-
-  // Gate: setting a visit date requires a genuinely verified phone number,
-  // since the agent and platform need a real, reachable contact for the
-  // visit itself. Shows the verification modal first if not yet verified.
-  function handleRequestSetDate(booking: Booking) {
-    if (!phoneNumberVerified) {
-      setPendingDateBooking(booking);
-      setShowPhoneVerify(true);
-      return;
-    }
-    setActiveDateSheet(booking);
-  }
-
-  function handlePhoneVerified() {
-    setShowPhoneVerify(false);
-    if (pendingDateBooking) {
-      setActiveDateSheet(pendingDateBooking);
-      setPendingDateBooking(null);
-    }
-  }
-
-  void currentUserId;
-  void currentUserName;
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -584,7 +464,6 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
     fetchRequests();
   }, [fetchBookings, fetchRentRecords, fetchRequests]);
 
-  // Handle return from Paystack after rent record payment
   useEffect(() => {
     const status = searchParams.get("receipt");
     const ref    = searchParams.get("ref");
@@ -596,10 +475,19 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
     }
   }, [searchParams, fetchRentRecords]);
 
-  const pendingReviews = bookings.filter(
-    (b) => b.status === "verified" && !b.hasReview
-  );
+  function handleReviewSubmitted(bookingId: string) {
+    setDismissedReviewIds((prev) => new Set([...prev, bookingId]));
+    fetchBookings();
+  }
 
+  function handlePhoneVerified() {
+    setShowPhoneVerify(false);
+    // Refresh bookings so the warning banner disappears and the agent
+    // can now see the renter's phone number on their side
+    fetchBookings();
+  }
+
+  const pendingReviews   = bookings.filter((b) => b.status === "verified" && !b.hasReview && !dismissedReviewIds.has(b.id));
   const rentRecordBookingIds = new Set(rentRecords.map((r) => r.bookingId));
   const activeRequestCount   = requests.filter((r) => ["open", "matched"].includes(r.status)).length;
 
@@ -626,7 +514,6 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 0 80px" }}>
 
-      {/* Header */}
       <div style={{ padding: "24px 16px 0" }}>
         <p style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 800, color: "var(--color-header)", margin: "0 0 4px" }}>
           My Bookings
@@ -636,21 +523,16 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
         </p>
       </div>
 
-      {/* Tab bar */}
       <div style={{ display: "flex", borderBottom: "1px solid var(--color-border)", margin: "16px 0 0", padding: "0 16px" }}>
         {([
-          { key: "bookings", label: "Bookings",     count: bookings.length     },
-          { key: "requests", label: "Requests",     count: activeRequestCount },
+          { key: "bookings", label: "Bookings",     count: bookings.length                       },
+          { key: "requests", label: "Requests",     count: activeRequestCount                    },
           { key: "rent",     label: "Rent Records", count: rentRecords.filter(r => r.feePaid).length },
         ] as const).map((tab) => {
           const isActive = activeTab === tab.key;
           return (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              style={{
-                flex: 1, padding: "10px 0 12px", background: "none", border: "none", cursor: "pointer",
-                borderBottom: isActive ? "2px solid var(--color-primary)" : "2px solid transparent",
-                marginBottom: -1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              }}>
+              style={{ flex: 1, padding: "10px 0 12px", background: "none", border: "none", cursor: "pointer", borderBottom: isActive ? "2px solid var(--color-primary)" : "2px solid transparent", marginBottom: -1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               <span style={{ fontFamily: "var(--font-heading)", fontWeight: isActive ? 700 : 500, fontSize: 13, color: isActive ? "var(--color-primary)" : "var(--color-text-muted)" }}>
                 {tab.label}
               </span>
@@ -666,7 +548,6 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
 
       <div style={{ padding: "20px 16px 0" }}>
 
-        {/* ── BOOKINGS TAB ── */}
         {activeTab === "bookings" && (
           <>
             {pendingReviews.length > 0 && (
@@ -675,7 +556,7 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
                   Rate your visits
                 </p>
                 {pendingReviews.map((b) => (
-                  <ReviewPromptCard key={b.id} booking={b} onSubmitted={fetchBookings} />
+                  <ReviewPromptCard key={b.id} booking={b} onSubmitted={handleReviewSubmitted} />
                 ))}
               </div>
             )}
@@ -686,7 +567,8 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
               <BookingCard
                 key={b.id}
                 booking={b}
-                onSetDate={handleRequestSetDate}
+                phoneNumberVerified={phoneNumberVerified}
+                onVerifyPhone={() => setShowPhoneVerify(true)}
                 onUploadReceipt={setActiveReceiptSheet}
                 hasRentRecord={rentRecordBookingIds.has(b.id)}
               />
@@ -694,12 +576,10 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
           </>
         )}
 
-        {/* ── REQUESTS TAB ── */}
         {activeTab === "requests" && (
           <MyRequestsTab requests={requests} onRefetch={fetchRequests} />
         )}
 
-        {/* ── RENT RECORDS TAB ── */}
         {activeTab === "rent" && (
           <>
             {rentRecords.filter(r => r.feePaid).length === 0 ? (
@@ -720,32 +600,20 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
                 </button>
               </div>
             ) : (
-              rentRecords.filter(r => r.feePaid).map((r) => (
-                <RentRecordCard key={r.id} record={r} />
-              ))
+              rentRecords.filter(r => r.feePaid).map((r) => <RentRecordCard key={r.id} record={r} />)
             )}
           </>
         )}
       </div>
 
-      {/* Phone verification gate — shown before set-date if not yet verified */}
+      {/* Phone verification modal — triggered from the booking card banner */}
       {showPhoneVerify && (
         <PhoneVerificationModal
-          onClose={() => { setShowPhoneVerify(false); setPendingDateBooking(null); }}
+          onClose={() => setShowPhoneVerify(false)}
           onVerified={handlePhoneVerified}
         />
       )}
 
-      {/* Set date sheet */}
-      {activeDateSheet && (
-        <SetDateSheet
-          booking={activeDateSheet}
-          onClose={() => setActiveDateSheet(null)}
-          onSuccess={() => { setActiveDateSheet(null); fetchBookings(); }}
-        />
-      )}
-
-      {/* Receipt upload sheet */}
       {activeReceiptSheet && (
         <ReceiptUploadSheet
           bookingId={activeReceiptSheet.id}

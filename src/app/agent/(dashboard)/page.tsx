@@ -66,6 +66,7 @@ export default async function AgentPage() {
       renterId:    booking.renterId,
       renterName:  user.name,
       renterPhone: user.phone,
+      renterPhoneNumberVerified: user.phoneNumberVerified,
       renterEmail: user.email,
     })
     .from(booking)

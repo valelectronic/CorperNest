@@ -5,7 +5,7 @@ import { useState } from "react";
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 // Replace with your WhatsApp number — no + sign, include country code
 // e.g. Nigerian number 08012345678 → "2348012345678"
-const WHATSAPP_NUMBER = "2349063087928";
+const WHATSAPP_NUMBER = "2348088419204";
 const WHATSAPP_MESSAGE = "Hello! I need help with a CorperNest booking.";
 
 // ─── COMPONENT ────────────────────────────────────────────────────────────────

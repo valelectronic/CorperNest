@@ -449,13 +449,13 @@ export default function HomeClient({
                 </svg>
               </div>
             </div>
-            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.15)", display: "flex", gap: 16 }}>
-              {["Free to request", "7-day active window", "No payment until you book"].map((t) => (
+            <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.15)", display: "flex", flexWrap: "wrap", gap: "8px 14px" }}>
+              {["Free to request", "7-day window", "No payment until you book"].map((t) => (
                 <div key={t} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                     <path d="M20 6L9 17l-5-5" stroke="#A5D6A7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.75)", whiteSpace: "nowrap" }}>{t}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.75)" }}>{t}</span>
                 </div>
               ))}
             </div>

@@ -62,7 +62,18 @@ const inputStyle = {
   boxSizing: "border-box" as const,
 };
 
-type ImagePreview = { file: File; previewUrl: string };
+// Each image has a stable ID assigned at selection time. All upload
+// callbacks use this ID — never the array index — so removing or
+// reordering images mid-upload can't corrupt the wrong entry.
+type ImageStatus = "pending" | "uploading" | "done" | "error";
+type ImagePreview = {
+  id:           string;
+  file:         File;
+  previewUrl:   string;
+  status:       ImageStatus;
+  uploadedUrl?: string;
+  errorMsg?:    string;
+};
 
 type DuplicateWarning = {
   count:    number;
@@ -168,7 +179,6 @@ export default function NewListingPage() {
   });
 
   const [images,            setImages]            = useState<ImagePreview[]>([]);
-  const [uploadedUrls,      setUploadedUrls]      = useState<string[]>([]);
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [customAmenities,   setCustomAmenities]   = useState<string[]>([]);
   const [customInput,       setCustomInput]       = useState("");
@@ -228,24 +238,113 @@ export default function NewListingPage() {
     setCustomAmenities((prev) => prev.filter((_, idx) => idx !== i));
   }
 
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+  const MAX_PHOTOS    = 5;
+
+  async function uploadSingle(id: string, file: File): Promise<void> {
+    // Mark by ID — never by index, so concurrent removes can't corrupt state
+    setImages((prev) => prev.map((img) => img.id === id ? { ...img, status: "uploading" } : img));
+
+    try {
+      const fd = new FormData();
+      fd.append("images", file);
+      const res  = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+
+      if (!res.ok || !data.urls?.[0]) {
+        setImages((prev) => prev.map((img) =>
+          img.id === id ? { ...img, status: "error", errorMsg: data.error ?? "Upload failed — tap × to remove and try again" } : img
+        ));
+        return;
+      }
+
+      // If this image was removed before the upload finished, this map
+      // simply finds no match and returns prev unchanged — no corruption
+      setImages((prev) => prev.map((img) =>
+        img.id === id ? { ...img, status: "done", uploadedUrl: data.urls[0] } : img
+      ));
+    } catch {
+      setImages((prev) => prev.map((img) =>
+        img.id === id ? { ...img, status: "error", errorMsg: "Network error — tap × to remove and try again" } : img
+      ));
+    }
+  }
+
   function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    if (images.length + files.length > 5) { setError("Maximum 5 images allowed."); return; }
-    setImages((prev) => [...prev, ...files.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }))]);
-    setUploadedUrls([]);
-    setError("");
+    const picked = Array.from(e.target.files ?? []);
+    if (!picked.length) return;
+
+    // ── Block video and non-image files explicitly ───────────────────────
+    const invalid = picked.filter((f) => !ALLOWED_TYPES.includes(f.type));
+    if (invalid.length > 0) {
+      setError(`${invalid.map((f) => f.name).join(", ")} — only JPEG, PNG and WebP photos are allowed. Videos cannot be uploaded.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    // ── Hard cap at MAX_PHOTOS — reject the whole batch if it would overflow ──
+    const remaining = MAX_PHOTOS - images.length;
+    if (remaining <= 0) {
+      setError(`Maximum ${MAX_PHOTOS} photos reached. Remove one to add another.`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const toAdd = picked.slice(0, remaining);
+    if (picked.length > remaining) {
+      setError(`Only ${remaining} more photo${remaining > 1 ? "s" : ""} allowed — added the first ${remaining}.`);
+    } else {
+      setError("");
+    }
+
+    // Add all selected images immediately with stable IDs, then kick off
+    // parallel uploads. The agent continues filling the form while photos
+    // upload in the background. Remove-and-replace works correctly because
+    // uploads track by ID, not array position.
+    const newEntries: ImagePreview[] = toAdd.map((file) => ({
+      id:         `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      status:     "pending" as ImageStatus,
+    }));
+
+    setImages((prev) => [...prev, ...newEntries]);
+
+    // Fire uploads OUTSIDE the state setter — same reason as removeImage:
+    // React Strict Mode calls state updaters twice to catch side effects,
+    // which was causing every image to upload to Cloudinary twice.
+    newEntries.forEach((entry) => {
+      setTimeout(() => uploadSingle(entry.id, entry.file), 50);
+    });
+
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  function removeImage(index: number) {
-    setImages((prev) => {
-      const updated = [...prev];
-      URL.revokeObjectURL(updated[index].previewUrl);
-      updated.splice(index, 1);
-      return updated;
-    });
-    setUploadedUrls([]);
+  function removeImage(id: string) {
+    // Find the target BEFORE touching state — the state setter must stay
+    // a pure function. Calling fetch() inside setImages is a side effect
+    // inside a state updater, which React can call multiple times in
+    // StrictMode and which caused the Cloudinary delete to never fire.
+    const target = images.find((img) => img.id === id);
+
+    if (target) {
+      URL.revokeObjectURL(target.previewUrl);
+
+      // Delete from Cloudinary if this photo finished uploading —
+      // fire-and-forget, UI updates immediately regardless of outcome
+      if (target.status === "done" && target.uploadedUrl) {
+        fetch("/api/upload/delete", {
+          method:  "POST",
+          headers: { "Content-Type": "application/json" },
+          body:    JSON.stringify({ url: target.uploadedUrl }),
+        }).catch(() => {
+          console.warn("[removeImage] Cloudinary delete failed for:", target.uploadedUrl);
+        });
+      }
+    }
+
+    // State update is now a pure filter — no side effects inside
+    setImages((prev) => prev.filter((img) => img.id !== id));
   }
 
   const priceNum       = parseInt(form.price.replace(/,/g, "")) || 0;
@@ -261,7 +360,16 @@ export default function NewListingPage() {
     if (!form.lga)             { setError("Please select your LGA."); return; }
     if (!form.landmark.trim()) { setError("Please enter the nearest landmark — this helps clients find the property."); return; }
     if (!priceNum || priceNum <= 0) { setError("Please enter a valid price."); return; }
-    if (images.length < 2)    { setError("Please upload at least 2 photos."); return; }
+    if (images.length < 2) { setError("Please upload at least 2 photos."); return; }
+
+    // Check every photo finished uploading — some might still be in progress
+    const stillUploading = images.some((img) => img.status === "uploading" || img.status === "pending");
+    if (stillUploading) { setError("Photos are still uploading — wait a moment then try again."); return; }
+
+    const failedUploads = images.filter((img) => img.status === "error");
+    if (failedUploads.length > 0) { setError("Some photos failed to upload. Remove them and add again."); return; }
+
+    const imageUrls = images.map((img) => img.uploadedUrl!);
 
     // Auto-built from type + landmark + amenities — no manual writing required
     const description = buildAutoDescription(
@@ -270,18 +378,6 @@ export default function NewListingPage() {
 
     setLoading(true);
     try {
-      let imageUrls = uploadedUrls;
-      if (imageUrls.length === 0) {
-        setUploadProgress("Uploading photos…");
-        const fd = new FormData();
-        images.forEach((img) => fd.append("images", img.file));
-        const uploadRes  = await fetch("/api/upload", { method: "POST", body: fd });
-        const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) { setError(uploadData.error ?? "Image upload failed."); setLoading(false); setUploadProgress(""); return; }
-        imageUrls = uploadData.urls;
-        setUploadedUrls(imageUrls);
-      }
-
       setUploadProgress("Saving listing…");
       const res  = await fetch("/api/properties/create", {
         method:  "POST",
@@ -553,21 +649,46 @@ export default function NewListingPage() {
 
             {images.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {images.map((img, index) => (
-                  <div key={index} style={{ position: "relative", aspectRatio: "1", borderRadius: 12, overflow: "hidden", border: "1px solid var(--color-border)" }}>
-                    <img src={img.previewUrl} alt={`Photo ${index + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    <button type="button" onClick={() => removeImage(index)}
-                      style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "#E53935", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {images.map((img) => (
+                  <div key={img.id} style={{ position: "relative", aspectRatio: "1", borderRadius: 12, overflow: "hidden", border: `1.5px solid ${img.status === "error" ? "#E53935" : img.status === "done" ? "#43A047" : "var(--color-border)"}` }}>
+                    <img src={img.previewUrl} alt="Photo" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: img.status === "uploading" || img.status === "pending" ? 0.5 : 1 }} />
+
+                    {/* Per-image status overlay */}
+                    {(img.status === "uploading" || img.status === "pending") && (
+                      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)" }}>
+                        <span style={{ width: 20, height: 20, borderRadius: "50%", border: "2.5px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                        <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, marginTop: 5 }}>UPLOADING</span>
+                      </div>
+                    )}
+                    {img.status === "done" && (
+                      <div style={{ position: "absolute", bottom: 6, right: 6, width: 20, height: 20, borderRadius: "50%", background: "#43A047", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                          <path d="M20 6L9 17l-5-5" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                    )}
+                    {img.status === "error" && (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(229,57,53,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: 9, color: "#fff", fontWeight: 700, background: "#E53935", padding: "2px 6px", borderRadius: 6, textAlign: "center" }}>FAILED</span>
+                      </div>
+                    )}
+
+                    {/* Remove button — always visible, uses stable ID */}
+                    <button type="button" onClick={() => removeImage(img.id)}
+                      style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "#E53935", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                         <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                       </svg>
                     </button>
-                    {index === 0 && (
+
+                    {images[0]?.id === img.id && img.status === "done" && (
                       <span style={{ position: "absolute", bottom: 6, left: 6, padding: "2px 7px", borderRadius: 6, background: "#2E7D32", color: "#fff", fontSize: 10, fontWeight: 700 }}>Cover</span>
                     )}
                   </div>
                 ))}
-                {images.length < 5 && (
+
+                {/* Add more — only shown if under the limit */}
+                {images.length < MAX_PHOTOS && (
                   <button type="button" onClick={() => fileInputRef.current?.click()}
                     style={{ aspectRatio: "1", borderRadius: 12, border: "1.5px dashed var(--color-border)", background: "var(--color-bg)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -594,16 +715,15 @@ export default function NewListingPage() {
               </button>
             )}
 
-            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+            <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
               multiple onChange={handleImageSelect} style={{ display: "none" }} />
 
             {images.length > 0 && (
-              <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: images.length >= 2 ? "var(--color-primary)" : "var(--color-text-muted)" }}>
-                {images.length}/5 photos {images.length < 2 ? "— add at least 2 to continue" : "✓"}
+              <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: images.filter(i => i.status === "done").length >= 2 ? "var(--color-primary)" : "var(--color-text-muted)" }}>
+                {images.filter(i => i.status === "done").length}/{MAX_PHOTOS} photos uploaded
+                {images.some(i => i.status === "uploading" || i.status === "pending") && " · uploading…"}
+                {images.filter(i => i.status === "done").length >= 2 && " ✓"}
               </p>
-            )}
-            {uploadedUrls.length > 0 && (
-              <p style={{ fontSize: 12, color: "var(--color-primary)", margin: 0 }}>✓ Photos already uploaded — won't re-upload on retry</p>
             )}
           </SectionCard>
 

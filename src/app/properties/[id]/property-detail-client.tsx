@@ -529,7 +529,7 @@ export default function PropertyDetailClient({
         {/* Price card */}
         <div style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 20, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-            <div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 3px" }}>
                 {isForSale ? "Selling price" : "Annual rent"}
               </p>
@@ -550,9 +550,11 @@ export default function PropertyDetailClient({
                 </div>
               )}
             </div>
-            <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ textAlign: "right", flexShrink: 0, maxWidth: "45%", minWidth: 0 }}>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 3px" }}>Listed by</p>
-              <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--color-text)", margin: "0 0 3px" }}>{agentName}</p>
+              <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "var(--color-text)", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {agentName}
+              </p>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>🔒 Contact after booking</p>
             </div>
           </div>

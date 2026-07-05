@@ -1,3 +1,4 @@
+// src/app/admin/listings/page.tsx
 import { db } from "@/lib/db";
 import { listing, user } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -8,24 +9,26 @@ export const revalidate = 30;
 async function getPendingListings() {
   const rows = await db
     .select({
-      id:           listing.id,
-      title:        listing.title,
-      description:  listing.description,
-      address:      listing.address,
-      landmark:       listing.landmark, 
-      lga:          listing.lga,
-      state:        listing.state,
-      price:        listing.price,
-      type:         listing.type,
-      listingPurpose: listing.listingPurpose,
-      status:       listing.status,
-      images:       listing.images,
-      amenities:    listing.amenities,
-      createdAt:    listing.createdAt,
-      agentId:      listing.agentId,
-      agentName:    user.name,
-      agentEmail:   user.email,
-      agentPhone:   user.phone,
+      id:               listing.id,
+      title:            listing.title,
+      description:      listing.description,
+      address:          listing.address,
+      landmark:         listing.landmark,
+      lga:              listing.lga,
+      state:            listing.state,
+      price:            listing.price,
+      type:             listing.type,
+      listingPurpose:   listing.listingPurpose,
+      status:           listing.status,
+      images:           listing.images,
+      amenities:        listing.amenities,
+      customAmenities:  listing.customAmenities,   // ← added
+      agencyFeePercent: listing.agencyFeePercent,  // ← added
+      createdAt:        listing.createdAt,
+      agentId:          listing.agentId,
+      agentName:        user.name,
+      agentEmail:       user.email,
+      agentPhone:       user.phone,
     })
     .from(listing)
     .innerJoin(user, eq(listing.agentId, user.id))

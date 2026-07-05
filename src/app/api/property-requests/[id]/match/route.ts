@@ -139,6 +139,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         : "We found a property matching your request — tap to view.",
       link: `/properties/${listingId}`,
     });
+    // No admin email here — admin did the matching themselves, no need
+    // to notify themselves about their own action.
   } else {
     // ── Pending — admin needs to review before this reaches the renter ──
     const budgetFit = requestRow[0].minBudget && requestRow[0].maxBudget

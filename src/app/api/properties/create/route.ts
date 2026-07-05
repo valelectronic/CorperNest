@@ -182,13 +182,14 @@ export async function POST(req: NextRequest) {
 
     // 10. Fetch agent for admin email
     const agentRows = await db
-      .select({ name: user.name, email: user.email, phone: user.phone })
+      .select({ name: user.name, email: user.email, phone: user.phone, phoneNumber: user.phoneNumber })
       .from(user)
       .where(eq(user.id, session.user.id))
       .limit(1);
     const agent = agentRows[0];
+    const agentPhone = agent?.phoneNumber ?? agent?.phone ?? "—";
 
-    // 11. Email admin — include duplicate warning if detected
+    // 11. Email admin — full details + inline photos so you can review without opening the dashboard
     sendAdminEmail(
       `New Listing for Review${possibleDuplicate ? " ⚠️ Possible Duplicate" : ""} — ${title}`,
       `
@@ -198,19 +199,19 @@ export async function POST(req: NextRequest) {
 
           ${possibleDuplicate ? `
           <div style="background:#FFF8E1;border:1px solid #FAC775;border-radius:10px;padding:12px 16px;margin-bottom:20px">
-            <p style="margin:0;font-size:13px;font-weight:700;color:#92400E">
-              ⚠️ Possible duplicate detected
-            </p>
+            <p style="margin:0;font-size:13px;font-weight:700;color:#92400E">⚠️ Possible duplicate detected</p>
             <p style="margin:4px 0 0;font-size:12px;color:#B45309">
-              Another active listing exists with a similar landmark and property type in ${lga.trim()}. 
+              Another active listing exists with a similar landmark and property type in ${lga.trim()}.
               Please verify this is a different unit before approving.
             </p>
           </div>
           ` : ""}
 
-          <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px">
             <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A;width:140px">Listing</td>
                 <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;font-weight:600;color:#1B1B1B">${title}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Type</td>
+                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B;text-transform:capitalize">${type}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Landmark</td>
                 <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B">${landmark.trim()}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Address</td>
@@ -218,22 +219,42 @@ export async function POST(req: NextRequest) {
             <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Purpose</td>
                 <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B;text-transform:capitalize">${listingPurpose}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Price</td>
-                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B">₦${Math.round(price).toLocaleString()}</td></tr>
+                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B;font-weight:700">₦${Math.round(price).toLocaleString()}${listingPurpose === "rent" ? "/yr" : ""}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Agency Fee</td>
                 <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B">${agencyFeePercent ? `${agencyFeePercent}%` : "Not set"}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Amenities</td>
+                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B">${amenities?.length ? amenities.join(", ") : "None selected"}</td></tr>
             <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Agent</td>
                 <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B">${agent?.name ?? "Unknown"}</td></tr>
-            <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Agent Email</td>
-                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B">${agent?.email ?? "—"}</td></tr>
-            <tr><td style="padding:10px 0;color:#7A9A7A">Agent Phone</td>
-                <td style="padding:10px 0;color:#1B1B1B">${agent?.phone ?? "—"}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Agent Phone</td>
+                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#1B1B1B">${agentPhone}</td></tr>
+            <tr><td style="padding:10px 0;color:#7A9A7A">Agent Email</td>
+                <td style="padding:10px 0;color:#1B1B1B">${agent?.email ?? "—"}</td></tr>
           </table>
 
-          <a href="https://www.corpernest.com.ng/admin/listings"
-             style="display:inline-block;margin-top:24px;padding:12px 24px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">
-            Review in Admin Dashboard →
-          </a>
-          <p style="margin-top:24px;font-size:12px;color:#7A9A7A">
+          ${images && images.length > 0 ? `
+          <p style="font-size:13px;font-weight:700;color:#1B2E1B;margin:0 0 12px">Photos (${images.length})</p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px">
+            ${images.map((url: string, i: number) => `
+              <a href="${url}" target="_blank" style="display:block">
+                <img src="${url}" alt="Photo ${i + 1}"
+                  style="width:175px;height:130px;object-fit:cover;border-radius:8px;border:1px solid #E8F5E9;display:block" />
+              </a>
+            `).join("")}
+          </div>
+          ` : "<p style='color:#E53935;font-size:13px'>⚠ No photos uploaded</p>"}
+
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <a href="https://www.corpernest.com.ng/admin/listings"
+               style="display:inline-block;padding:12px 24px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">
+              Review &amp; Approve →
+            </a>
+            <a href="https://www.corpernest.com.ng/admin/listings"
+               style="display:inline-block;padding:12px 24px;background:#E53935;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">
+              Reject
+            </a>
+          </div>
+          <p style="margin-top:16px;font-size:12px;color:#7A9A7A">
             Submitted ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })} WAT
           </p>
         </div>

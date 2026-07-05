@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { STATE_NAMES, getLGAs } from "@/lib/nigeria-location";
 
@@ -185,9 +185,73 @@ export default function NewListingPage() {
   const [loading,           setLoading]           = useState(false);
   const [error,             setError]             = useState("");
   const [uploadProgress,    setUploadProgress]    = useState("");
+  const [draftSaved,        setDraftSaved]        = useState(false);
 
   const [duplicateWarning,    setDuplicateWarning]    = useState<DuplicateWarning | null>(null);
   const [checkingDuplicate,   setCheckingDuplicate]   = useState(false);
+
+  const DRAFT_KEY    = "corpernest_listing_draft";
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Restore draft on mount ─────────────────────────────────────────────────
+  // Runs once when the page loads. Checks localStorage for a saved draft
+  // and restores all fields if one exists. For images, only those that
+  // already finished uploading to Cloudinary can be restored — File objects
+  // can't survive a page refresh, but Cloudinary URLs can.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (!saved) return;
+      const draft = JSON.parse(saved);
+      if (draft.form)             setForm(draft.form);
+      if (draft.selectedAmenities) setSelectedAmenities(draft.selectedAmenities);
+      if (draft.customAmenities)  setCustomAmenities(draft.customAmenities);
+      if (draft.uploadedImages?.length) {
+        // Restore already-uploaded images as "done" so the agent can see
+        // their photos are still there. File object is gone but the URL is
+        // all we need at this point — upload already finished before refresh.
+        setImages(draft.uploadedImages.map((url: string, i: number) => ({
+          id:          `restored_${i}_${Date.now()}`,
+          file:        undefined as unknown as File, // gone after refresh, never needed again
+          previewUrl:  url,
+          status:      "done" as const,
+          uploadedUrl: url,
+        })));
+      }
+    } catch {
+      // Corrupted draft — silently ignore and start fresh
+      localStorage.removeItem(DRAFT_KEY);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Save draft on every change (debounced 1.5s) ────────────────────────────
+  // Saves to localStorage automatically so the agent never has to think
+  // about it. Only uploads that are fully done get saved for images.
+  useEffect(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        const uploadedImageUrls = images
+          .filter((img) => img.status === "done" && img.uploadedUrl)
+          .map((img) => img.uploadedUrl!);
+
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          form,
+          selectedAmenities,
+          customAmenities,
+          uploadedImages: uploadedImageUrls,
+          savedAt: Date.now(),
+        }));
+        setDraftSaved(true);
+        setTimeout(() => setDraftSaved(false), 2000);
+      } catch {
+        // localStorage full or unavailable — fail silently
+      }
+    }, 1500);
+
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [form, selectedAmenities, customAmenities, images]);
 
   const lgaOptions = getLGAs(form.state);
 
@@ -394,6 +458,8 @@ export default function NewListingPage() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Failed to save listing."); setLoading(false); setUploadProgress(""); return; }
+      // Draft no longer needed — clear it so the next listing starts fresh
+      localStorage.removeItem(DRAFT_KEY);
       router.push("/agent");
     } catch {
       setError("Network error. Check your connection and try again.");
@@ -422,10 +488,18 @@ export default function NewListingPage() {
       </header>
 
       {/* ── HINT BAR ── */}
-      <div style={{ background: "var(--color-light)", borderBottom: "1px solid var(--color-border)", padding: "10px 16px", textAlign: "center" }}>
+      <div style={{ background: "var(--color-light)", borderBottom: "1px solid var(--color-border)", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <p style={{ fontSize: 12, color: "var(--color-primary)", margin: 0, fontWeight: 600 }}>
           Fill all sections carefully — honest listings get approved faster and attract more bookings
         </p>
+        {draftSaved && (
+          <span style={{ fontSize: 11, color: "var(--color-primary)", fontWeight: 600, display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: 12 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Draft saved
+          </span>
+        )}
       </div>
 
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "16px 16px 80px", display: "flex", flexDirection: "column", gap: 12 }}>

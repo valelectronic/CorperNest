@@ -6,25 +6,27 @@ import { toast } from "sonner";
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 type PendingListing = {
-  id:              string;
-  title:           string;
-  description:     string;
-  address:         string;
-  landmark:        string | null; // ← ADD
-  lga:             string;
-  state:           string;
-  price:           number;
-  type:            string;
-  listingPurpose:  string;
-  status:          string;
-  images:          string[] | null;
-  amenities:       string[] | null;
-  createdAt:       Date;
-  agentId:         string;
-  agentName:       string;
-  agentEmail:      string;
-  agentPhone:      string | null;
-  possibleDuplicate?: boolean; // ← ADD
+  id:               string;
+  title:            string;
+  description:      string;
+  address:          string;
+  landmark:         string | null;
+  lga:              string;
+  state:            string;
+  price:            number;
+  type:             string;
+  listingPurpose:   string;
+  status:           string;
+  images:           string[] | null;
+  amenities:        string[] | null;
+  customAmenities:  string[] | null;   // ← added
+  agencyFeePercent: number | null;     // ← added
+  createdAt:        Date;
+  agentId:          string;
+  agentName:        string;
+  agentEmail:       string;
+  agentPhone:       string | null;
+  possibleDuplicate?: boolean;
 };
 
 type RecentlyDeclined = {
@@ -52,6 +54,58 @@ function formatPrice(p: number) {
   return `₦${p.toLocaleString("en-NG")}`;
 }
 
+// ─── LIGHTBOX ─────────────────────────────────────────────────────────────────
+// Fullscreen photo viewer — click any thumbnail to open, arrow through all
+// photos, tap background or X to close.
+
+function Lightbox({ images, startIndex, onClose }: {
+  images:     string[];
+  startIndex: number;
+  onClose:    () => void;
+}) {
+  const [index, setIndex] = useState(startIndex);
+
+  function prev(e: React.MouseEvent) { e.stopPropagation(); setIndex((i) => (i - 1 + images.length) % images.length); }
+  function next(e: React.MouseEvent) { e.stopPropagation(); setIndex((i) => (i + 1) % images.length); }
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.95)", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: "rgba(255,255,255,0.15)", padding: "4px 12px", borderRadius: 20 }}>
+          {index + 1} / {images.length}
+        </span>
+        <button onClick={(e) => { e.stopPropagation(); onClose(); }}
+          style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+      <div onClick={(e) => e.stopPropagation()} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden" }}>
+        <img src={images[index]} alt={`Photo ${index + 1}`} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+        {images.length > 1 && (
+          <>
+            <button onClick={prev} style={{ position: "absolute", left: 12, width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+            <button onClick={next} style={{ position: "absolute", right: 12, width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </button>
+          </>
+        )}
+      </div>
+      <div onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0, padding: "12px 16px 20px", display: "flex", gap: 8, overflowX: "auto", justifyContent: "center" }}>
+        {images.map((img, i) => (
+          <button key={i} onClick={() => setIndex(i)}
+            style={{ width: 52, height: 52, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: i === index ? "2px solid #fff" : "2px solid rgba(255,255,255,0.25)", cursor: "pointer", padding: 0 }}>
+            <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function AdminListingsClient({ pending, recentlyDeclined }: Props) {
@@ -61,7 +115,143 @@ export default function AdminListingsClient({ pending, recentlyDeclined }: Props
   const [declineTarget, setDeclineTarget] = useState<PendingListing | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [expandedId, setExpandedId]       = useState<string | null>(null);
+  const [lightbox, setLightbox]           = useState<{ images: string[]; index: number } | null>(null);
+  const [editTarget, setEditTarget]       = useState<PendingListing | null>(null);
 
+  // ── Edit form state ────────────────────────────────────────────────────────
+  const [editTitle,       setEditTitle]       = useState("");
+  const [editPrice,       setEditPrice]       = useState("");
+  const [editLandmark,    setEditLandmark]    = useState("");
+  const [editAddress,     setEditAddress]     = useState("");
+  const [editLga,         setEditLga]         = useState("");
+  const [editState,       setEditState]       = useState("");
+  const [editType,        setEditType]        = useState("");
+  const [editPurpose,     setEditPurpose]     = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editAmenities,   setEditAmenities]   = useState<string[]>([]);
+  const [editImages,      setEditImages]      = useState<string[]>([]);
+  const [editSaving,      setEditSaving]      = useState(false);
+
+  const PROPERTY_TYPES = [
+    { value: "self-con",  label: "Self Contained" },
+    { value: "mini-flat", label: "Mini Flat"       },
+    { value: "1-bed",     label: "1 Bedroom"       },
+    { value: "2-bed",     label: "2 Bedroom"       },
+    { value: "3-bed",     label: "3 Bedroom"       },
+    { value: "room",      label: "Single Room"     },
+  ];
+
+  const AMENITY_LIST = [
+    "running-water","prepaid-meter","band-a-light","band-b-light","tiled-floors",
+    "ceiling-fan","furnished","kitchen","bathroom-inside","security-gate",
+    "parking-space","fence-compound","good-road-access","close-to-nysc","good-network",
+  ];
+
+  function openEdit(l: PendingListing) {
+    setEditTarget(l);
+    setEditTitle(l.title);
+    setEditPrice(l.price.toString());
+    setEditLandmark(l.landmark ?? "");
+    setEditAddress(l.address);
+    setEditLga(l.lga);
+    setEditState(l.state);
+    setEditType(l.type);
+    setEditPurpose(l.listingPurpose);
+    setEditDescription(l.description);
+    setEditAmenities(l.amenities ?? []);
+    setEditImages(l.images ?? []);
+  }
+
+  function closeEdit() {
+    setEditTarget(null);
+  }
+
+  function toggleEditAmenity(slug: string) {
+    setEditAmenities((prev) =>
+      prev.includes(slug) ? prev.filter((a) => a !== slug) : [...prev, slug]
+    );
+  }
+
+  function removeEditImage(index: number) {
+    setEditImages((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleEditSave(andApprove = false) {
+    if (!editTarget) return;
+    if (!editTitle.trim())   { toast.error("Title is required");    return; }
+    if (!editPrice || isNaN(Number(editPrice)) || Number(editPrice) <= 0) {
+      toast.error("Valid price is required"); return;
+    }
+    if (editImages.length < 2) { toast.error("At least 2 photos required"); return; }
+
+    setEditSaving(true);
+    try {
+      // Save edits
+      const saveRes = await fetch(`/api/admin/listings/${editTarget.id}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title:          editTitle.trim(),
+          price:          Number(editPrice),
+          landmark:       editLandmark.trim(),
+          address:        editAddress.trim(),
+          lga:            editLga.trim(),
+          state:          editState.trim(),
+          type:           editType,
+          listingPurpose: editPurpose,
+          description:    editDescription.trim(),
+          amenities:      editAmenities,
+          images:         editImages,
+        }),
+      });
+      if (!saveRes.ok) {
+        const d = await saveRes.json();
+        toast.error(d.error ?? "Failed to save edits");
+        setEditSaving(false);
+        return;
+      }
+
+      // Optionally approve immediately after saving
+      if (andApprove) {
+        const approveRes = await fetch("/api/admin/listings/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ listingId: editTarget.id }),
+        });
+        if (!approveRes.ok) {
+          toast.error("Edits saved but approval failed — approve manually");
+          setEditSaving(false);
+          return;
+        }
+        setItems((prev) => prev.filter((l) => l.id !== editTarget.id));
+        toast.success("Listing edited and approved — now live ✓");
+      } else {
+        // Update the item in the list with new data
+        setItems((prev) => prev.map((l) => l.id === editTarget.id ? {
+          ...l,
+          title:          editTitle.trim(),
+          price:          Number(editPrice),
+          landmark:       editLandmark.trim() || null,
+          address:        editAddress.trim(),
+          lga:            editLga.trim(),
+          state:          editState.trim(),
+          type:           editType,
+          listingPurpose: editPurpose,
+          description:    editDescription.trim(),
+          amenities:      editAmenities,
+          images:         editImages,
+        } : l));
+        toast.success("Edits saved — approve when ready");
+      }
+      closeEdit();
+    } catch {
+      toast.error("Network error. Try again.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  // ── Approve ────────────────────────────────────────────────────────────────
   async function handleApprove(listingId: string) {
     setProcessingId(listingId);
     try {
@@ -80,6 +270,29 @@ export default function AdminListingsClient({ pending, recentlyDeclined }: Props
     }
   }
 
+  // ── Call to Edit ───────────────────────────────────────────────────────────
+  // Marks listing as needs-correction and notifies agent to wait for your call.
+  // Listing stays hidden until you approve after your call.
+  async function handleCallToEdit(listingId: string) {
+    setProcessingId(listingId);
+    try {
+      const res  = await fetch(`/api/admin/listings/${listingId}/review`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "needs-correction" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Failed."); return; }
+      // Keep in list but update status so it shows the correction badge
+      setItems((prev) => prev.map((l) => l.id === listingId ? { ...l, status: "needs-correction" } : l));
+      toast.success("Agent notified — they'll wait for your call.");
+    } catch {
+      toast.error("Network error. Try again.");
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  // ── Decline ────────────────────────────────────────────────────────────────
   async function handleDeclineSubmit() {
     if (!declineTarget) return;
     if (declineReason.trim().length < 5) {
@@ -155,22 +368,39 @@ export default function AdminListingsClient({ pending, recentlyDeclined }: Props
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 40 }}>
           {items.map((l) => {
-            const isExpanded   = expandedId === l.id;
-            const isProcessing = processingId === l.id;
-            const coverImage   = l.images?.[0] ?? null;
-            const isDuplicate  = l.possibleDuplicate === true;
+            const isExpanded      = expandedId === l.id;
+            const isProcessing    = processingId === l.id;
+            const coverImage      = l.images?.[0] ?? null;
+            const isDuplicate     = l.possibleDuplicate === true;
+            const isNeedsCorrect  = l.status === "needs-correction";
+            const agencyFeeNaira  = l.agencyFeePercent && l.price
+              ? Math.round(l.price * (l.agencyFeePercent / 100))
+              : null;
+            const allAmenities    = [
+              ...(l.amenities ?? []),
+              ...(l.customAmenities ?? []),
+            ];
 
             return (
               <div key={l.id} style={{
-                background: "var(--color-card)", border: `1px solid ${isDuplicate ? "#FAC775" : "var(--color-border)"}`,
+                background: "var(--color-card)",
+                border: `1px solid ${isNeedsCorrect ? "#FAC775" : isDuplicate ? "#FAC775" : "var(--color-border)"}`,
                 borderRadius: 18, overflow: "hidden",
                 opacity: isProcessing ? 0.6 : 1, transition: "opacity 0.2s",
               }}>
-                {/* Top strip — yellow for duplicate, amber for normal */}
-                <div style={{ height: 3, background: isDuplicate ? "#F59E0B" : "#F59E0B" }} />
+                <div style={{ height: 3, background: isNeedsCorrect ? "#F59E0B" : isDuplicate ? "#F59E0B" : "#F59E0B" }} />
 
-                {/* ── POSSIBLE DUPLICATE WARNING ── */}
-                {isDuplicate && (
+                {/* Needs-correction banner */}
+                {isNeedsCorrect && (
+                  <div style={{ background: "#FFF8E1", borderBottom: "1px solid #FAC775", padding: "10px 16px" }}>
+                    <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#92400E" }}>
+                      📞 Waiting for your call — correction needed
+                    </p>
+                  </div>
+                )}
+
+                {/* Duplicate warning */}
+                {isDuplicate && !isNeedsCorrect && (
                   <div style={{ background: "#FFF8E1", borderBottom: "1px solid #FAC775", padding: "10px 16px", display: "flex", alignItems: "flex-start", gap: 10 }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
                       <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="#B45309" strokeWidth="1.8" strokeLinejoin="round" />
@@ -207,24 +437,31 @@ export default function AdminListingsClient({ pending, recentlyDeclined }: Props
                         <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)", lineHeight: 1.3 }}>
                           {l.title}
                         </p>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "#FFF8E1", color: "#92400E", flexShrink: 0, whiteSpace: "nowrap" }}>
-                          Under Review
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, flexShrink: 0, whiteSpace: "nowrap",
+                          background: isNeedsCorrect ? "#FFF8E1" : "#FFF8E1",
+                          color: isNeedsCorrect ? "#92400E" : "#92400E",
+                        }}>
+                          {isNeedsCorrect ? "Needs Correction" : "Under Review"}
                         </span>
                       </div>
-
-                      {/* Landmark shown prominently */}
                       {l.landmark && (
                         <p style={{ margin: "0 0 3px", fontSize: 12, color: "var(--color-primary)", fontWeight: 600 }}>
                           📍 {l.landmark}
                         </p>
                       )}
-
                       <p style={{ margin: "0 0 6px", fontSize: 12, color: "var(--color-text-muted)" }}>
                         {l.address}, {l.lga}
                       </p>
-                      <p style={{ margin: "0 0 6px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "var(--color-primary)" }}>
+                      <p style={{ margin: "0 0 4px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "var(--color-primary)" }}>
                         {formatPrice(l.price)}<span style={{ fontSize: 11, fontWeight: 400, color: "var(--color-text-muted)" }}>{l.listingPurpose === "rent" ? "/yr" : ""}</span>
                       </p>
+                      {/* Agency fee — shown here so you spot suspicious fees at a glance */}
+                      {agencyFeeNaira !== null && (
+                        <p style={{ margin: "0 0 4px", fontSize: 11, color: "#B45309", fontWeight: 600 }}>
+                          Agency fee: {l.agencyFeePercent}% — ₦{agencyFeeNaira.toLocaleString()}
+                        </p>
+                      )}
                       <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-muted)" }}>
                         Submitted {formatDate(l.createdAt)}
                       </p>
@@ -265,18 +502,25 @@ export default function AdminListingsClient({ pending, recentlyDeclined }: Props
                         <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Description</p>
                         <p style={{ margin: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.6 }}>{l.description}</p>
                       </div>
+
+                      {/* All photos — click any to open lightbox, arrow through the rest */}
                       {l.images && l.images.length > 0 && (
                         <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4, marginBottom: 10 }}>
                           {l.images.map((img, i) => (
-                            <img key={i} src={img} alt={`Photo ${i + 1}`}
-                              style={{ width: 100, height: 80, objectFit: "cover", borderRadius: 10, flexShrink: 0, border: "1px solid var(--color-border)" }} />
+                            <button key={i} onClick={() => setLightbox({ images: l.images!, index: i })}
+                              style={{ padding: 0, border: "1px solid var(--color-border)", borderRadius: 10, overflow: "hidden", flexShrink: 0, cursor: "zoom-in", background: "none" }}>
+                              <img src={img} alt={`Photo ${i + 1}`}
+                                style={{ width: 110, height: 88, objectFit: "cover", display: "block" }} />
+                            </button>
                           ))}
                         </div>
                       )}
-                      {l.amenities && l.amenities.length > 0 && (
+
+                      {/* Amenities — standard + custom */}
+                      {allAmenities.length > 0 && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {l.amenities.map((a) => (
-                            <span key={a} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 20, background: "var(--color-light)", color: "var(--color-primary)", fontWeight: 600 }}>
+                          {allAmenities.map((a, i) => (
+                            <span key={i} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 20, background: "var(--color-light)", color: "var(--color-primary)", fontWeight: 600 }}>
                               {a.replace(/-/g, " ")}
                             </span>
                           ))}
@@ -285,28 +529,35 @@ export default function AdminListingsClient({ pending, recentlyDeclined }: Props
                     </div>
                   )}
 
-                  {/* Action buttons */}
-                  <div style={{ display: "flex", gap: 10 }}>
+                  {/* ── ACTION BUTTONS ── */}
+                  <div style={{ display: "flex", gap: 8 }}>
                     <button
                       onClick={() => setDeclineTarget(l)}
                       disabled={isProcessing}
-                      style={{ flex: 1, padding: "13px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: "#FEF2F2", border: "1px solid #FECACA", color: "#C62828", cursor: "pointer", fontFamily: "var(--font-heading)" }}
+                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, fontSize: 12, fontWeight: 700, background: "#FEF2F2", border: "1px solid #FECACA", color: "#C62828", cursor: "pointer", fontFamily: "var(--font-heading)" }}
                     >
                       Decline
                     </button>
                     <button
+                      onClick={() => openEdit(l)}
+                      disabled={isProcessing}
+                      style={{ flex: 1, padding: "12px 8px", borderRadius: 12, fontSize: 12, fontWeight: 700, background: "#EEF2FF", border: "1px solid #C7D2FE", color: "#3730A3", cursor: "pointer", fontFamily: "var(--font-heading)" }}
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
                       onClick={() => handleApprove(l.id)}
                       disabled={isProcessing}
-                      style={{ flex: 2, padding: "13px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: "var(--color-primary)", border: "none", color: "#fff", cursor: "pointer", fontFamily: "var(--font-heading)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                      style={{ flex: 2, padding: "12px 8px", borderRadius: 12, fontSize: 12, fontWeight: 700, background: "var(--color-primary)", border: "none", color: "#fff", cursor: "pointer", fontFamily: "var(--font-heading)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                     >
                       {isProcessing ? (
-                        <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                        <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
                       ) : (
                         <>
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                             <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
-                          Approve & Go Live
+                          Approve
                         </>
                       )}
                     </button>
@@ -392,6 +643,189 @@ export default function AdminListingsClient({ pending, recentlyDeclined }: Props
           </div>
         </div>
       </div>
+
+      {/* Edit sheet backdrop */}
+      {editTarget && (
+        <div onClick={closeEdit} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
+      )}
+
+      {/* Edit bottom sheet — all fields editable, save or save+approve */}
+      <div style={{
+        position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70,
+        background: "var(--color-card)", borderRadius: "22px 22px 0 0",
+        transform: editTarget ? "translateY(0)" : "translateY(100%)",
+        transition: "transform 0.3s cubic-bezier(0.32,0.72,0,1)",
+        maxWidth: 800, margin: "0 auto", maxHeight: "90dvh",
+        display: "flex", flexDirection: "column",
+        paddingBottom: "env(safe-area-inset-bottom, 16px)",
+      }}>
+        {/* Sheet handle + header */}
+        <div style={{ flexShrink: 0, padding: "12px 16px 0" }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--color-border)", margin: "0 auto 16px" }} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16, color: "var(--color-header)" }}>
+                Edit Listing
+              </p>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-text-muted)" }}>
+                {editTarget?.agentName} — changes save directly to the listing
+              </p>
+            </div>
+            <button onClick={closeEdit}
+              style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid var(--color-border)", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="var(--color-text)" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable fields */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 16px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, paddingBottom: 16 }}>
+
+            {/* Title */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>Title</label>
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
+            </div>
+
+            {/* Price + Purpose side by side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>Price (₦)</label>
+                <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>Purpose</label>
+                <select value={editPurpose} onChange={(e) => setEditPurpose(e.target.value)}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 13, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }}>
+                  <option value="rent">Rent</option>
+                  <option value="sale">Sale</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Type */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>Property Type</label>
+              <select value={editType} onChange={(e) => setEditType(e.target.value)}
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 13, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }}>
+                {PROPERTY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+
+            {/* Landmark */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>Landmark</label>
+              <input value={editLandmark} onChange={(e) => setEditLandmark(e.target.value)}
+                placeholder="e.g. Near NYSC secretariat"
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
+            </div>
+
+            {/* Address */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>Full Address</label>
+              <input value={editAddress} onChange={(e) => setEditAddress(e.target.value)}
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
+            </div>
+
+            {/* LGA + State side by side */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>LGA</label>
+                <input value={editLga} onChange={(e) => setEditLga(e.target.value)}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>State</label>
+                <input value={editState} onChange={(e) => setEditState(e.target.value)}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>Description</label>
+              <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={3}
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box", resize: "none", fontFamily: "var(--font-body)" }} />
+            </div>
+
+            {/* Amenities */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 8 }}>Amenities</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {AMENITY_LIST.map((slug) => {
+                  const selected = editAmenities.includes(slug);
+                  return (
+                    <button key={slug} type="button" onClick={() => toggleEditAmenity(slug)}
+                      style={{ padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1.5px solid", backgroundColor: selected ? "var(--color-light)" : "var(--color-bg)", color: selected ? "var(--color-primary)" : "var(--color-text-muted)", borderColor: selected ? "var(--color-primary)" : "var(--color-border)" }}>
+                      {slug.replace(/-/g, " ")}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Photos — remove bad ones, keep good ones */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 8 }}>
+                Photos — tap × to remove a bad photo ({editImages.length} remaining)
+              </label>
+              {editImages.length > 0 ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {editImages.map((img, i) => (
+                    <div key={i} style={{ position: "relative", width: 88, height: 72, borderRadius: 10, overflow: "hidden", border: "1px solid var(--color-border)", flexShrink: 0 }}>
+                      <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onClick={() => setLightbox({ images: editImages, index: i })} />
+                      <button onClick={() => removeEditImage(i)}
+                        style={{ position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: "50%", background: "#E53935", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+                          <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ fontSize: 12, color: "#E53935", fontWeight: 600 }}>⚠ All photos removed — at least 2 required to approve</p>
+              )}
+              <p style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 6 }}>
+                To add new photos, decline and ask the agent to resubmit with better photos.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sticky action buttons */}
+        <div style={{ flexShrink: 0, padding: "12px 16px", borderTop: "1px solid var(--color-border)", display: "flex", gap: 10 }}>
+          <button onClick={() => handleEditSave(false)} disabled={editSaving}
+            style={{ flex: 1, padding: "13px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: "var(--color-bg)", border: "1.5px solid var(--color-border)", color: "var(--color-text)", cursor: "pointer", fontFamily: "var(--font-heading)" }}>
+            {editSaving ? "Saving…" : "Save Only"}
+          </button>
+          <button onClick={() => handleEditSave(true)} disabled={editSaving}
+            style={{ flex: 2, padding: "13px", borderRadius: 14, fontSize: 13, fontWeight: 700, background: "var(--color-primary)", border: "none", color: "#fff", cursor: "pointer", fontFamily: "var(--font-heading)", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            {editSaving ? (
+              <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+            ) : (
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path d="M20 6L9 17l-5-5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Save &amp; Approve
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+      {lightbox && (
+        <Lightbox
+          images={lightbox.images}
+          startIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

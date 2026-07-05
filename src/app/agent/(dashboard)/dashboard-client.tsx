@@ -68,12 +68,14 @@ const STATUS_OPTIONS = [
   { value: "temp-unavailable", label: "Temp unavailable" },
 ];
 
-const statusStyle: Record<string, { bg: string; color: string; dot: string }> = {
-  available:          { bg: "#EAF3DE", color: "#27500A", dot: "#43A047" },
-  occupied:           { bg: "#FCEBEB", color: "#791F1F", dot: "#E53935" },
-  "temp-unavailable": { bg: "#F3F4F6", color: "#4B5563", dot: "#9CA3AF" },
-  reserved:           { bg: "#EEF2FF", color: "#3730A3", dot: "#6366F1" },
-  "under-review":     { bg: "#FFF8E1", color: "#92400E", dot: "#F59E0B" },
+const statusStyle: Record<string, { bg: string; color: string; dot: string; label: string }> = {
+  available:           { bg: "#EAF3DE", color: "#27500A", dot: "#43A047",  label: "Available"        },
+  occupied:            { bg: "#FCEBEB", color: "#791F1F", dot: "#E53935",  label: "Occupied"         },
+  "temp-unavailable":  { bg: "#F3F4F6", color: "#4B5563", dot: "#9CA3AF",  label: "Temp Unavailable" },
+  reserved:            { bg: "#EEF2FF", color: "#3730A3", dot: "#6366F1",  label: "Reserved"         },
+  "under-review":      { bg: "#FFF8E1", color: "#92400E", dot: "#F59E0B",  label: "Under Review"     },
+  "needs-correction":  { bg: "#FEF2F2", color: "#C62828", dot: "#E53935",  label: "Needs Correction" },
+  flagged:             { bg: "#FEF2F2", color: "#C62828", dot: "#E53935",  label: "Not Approved"     },
 };
 
 const REQUEST_TYPE_LABELS: Record<string, string> = {
@@ -559,23 +561,59 @@ function ListingCard(props: {
         <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--color-text-muted)" }}>
           {listing.lga}, {listing.state}
         </p>
+        {/* Review status messages — agent always knows where their listing stands */}
+        {currentStatus === "under-review" && (
+          <div style={{ margin: "0 0 10px", padding: "10px 12px", borderRadius: 10, background: "#FFF8E1", border: "1px solid #FAC775" }}>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#92400E" }}>
+              ⏳ Under Review
+            </p>
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#B45309", lineHeight: 1.5 }}>
+              Our team is reviewing your listing. You'll be notified once it's approved — usually within 24 hours.
+            </p>
+          </div>
+        )}
+        {currentStatus === "needs-correction" && (
+          <div style={{ margin: "0 0 10px", padding: "10px 12px", borderRadius: 10, background: "#FEF2F2", border: "1px solid #FECACA" }}>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#C62828" }}>
+              📞 Our team will call you
+            </p>
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#E57373", lineHeight: 1.5 }}>
+              We found some corrections needed on this listing. Please wait for our call before resubmitting.
+            </p>
+          </div>
+        )}
+        {currentStatus === "flagged" && (
+          <div style={{ margin: "0 0 10px", padding: "10px 12px", borderRadius: 10, background: "#FEF2F2", border: "1px solid #FECACA" }}>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#C62828" }}>
+              ✕ Not Approved
+            </p>
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#E57373", lineHeight: 1.5 }}>
+              This listing was not approved. Check your notifications for the reason, then submit a new listing with the corrections.
+            </p>
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <label style={{ fontSize: 12, color: "var(--color-text-muted)", flexShrink: 0 }}>Status:</label>
-          <select
-            value={currentStatus}
-            onChange={(e) => onStatusChange(listing.id, e.target.value)}
-            style={{
-              flex: 1, padding: "8px 12px", borderRadius: 10, fontSize: 12,
-              border: "1.5px solid var(--color-border)", background: "var(--color-bg)",
-              color: "var(--color-text)", maxWidth: 180,
-              opacity: updatingId === listing.id ? 0.5 : 1,
-            }}
-          >
-            {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-          {updatingId === listing.id && (
-            <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block", flexShrink: 0 }} />
-          )}
+        {["available", "occupied", "temp-unavailable", "reserved"].includes(currentStatus) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ fontSize: 12, color: "var(--color-text-muted)", flexShrink: 0 }}>Status:</label>
+            <select
+              value={currentStatus}
+              onChange={(e) => onStatusChange(listing.id, e.target.value)}
+              style={{
+                flex: 1, padding: "8px 12px", borderRadius: 10, fontSize: 12,
+                border: "1.5px solid var(--color-border)", background: "var(--color-bg)",
+                color: "var(--color-text)", maxWidth: 180,
+                opacity: updatingId === listing.id ? 0.5 : 1,
+              }}
+            >
+              {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            {updatingId === listing.id && (
+              <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block", flexShrink: 0 }} />
+            )}
+          </div>
+        )}
         </div>
       </div>
     </div>

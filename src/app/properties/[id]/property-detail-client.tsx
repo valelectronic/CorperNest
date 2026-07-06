@@ -400,9 +400,12 @@ export default function PropertyDetailClient({
             onClick={async () => {
               const url       = `https://www.corpernest.com.ng/properties/${linkPath}`;
               const purpose   = isForSale ? "for sale" : "for rent";
+              const location  = listing.landmark
+                ? `${listing.landmark}, ${listing.lga}, ${listing.state}`
+                : `${listing.lga}, ${listing.state}`;
               const text      =
                 `🏠 ${listing.title}\n` +
-                `${typeLabel} · 📍 ${listing.lga}, ${listing.state}\n` +
+                `${typeLabel} · 📍 ${location}\n` +
                 `💰 ₦${listing.price.toLocaleString()}${isForSale ? "" : "/yr"} — ${purpose}\n\n` +
                 `Verified listing on CorperNest — inspect before you pay rent. No scams, agent KYC-checked.`;
               if (navigator.share) { try { await navigator.share({ title: listing.title, text, url }); } catch {} }

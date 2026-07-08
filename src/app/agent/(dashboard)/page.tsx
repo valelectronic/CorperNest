@@ -57,25 +57,31 @@ export default async function AgentPage() {
   // ── Incoming bookings (pending + scheduled) ───────────────────────────────
   const allBookings = await db
     .select({
-      id:          booking.id,
-      bookingCode: booking.bookingCode,
-      status:      booking.status,
-      agreedDate:  booking.agreedDate,
-      agreedTime:  booking.agreedTime,
-      listingId:   booking.listingId,
-      renterId:    booking.renterId,
-      renterName:  user.name,
-      renterPhone: user.phone,
+      id:               booking.id,
+      bookingCode:      booking.bookingCode,
+      status:           booking.status,
+      agreedDate:       booking.agreedDate,
+      agreedTime:       booking.agreedTime,
+      listingId:        booking.listingId,
+      renterId:         booking.renterId,
+      commissionStatus: booking.commissionStatus,
+      renterName:       user.name,
+      renterPhone:               user.phoneNumber,
+      renterPhoneLegacy:         user.phone,
       renterPhoneNumberVerified: user.phoneNumberVerified,
-      renterEmail: user.email,
+      renterEmail:               user.email,
     })
     .from(booking)
     .innerJoin(user, eq(booking.renterId, user.id))
     .where(eq(booking.agentId, agentId));
 
-  const activeBookings = allBookings.filter(
-    (b) => b.status === "pending" || b.status === "scheduled"
-  );
+  const activeBookings = allBookings
+    .filter((b) => b.status === "pending" || b.status === "scheduled" || b.status === "verified")
+    .map((b) => ({
+      ...b,
+      // Prefer verified phoneNumber, fall back to legacy phone
+      renterPhone: b.renterPhone ?? b.renterPhoneLegacy ?? null,
+    }));
 
   // ── Listing health checks ─────────────────────────────────────────────────
   const sevenDaysAgo = new Date();

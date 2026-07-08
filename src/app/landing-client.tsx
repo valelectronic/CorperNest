@@ -2,404 +2,325 @@
 
 import Link from "next/link";
 
-function Logo({ variant = "dark" }: { variant?: "dark" | "light" }) {
+export default function LandingClient() {
   return (
-    <span style={{
-      fontFamily: "var(--font-heading)", fontSize: 20, fontWeight: 800,
-      color: variant === "light" ? "#fff" : "var(--color-primary)", letterSpacing: "-0.5px",
-    }}>
-      Corper<span style={{ color: "var(--color-action)", fontStyle: "italic" }}>Nest</span>
-    </span>
-  );
-}
+    <div style={{ fontFamily: "var(--font-body)", background: "#fff", color: "#111", minHeight: "100dvh" }}>
 
-const HOW_IT_WORKS = [
-  {
-    num: "01",
-    title: "Browse verified listings",
-    body: "Every property on CorperNest is reviewed by our team before it goes live. No fake listings, no bait-and-switch.",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <circle cx="11" cy="11" r="8" stroke="var(--color-primary)" strokeWidth="1.8" />
-        <path d="M21 21l-4.35-4.35" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    num: "02",
-    title: "Pay ₦5,000 to book an agent tour",
-    body: "The inspection fee connects you to a verified agent who will take you around — not just one property, but all their available options in one trip. You only pay once per agent.",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <rect x="2" y="5" width="20" height="14" rx="2" stroke="var(--color-primary)" strokeWidth="1.8" />
-        <path d="M2 10h20" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    num: "03",
-    title: "Tour properties, pick what you like",
-    body: "Meet the agent, inspect the properties in person, and choose the one that works for you. No pressure, no hidden fees.",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <path d="M3 9.5L12 3l9 6.5V21a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="M9 22V12h6v10" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    num: "04",
-    title: "Move in with confidence",
-    body: "Your visit is verified with a unique code on the day. No ghost agents, no money sent to strangers — just a clean, safe process from browse to move-in.",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <path d="M12 2L4 6v6c0 4.418 3.582 8 8 8s8-3.582 8-8V6L12 2Z" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="M9 12l2 2 4-4" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-];
+      {/* ── NAV ── */}
+      <nav style={{
+        position: "sticky", top: 0, zIndex: 50,
+        background: "#fff", borderBottom: "1px solid #E8F0E8",
+        padding: "14px 20px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px", color: "#1B5E20" }}>
+          Corper<span style={{ color: "#43A047", fontStyle: "italic" }}>Nest</span>
+        </span>
+        <Link href="/signin" style={{
+          padding: "9px 20px", borderRadius: 50, fontSize: 14, fontWeight: 600,
+          color: "#1B5E20", textDecoration: "none",
+          border: "1.5px solid #1B5E20", display: "inline-block",
+        }}>
+          Sign in
+        </Link>
+      </nav>
 
-const TRUST_POINTS = [
-  {
-    q: "What is the ₦5,000 for?",
-    a: "It's an inspection fee — not rent, not a deposit. It covers the agent's time to take you around and show you available properties. You pay once and tour everything they have.",
-  },
-  {
-    q: "What if I don't like any property?",
-    a: "You're under no obligation to rent. The fee covers the tour, not the rent. If nothing suits you, you simply don't proceed — and you can book a different agent.",
-  },
-  {
-    q: "How do I know the agent is real?",
-    a: "Every agent on CorperNest goes through identity verification before they can list properties. You'll see a verified badge on their profile.",
-  },
-  {
-    q: "Is my money safe?",
-    a: "Payments are processed by Paystack — one of Nigeria's most trusted payment companies. We never ask you to send money directly to an agent.",
-  },
-];
+      {/* ── HERO ── */}
+      <section style={{ padding: "40px 20px 36px", maxWidth: 540, margin: "0 auto" }}>
 
-export default function LandingPageClient() {
-  return (
-    <div style={{ backgroundColor: "var(--color-bg)", minHeight: "100dvh" }}>
+        {/* Badge */}
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          background: "#E8F5E9", borderRadius: 50, padding: "7px 16px", marginBottom: 24,
+        }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#43A047" }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#2E7D32" }}>
+            Now live in Eket, Akwa Ibom
+          </span>
+        </div>
 
-      {/* ══════════════════════════════════════
-          MOBILE
-      ══════════════════════════════════════ */}
-      <div className="md:hidden flex flex-col min-h-screen">
+        {/* Headline */}
+        <h1 style={{
+          fontFamily: "var(--font-heading)", fontSize: "clamp(36px, 9vw, 52px)",
+          fontWeight: 900, color: "#0D1F0D", margin: "0 0 16px",
+          lineHeight: 1.05, letterSpacing: "-0.02em",
+        }}>
+          Find a property.{" "}
+          <span style={{ color: "#43A047", fontStyle: "italic" }}>No scams.</span>
+        </h1>
 
-        {/* Nav */}
-        <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--color-border)", background: "var(--color-card)", position: "sticky", top: 0, zIndex: 30 }}>
-          <Logo variant="dark" />
-          <Link href="/signin" style={{ fontSize: 13, fontWeight: 600, padding: "7px 16px", borderRadius: 12, border: "1.5px solid var(--color-border)", color: "var(--color-text-secondary)", textDecoration: "none" }}>
-            Sign in
-          </Link>
-        </nav>
+        {/* Subtext */}
+        <p style={{ fontSize: 16, color: "#444", lineHeight: 1.75, margin: "0 0 32px", maxWidth: 420 }}>
+          Inspection is free. Meet a verified agent in Eket, tour all their available properties in one visit. Pay the agent directly when you arrive — nothing to us before you see the property.
+        </p>
 
-        {/* Hero */}
-        <div style={{ padding: "28px 20px 0" }}>
-
-          {/* Live badge — EKET */}
-          <div style={{ marginBottom: 16 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 999, backgroundColor: "var(--color-light)", border: "1px solid var(--color-border)", color: "var(--color-primary)" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "var(--color-action)", display: "inline-block", animation: "pulse 2s infinite" }} />
-              Now live in Eket, Akwa Ibom
-            </span>
-          </div>
-
-          <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 34, fontWeight: 900, color: "var(--color-header)", letterSpacing: "-1px", lineHeight: 1.1, marginBottom: 12 }}>
-            Find a property.{" "}
-            <span style={{ color: "var(--color-action)", fontStyle: "italic" }}>No scams.</span>
-          </h1>
-
-          <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.65, marginBottom: 24 }}>
-            Pay ₦5,000 once, meet a verified agent in Eket, and tour all their available properties in one trip. Move in with confidence.
-          </p>
-
-          <Link href="/properties" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "15px", backgroundColor: "var(--color-action)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none", marginBottom: 10 }}>
+        {/* CTAs */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 36 }}>
+          <Link href="/signup" style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "17px 24px", borderRadius: 14, fontSize: 15, fontWeight: 700,
+            background: "#1B5E20", color: "#fff", textDecoration: "none",
+          }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="white" strokeWidth="2" />
-              <circle cx="12" cy="10" r="3" stroke="white" strokeWidth="2" />
+              <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="white" strokeWidth="1.8" />
+              <circle cx="12" cy="10" r="3" stroke="white" strokeWidth="1.8" />
             </svg>
-            Browse listings — no signup needed
+            Browse listings — free inspection
           </Link>
-
-          <Link href="/signup" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "15px", backgroundColor: "var(--color-light)", color: "var(--color-primary)", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none", border: "1.5px solid var(--color-border)", marginBottom: 32 }}>
+          <Link href="/signup" style={{
+            display: "block", padding: "16px 24px", borderRadius: 14, fontSize: 15, fontWeight: 600,
+            background: "#E8F5E9", color: "#1B5E20", textDecoration: "none", textAlign: "center",
+          }}>
             Create free account →
           </Link>
-
-          {/* Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, background: "var(--color-border)", borderRadius: 16, overflow: "hidden", marginBottom: 40 }}>
-            {[
-              { value: "100%", label: "Verified listings" },
-              { value: "₦5k",  label: "Flat fee, one tour" },
-              { value: "0",    label: "Scam reports" },
-            ].map((s) => (
-              <div key={s.label} style={{ background: "var(--color-card)", padding: "14px 8px", textAlign: "center" }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 900, color: "var(--color-primary)", margin: "0 0 2px" }}>{s.value}</p>
-                <p style={{ fontSize: 10, color: "var(--color-text-muted)", margin: 0, lineHeight: 1.3 }}>{s.label}</p>
-              </div>
-            ))}
-          </div>
         </div>
 
-        {/* How it works */}
-        <div style={{ padding: "0 20px 40px" }}>
-          <p style={{ fontFamily: "var(--font-heading)", fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 20px" }}>
-            How it works
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {HOW_IT_WORKS.map((step, i) => (
-              <div key={i} style={{ background: "var(--color-card)", borderRadius: 16, padding: "16px", border: "1px solid var(--color-border)", display: "flex", gap: 14, alignItems: "flex-start" }}>
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {step.icon}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "var(--color-action)" }}>{step.num}</span>
-                    <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, color: "var(--color-header)", margin: 0 }}>{step.title}</p>
-                  </div>
-                  <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.6 }}>{step.body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Trust / FAQ */}
-        <div style={{ padding: "0 20px 40px", background: "var(--color-card)", borderTop: "1px solid var(--color-border)", borderBottom: "1px solid var(--color-border)" }}>
-          <p style={{ fontFamily: "var(--font-heading)", fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "24px 0 16px" }}>
-            Common questions
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {TRUST_POINTS.map((t, i) => (
-              <div key={i}>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, color: "var(--color-header)", margin: "0 0 5px" }}>{t.q}</p>
-                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.6 }}>{t.a}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bottom CTA */}
-        <div style={{ padding: "24px 20px 24px", textAlign: "center" }}>
-          <Link href="/properties" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", backgroundColor: "var(--color-primary)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, textDecoration: "none", marginBottom: 12 }}>
-            Browse listings now →
-          </Link>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
-            Already have an account?{" "}
-            <Link href="/signin" style={{ color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>Sign in</Link>
-          </p>
-        </div>
-
-        {/* Mobile footer — About link + copyright */}
-        <div style={{ padding: "16px 20px 32px", textAlign: "center", borderTop: "1px solid var(--color-border)" }}>
-          <Link href="/about" style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none", fontWeight: 600 }}>
-            About CorperNest
-          </Link>
-          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "10px 0 0" }}>
-            © {new Date().getFullYear()} Bridgenest Limited
-          </p>
-        </div>
-      </div>
-
-      {/* ══════════════════════════════════════
-          DESKTOP
-      ══════════════════════════════════════ */}
-      <div className="hidden md:block">
-
-        {/* Desktop nav */}
-        <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 64px", borderBottom: "1px solid var(--color-border)", background: "var(--color-card)", position: "sticky", top: 0, zIndex: 30 }}>
-          <Logo variant="dark" />
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Link href="/about" style={{ fontSize: 13, fontWeight: 600, padding: "9px 14px", color: "var(--color-text-secondary)", textDecoration: "none" }}>
-              About
-            </Link>
-            <Link href="/properties" style={{ fontSize: 13, fontWeight: 700, padding: "9px 18px", color: "#fff", textDecoration: "none", borderRadius: 12, background: "var(--color-action)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="white" strokeWidth="2" />
-                <circle cx="12" cy="10" r="3" stroke="white" strokeWidth="2" />
-              </svg>
-              Browse listings
-            </Link>
-            <Link href="/signin" style={{ fontSize: 13, fontWeight: 600, padding: "9px 18px", borderRadius: 12, border: "1.5px solid var(--color-border)", color: "var(--color-text-secondary)", textDecoration: "none" }}>
-              Sign in
-            </Link>
-            <Link href="/signup" style={{ fontSize: 13, fontWeight: 700, padding: "9px 18px", borderRadius: 12, backgroundColor: "var(--color-light)", color: "var(--color-primary)", textDecoration: "none", fontFamily: "var(--font-heading)", border: "1.5px solid var(--color-border)" }}>
-              Create account
-            </Link>
-          </div>
-        </nav>
-
-        {/* Desktop hero */}
-        <div style={{ display: "flex", minHeight: "calc(100dvh - 65px)" }}>
-
-          {/* Left */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "64px", maxWidth: 660 }}>
-            <div style={{ marginBottom: 24 }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 600, padding: "7px 14px", borderRadius: 999, backgroundColor: "var(--color-light)", border: "1px solid var(--color-border)", color: "var(--color-primary)" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: "var(--color-action)", display: "inline-block" }} />
-                Now live in Eket, Akwa Ibom · More cities coming soon
-              </span>
+        {/* Stats */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+          borderTop: "1px solid #E8F0E8", borderBottom: "1px solid #E8F0E8",
+          padding: "20px 0",
+        }}>
+          {[
+            { val: "100%",  label: "Verified listings" },
+            { val: "Free",  label: "To book & inspect"  },
+            { val: "0",     label: "Scam reports"       },
+          ].map((s, i) => (
+            <div key={s.label} style={{
+              textAlign: "center",
+              borderRight: i < 2 ? "1px solid #E8F0E8" : "none",
+              padding: "4px 0",
+            }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 22, color: "#1B5E20", margin: 0, lineHeight: 1 }}>
+                {s.val}
+              </p>
+              <p style={{ fontSize: 11, color: "#888", margin: "6px 0 0", lineHeight: 1.4 }}>
+                {s.label}
+              </p>
             </div>
+          ))}
+        </div>
+      </section>
 
-            <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(44px, 4.5vw, 60px)", fontWeight: 900, color: "var(--color-header)", letterSpacing: "-2px", lineHeight: 1.05, marginBottom: 20 }}>
-              Find a property.{" "}
-              <span style={{ color: "var(--color-action)", fontStyle: "italic" }}>Zero scams.</span>
-            </h1>
-
-            <p style={{ fontSize: 16, color: "var(--color-text-secondary)", lineHeight: 1.7, marginBottom: 36, maxWidth: 480 }}>
-              Pay ₦5,000 once to book a verified agent in Eket. They'll take you around — one trip, multiple properties — until you find the right one. No fake listings, no money to strangers.
-            </p>
-
-            <div style={{ display: "flex", gap: 12, marginBottom: 48 }}>
-              <Link href="/properties" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "14px 28px", backgroundColor: "var(--color-action)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="white" strokeWidth="2" />
-                  <circle cx="12" cy="10" r="3" stroke="white" strokeWidth="2" />
+      {/* ── HOW IT WORKS ── */}
+      <section style={{ padding: "40px 20px", maxWidth: 540, margin: "0 auto" }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#43A047", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px" }}>
+          How it works
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {[
+            {
+              num: "01",
+              title: "Browse verified listings",
+              body: "Every property on CorperNest is reviewed by our team before it goes live. No fake listings, no photos that don't match.",
+              icon: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="8" stroke="#2E7D32" strokeWidth="1.8" />
+                  <path d="M21 21l-4.35-4.35" stroke="#2E7D32" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
-                Browse listings — no signup
-              </Link>
-              <Link href="/signup" style={{ display: "inline-flex", alignItems: "center", padding: "14px 28px", border: "1.5px solid var(--color-border)", color: "var(--color-primary)", borderRadius: 16, fontWeight: 700, fontSize: 14, textDecoration: "none", background: "var(--color-light)", fontFamily: "var(--font-heading)" }}>
-                Create free account →
-              </Link>
-            </div>
-
-            {/* Stats */}
-            <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-              {[
-                { value: "100%",   label: "Verified listings" },
-                { value: "₦5,000", label: "One fee, full agent tour" },
-                { value: "0",      label: "Scam reports" },
-              ].map((stat, i) => (
-                <div key={stat.label} style={{ display: "flex", alignItems: "center", gap: 32 }}>
-                  {i > 0 && <div style={{ width: 1, height: 32, backgroundColor: "var(--color-border)" }} />}
-                  <div>
-                    <p style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 900, color: "var(--color-primary)", margin: 0 }}>{stat.value}</p>
-                    <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "2px 0 0" }}>{stat.label}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right card */}
-          <div style={{ width: 360, margin: "32px 64px 32px 0", borderRadius: 24, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", padding: 28, display: "flex", flexDirection: "column", justifyContent: "center", boxShadow: "0 4px 24px rgba(46,125,50,0.07)", alignSelf: "center" }}>
-            <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>Find your next home in Eket</p>
-            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px", lineHeight: 1.6 }}>
-              Browse verified listings or create an account to book an agent tour.
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
-              <Link href="/properties" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "14px", backgroundColor: "var(--color-action)", color: "#fff", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, textDecoration: "none" }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="white" strokeWidth="2" />
-                  <circle cx="12" cy="10" r="3" stroke="white" strokeWidth="2" />
+              ),
+            },
+            {
+              num: "02",
+              title: "Book a free inspection",
+              body: "No payment to us. Request to inspect — we call you personally to confirm, then connect you directly to the agent.",
+              icon: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="#2E7D32" strokeWidth="1.8" fill="none" />
                 </svg>
-                Browse listings — no signup
-              </Link>
-              <Link href="/signup" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "14px", border: "1.5px solid var(--color-border)", color: "var(--color-primary)", borderRadius: 14, fontWeight: 700, fontSize: 14, textDecoration: "none", background: "var(--color-light)", fontFamily: "var(--font-heading)" }}>
-                Create free account →
-              </Link>
-              <Link href="/signin" style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "12px", color: "var(--color-text-muted)", borderRadius: 14, fontWeight: 500, fontSize: 13, textDecoration: "none" }}>
-                I already have an account
-              </Link>
+              ),
+            },
+            {
+              num: "03",
+              title: "Meet the agent, see the properties",
+              body: "One visit covers everything the agent has. Pay their inspection fee when you arrive — cash or transfer, directly to them.",
+              icon: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 9.5L12 3l9 6.5V21a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" stroke="#2E7D32" strokeWidth="1.8" strokeLinejoin="round" />
+                  <path d="M9 22V12h6v10" stroke="#2E7D32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ),
+            },
+            {
+              num: "04",
+              title: "Confirm your visit",
+              body: "After meeting the agent, tap 'I Have Seen The Agent' in your bookings. This creates an official record of your inspection that protects you.",
+              icon: (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L4 6v6c0 4.418 3.582 8 8 8s8-3.582 8-8V6L12 2Z" stroke="#2E7D32" strokeWidth="1.8" strokeLinejoin="round" />
+                  <path d="M9 12l2 2 4-4" stroke="#2E7D32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ),
+            },
+          ].map((step) => (
+            <div key={step.num} style={{
+              background: "#fff", border: "1px solid #E8F0E8",
+              borderRadius: 16, padding: "18px 16px",
+              display: "flex", gap: 14, alignItems: "flex-start",
+            }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, background: "#E8F5E9",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                {step.icon}
+              </div>
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, color: "#43A047", margin: "0 0 4px", letterSpacing: "0.04em" }}>
+                  {step.num}
+                </p>
+                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "#0D1F0D", margin: "0 0 5px" }}>
+                  {step.title}
+                </p>
+                <p style={{ fontSize: 13, color: "#555", margin: 0, lineHeight: 1.7 }}>
+                  {step.body}
+                </p>
+              </div>
             </div>
-
-            {/* How it works mini */}
-            <div style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 16, padding: "14px 16px" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontSize: 10, fontWeight: 700, letterSpacing: "1.5px", color: "var(--color-text-muted)", textTransform: "uppercase", margin: "0 0 12px" }}>
-                How it works
-              </p>
-              {[
-                "Browse verified listings in Eket",
-                "Pay ₦5,000 — agent tours you around",
-                "Visit multiple properties in one trip",
-                "Move in with full confidence",
-              ].map((text, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: i < 3 ? 10 : 0 }}>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: "var(--color-action)", flexShrink: 0, marginTop: 1 }}>0{i + 1}</span>
-                  <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.5 }}>{text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
+      </section>
 
-        {/* How it works full section */}
-        <div style={{ background: "var(--color-card)", borderTop: "1px solid var(--color-border)", padding: "64px 64px" }}>
-          <div style={{ maxWidth: 960, margin: "0 auto" }}>
-            <div style={{ marginBottom: 48, textAlign: "center" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px" }}>
-                The process
-              </p>
-              <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 36, fontWeight: 900, color: "var(--color-header)", margin: 0, letterSpacing: "-1px" }}>
-                How CorperNest works
-              </h2>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }}>
-              {HOW_IT_WORKS.map((step, i) => (
-                <div key={i} style={{ background: "var(--color-bg)", borderRadius: 20, padding: 24, border: "1px solid var(--color-border)" }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 14, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
-                    {step.icon}
-                  </div>
-                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "var(--color-action)", display: "block", marginBottom: 6 }}>{step.num}</span>
-                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "var(--color-header)", margin: "0 0 8px" }}>{step.title}</p>
-                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.7 }}>{step.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Trust / FAQ */}
-        <div style={{ padding: "64px 64px", background: "var(--color-bg)" }}>
-          <div style={{ maxWidth: 960, margin: "0 auto" }}>
-            <div style={{ marginBottom: 40, textAlign: "center" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px" }}>
-                Transparency
-              </p>
-              <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 32, fontWeight: 900, color: "var(--color-header)", margin: 0, letterSpacing: "-1px" }}>
-                Common questions
-              </h2>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 20 }}>
-              {TRUST_POINTS.map((t, i) => (
-                <div key={i} style={{ background: "var(--color-card)", borderRadius: 18, padding: "24px", border: "1px solid var(--color-border)" }}>
-                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "var(--color-header)", margin: "0 0 10px" }}>{t.q}</p>
-                  <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.7 }}>{t.a}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer CTA */}
-        <div style={{ background: "#1B2E1B", padding: "56px 64px 32px", textAlign: "center" }}>
-          <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 32, fontWeight: 900, color: "#E8F5E9", margin: "0 0 12px", letterSpacing: "-1px" }}>
-            Ready to find your home in Eket?
+      {/* ── WHY NOT FACEBOOK/WHATSAPP ── */}
+      <section style={{ padding: "40px 20px", background: "#fff" }}>
+        <div style={{ maxWidth: 540, margin: "0 auto" }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#43A047", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 12px" }}>
+            Why not just use WhatsApp?
+          </p>
+          <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(22px, 5vw, 28px)", fontWeight: 800, color: "#0D1F0D", margin: "0 0 12px", lineHeight: 1.25 }}>
+            We're not competing with Facebook.<br />
+            <span style={{ color: "#43A047", fontStyle: "italic" }}>We're fixing what Facebook created.</span>
           </h2>
-          <p style={{ fontSize: 15, color: "#7A9A7A", margin: "0 0 32px" }}>
-            Browse verified listings in Eket, Akwa Ibom — no account needed.
+          <p style={{ fontSize: 14, color: "#555", lineHeight: 1.8, margin: "0 0 24px" }}>
+            WhatsApp groups and Facebook pages made it easier for anyone to post a property listing — including people who don't own or manage the property at all. The scam is simple: post attractive photos, collect inspection fees, disappear. CorperNest exists because that pattern is too common in Eket.
           </p>
-          <Link href="/properties" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "15px 36px", backgroundColor: "var(--color-action)", color: "#fff", borderRadius: 16, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none", marginBottom: 32 }}>
-            Browse listings →
-          </Link>
 
-          {/* Desktop footer — About link + copyright */}
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
-            <Link href="/about" style={{ fontSize: 13, color: "#7A9A7A", textDecoration: "none", fontWeight: 600 }}>
-              About CorperNest
-            </Link>
-            <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
-            <p style={{ fontSize: 13, color: "#7A9A7A", margin: 0 }}>
-              © {new Date().getFullYear()} Bridgenest Limited
-            </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              {
+                label: "Verified identity on both sides",
+                body: "When you book through CorperNest, the agent's real name, phone, and ID are on file with us. 'Agent Bassey' on WhatsApp is an account that could disappear tomorrow. Our agents cannot.",
+              },
+              {
+                label: "Search by what actually matters",
+                body: "Looking for a self-contained near NYSC secretariat in Eket under ₦200,000? You can filter for that here. On Facebook you scroll through hundreds of irrelevant posts hoping to find it.",
+              },
+              {
+                label: "A record that exists",
+                body: "Your CorperNest booking is documented. What was shown, when, and by whom. On WhatsApp there's a deleted message. That difference matters the moment something goes wrong.",
+              },
+              {
+                label: "Listings that stay searchable",
+                body: "A Facebook post is buried within 48 hours. A CorperNest listing stays visible to everyone searching in Eket until the property is no longer available.",
+              },
+            ].map((item, i) => (
+              <div key={i} style={{
+                background: "#F7FBF7", border: "1px solid #E0EEE0",
+                borderRadius: 14, padding: "16px",
+                display: "flex", gap: 12, alignItems: "flex-start",
+              }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#43A047", flexShrink: 0, marginTop: 6 }} />
+                <div>
+                  <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "#0D1F0D", margin: "0 0 5px" }}>
+                    {item.label}
+                  </p>
+                  <p style={{ fontSize: 13, color: "#555", margin: 0, lineHeight: 1.7 }}>
+                    {item.body}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      </section>
 
-      <style>{`@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
+
+      <section style={{ padding: "40px 20px", background: "#F7FBF7", margin: "0" }}>
+        <div style={{ maxWidth: 540, margin: "0 auto" }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: "#43A047", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 12px" }}>
+            Are you an agent?
+          </p>
+          <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(22px, 5vw, 28px)", fontWeight: 800, color: "#0D1F0D", margin: "0 0 12px", lineHeight: 1.25 }}>
+            Get verified, start receiving clients.
+          </h2>
+          <p style={{ fontSize: 14, color: "#555", lineHeight: 1.75, margin: "0 0 20px" }}>
+            Every client we send you has been spoken to by our team before we connect you. No time-wasters, no ghost clients. You pay ₦1,000 commission only after a client confirms they met you.
+          </p>
+          <Link href="/signup?agent=1" style={{
+            display: "inline-block", padding: "13px 22px", borderRadius: 12,
+            fontSize: 14, fontWeight: 700, background: "#1B5E20", color: "#fff", textDecoration: "none",
+          }}>
+            Apply as a verified agent
+          </Link>
+        </div>
+      </section>
+
+      {/* ── FAQS ── */}
+      <section style={{ padding: "40px 20px", maxWidth: 540, margin: "0 auto" }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#43A047", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px" }}>
+          Common questions
+        </p>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {[
+            {
+              q: "Is the inspection really free?",
+              a: "Yes. You pay nothing to CorperNest to book an inspection. When you meet the agent, you pay them their inspection fee directly — cash or transfer. That money goes to them, not us.",
+            },
+            {
+              q: "What if I don't like any of the properties?",
+              a: "You're under no obligation to rent. The inspection fee you pay the agent covers their time to show you around. If nothing works for you, you can request a different agent and try again.",
+            },
+            {
+              q: "How do I know the agent is real?",
+              a: "Every agent on CorperNest goes through our identity verification before they can list anything. We have their real name and phone on file. If anything goes wrong, we can follow up directly.",
+            },
+            {
+              q: "Is my money safe?",
+              a: "You never send money to us or to an agent through the app. The agent collects their inspection fee from you in person. CorperNest handles zero client payments — everything is face to face.",
+            },
+            {
+              q: "What is the 'I Have Seen The Agent' button?",
+              a: "After your visit, tap this in your bookings. It creates an official CorperNest record that you inspected with a verified agent — your proof if any dispute ever comes up later.",
+            },
+          ].map((faq, i, arr) => (
+            <div key={i} style={{ borderBottom: i < arr.length - 1 ? "1px solid #E8F0E8" : "none", padding: "18px 0" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "#0D1F0D", margin: "0 0 8px" }}>
+                {faq.q}
+              </p>
+              <p style={{ fontSize: 14, color: "#555", margin: 0, lineHeight: 1.75 }}>
+                {faq.a}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ── */}
+      <section style={{ padding: "40px 20px 48px", maxWidth: 540, margin: "0 auto", textAlign: "center" }}>
+        <Link href="/signup" style={{
+          display: "block", padding: "18px 24px", borderRadius: 14,
+          fontSize: 16, fontWeight: 700, background: "#1B5E20", color: "#fff",
+          textDecoration: "none", marginBottom: 14,
+        }}>
+          Browse listings now →
+        </Link>
+        <p style={{ fontSize: 14, color: "#888", margin: 0 }}>
+          Already have an account?{" "}
+          <Link href="/signin" style={{ color: "#1B5E20", fontWeight: 700, textDecoration: "none" }}>
+            Sign in
+          </Link>
+        </p>
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{ borderTop: "1px solid #E8F0E8", padding: "24px 20px", textAlign: "center" }}>
+        <Link href="/about" style={{ fontSize: 14, fontWeight: 600, color: "#888", textDecoration: "none", display: "block", marginBottom: 8 }}>
+          About CorperNest
+        </Link>
+        <p style={{ fontSize: 12, color: "#bbb", margin: 0 }}>
+          © {new Date().getFullYear()} Bridgenest Limited · RC 9630078
+        </p>
+      </footer>
+
     </div>
   );
 }

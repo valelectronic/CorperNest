@@ -128,7 +128,11 @@ export default function HomeClient({
       const data = await res.json();
 
       if (isLoadMore) {
-        setListings((prev) => [...prev, ...(data.listings ?? [])]);
+        setListings((prev) => {
+          const existingIds = new Set(prev.map((l) => l.id));
+          const newListings = (data.listings ?? []).filter((l: PropertyCardData) => !existingIds.has(l.id));
+          return [...prev, ...newListings];
+        });
         setPage(pageNum);
       } else {
         setListings(data.listings ?? []);

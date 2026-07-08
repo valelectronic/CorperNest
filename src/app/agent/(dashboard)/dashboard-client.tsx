@@ -33,8 +33,10 @@ type IncomingBooking = {
   renterId:    string;
   renterName:                string;
   renterPhone:               string | null;
+  renterPhoneLegacy:         string | null;
   renterPhoneNumberVerified: boolean | null;
   renterEmail:               string;
+  commissionStatus:          string | null;
 };
 
 type PropertyRequestItem = {
@@ -118,8 +120,8 @@ type VerifyState = {
 function BookingStatusPill({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string }> = {
     verified:  { label: "Visited ✓",     bg: "#E8F5E9", color: "#2E7D32" },
-    scheduled: { label: "Scheduled",     bg: "#EEF2FF", color: "#3730A3" },
-    pending:   { label: "Awaiting date", bg: "#FFF8E1", color: "#92400E" },
+    scheduled: { label: "Awaiting Visit", bg: "#EEF2FF", color: "#4338CA" },
+    pending:   { label: "Awaiting Visit", bg: "#EEF2FF", color: "#4338CA" },
     completed: { label: "Completed",     bg: "#F3F4F6", color: "#374151" },
     cancelled: { label: "Cancelled",     bg: "#FEF2F2", color: "#C62828" },
   };
@@ -252,37 +254,52 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
           <BookingStatusPill status={booking.status} />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-          <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Visit Date
-            </p>
-            {booking.agreedDate ? (
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>
-                {formatDate(booking.agreedDate)}{booking.agreedTime ? ` · ${booking.agreedTime}` : ""}
-              </p>
-            ) : (
-              <p style={{ margin: 0, fontSize: 12, color: "var(--color-text-muted)" }}>Not scheduled</p>
-            )}
+        {/* Visit confirmed banner */}
+        {booking.status === "verified" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "#E8F5E9", border: "1px solid #A5D6A7", marginBottom: 10 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M20 6L9 17l-5-5" stroke="#2E7D32" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#2E7D32" }}>Client confirmed their visit ✓</p>
+              <p style={{ margin: "2px 0 0", fontSize: 11, color: "#388E3C" }}>CorperNest will send your commission details shortly</p>
+            </div>
           </div>
-          <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)" }}>
-            <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Contact
-            </p>
-            {booking.renterPhone && booking.renterPhoneNumberVerified ? (
-              <a href={`tel:${booking.renterPhone}`} style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none", display: "block" }}>
-                {booking.renterPhone}
-              </a>
-            ) : booking.renterPhone && !booking.renterPhoneNumberVerified ? (
-              <p style={{ margin: 0, fontSize: 12, color: "#B45309", fontWeight: 600 }}>
-                ⚠ Phone not verified yet
-              </p>
-            ) : (
-              <a href={`mailto:${booking.renterEmail}`} style={{ margin: 0, fontSize: 11, color: "var(--color-primary)", textDecoration: "none", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {booking.renterEmail}
-              </a>
-            )}
+        )}
+
+        {/* Commission payment card — shown when admin sends request */}
+        {booking.commissionStatus === "requested" && (
+          <CommissionCard bookingId={booking.id} />
+        )}
+        {booking.commissionStatus === "paid" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "#F0FDF4", border: "1px solid #86EFAC", marginBottom: 10 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M20 6L9 17l-5-5" stroke="#15803D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "#15803D" }}>Commission paid ✓ — Thank you!</p>
           </div>
+        )}
+
+        {/* Client contact — phone and email, no date setting needed */}
+        <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 14 }}>
+          <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            Client Contact
+          </p>
+          {booking.renterPhone ? (
+            <a href={`tel:${booking.renterPhone}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, color: "var(--color-primary)", textDecoration: "none", marginBottom: 4 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="currentColor" strokeWidth="1.8" fill="none" />
+              </svg>
+              {booking.renterPhone}
+            </a>
+          ) : (
+            <p style={{ margin: "0 0 4px", fontSize: 12, color: "#B45309", fontWeight: 600 }}>
+              ⚠ Client phone not verified yet
+            </p>
+          )}
+          <a href={`mailto:${booking.renterEmail}`} style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+            {booking.renterEmail}
+          </a>
         </div>
 
         {isScheduled && vs.step === "idle" && (
@@ -620,6 +637,67 @@ function ListingCard(props: {
   );
 }
 
+// ─── COMMISSION CARD ──────────────────────────────────────────────────────────
+// Shown when admin sends a commission request to an agent.
+// The agent pays ₦1,000 via Paystack button. Clean, no mention of
+// tracking — just "a commission is due, here's how to pay."
+
+function CommissionCard({ bookingId }: { bookingId: string }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handlePay() {
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/payments/commission/initiate", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ bookingId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Could not start payment"); setLoading(false); return; }
+      window.location.href = data.authorizationUrl;
+    } catch {
+      toast.error("Network error. Try again.");
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ background: "#FFF8E1", border: "1.5px solid #FAC775", borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: "#FEF3C7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="#92400E" strokeWidth="1.8" />
+            <path d="M12 8v4M12 16h.01" stroke="#92400E" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </div>
+        <div>
+          <p style={{ margin: "0 0 4px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "#92400E" }}>
+            Commission payment due
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: "#B45309", lineHeight: 1.6 }}>
+            A client confirmed their visit through CorperNest. Your platform commission of <strong>₦1,000</strong> is now due. Pay securely via Paystack below.
+          </p>
+        </div>
+      </div>
+      <button onClick={handlePay} disabled={loading}
+        style={{ width: "100%", padding: "13px", borderRadius: 12, background: loading ? "var(--color-border)" : "#92400E", border: "none", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        {loading ? (
+          <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+        ) : (
+          <>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <rect x="1" y="4" width="22" height="16" rx="2" stroke="white" strokeWidth="1.8" />
+              <path d="M1 10h22" stroke="white" strokeWidth="1.8" />
+            </svg>
+            Pay ₦1,000 Commission
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function AgentDashboardClient(mainProps: Props) {
@@ -646,7 +724,8 @@ export default function AgentDashboardClient(mainProps: Props) {
     // Fire-and-forget housekeeping — never awaited, never blocks the UI,
     // and only ever runs because someone happened to open this page, not
     // on any schedule.
-    fetch("/api/listings/cleanup-stale", { method: "POST" }).catch(() => {});
+    // Stale listing cleanup is handled server-side on a schedule,
+    // not on every dashboard mount — removed to save Neon compute hours.
   }, []);
 
   async function fetchRequests() {
@@ -766,7 +845,7 @@ export default function AgentDashboardClient(mainProps: Props) {
             padding: "10px 0", marginBottom: 12,
           }}>
             {[
-              { num: activeBookings.length,  label: "Active",   color: "#FAC775" },
+              { num: activeBookings.filter(b => b.status === "pending" || b.status === "scheduled").length,  label: "Active",   color: "#FAC775" },
               { num: visibleListings.length, label: "Listings", color: "#A5D6A7" },
               { num: completedCount,         label: "Done",     color: "#7A9A7A" },
             ].map((s, i, arr) => (

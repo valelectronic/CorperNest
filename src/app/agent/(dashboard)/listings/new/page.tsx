@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { STATE_NAMES, getLGAs } from "@/lib/nigeria-location";
+import { authClient } from "@/lib/auth-client";
+import PhoneVerificationModal from "@/components/phone-verification-modal";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -161,6 +163,21 @@ function Field({
 
 export default function NewListingPage() {
   const router           = useRouter();
+
+  // Phone verification gate — agent must have a verified phone number
+  // before listing. Clients need to reach them when a booking is confirmed.
+  // Agents onboarded before Termii was active may not have this set yet.
+  const { data: session } = authClient.useSession();
+  const sessionUser = session?.user as { phoneNumber?: string | null; phoneNumberVerified?: boolean } | undefined;
+  const hasVerifiedPhone = !!(sessionUser?.phoneNumber || sessionUser?.phoneNumberVerified);
+  const [showPhoneGate, setShowPhoneGate] = useState(false);
+
+  // Show phone gate if not verified — checked after session loads
+  useEffect(() => {
+    if (session && !hasVerifiedPhone) {
+      setShowPhoneGate(true);
+    }
+  }, [session, hasVerifiedPhone]);
   const fileInputRef     = useRef<HTMLInputElement>(null);
   const customAmenityRef = useRef<HTMLInputElement>(null);
   const dupTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -466,6 +483,48 @@ export default function NewListingPage() {
       setLoading(false);
       setUploadProgress("");
     }
+  }
+
+  // ── Phone gate — shown if agent has no verified phone number ──────────────
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+
+  if (showPhoneGate && !hasVerifiedPhone) {
+    return (
+      <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 20px", textAlign: "center" }}>
+        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#FFF8E1", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="#92400E" strokeWidth="1.8" fill="none" />
+          </svg>
+        </div>
+        <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 20, fontWeight: 800, color: "var(--color-header)", margin: "0 0 10px" }}>
+          Verify your phone first
+        </h2>
+        <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.7, maxWidth: 300, margin: "0 0 8px" }}>
+          You need a verified phone number before you can list a property.
+        </p>
+        <p style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.6, maxWidth: 300, margin: "0 0 28px" }}>
+          When a client books an inspection, your phone number is shared with them so they can contact you directly. This is how they reach you to arrange the visit.
+        </p>
+        <button onClick={() => setShowPhoneModal(true)}
+          style={{ padding: "14px 32px", background: "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 12 }}>
+          Verify My Phone Number
+        </button>
+        <button onClick={() => router.back()}
+          style={{ padding: "12px 24px", background: "none", color: "var(--color-text-muted)", border: "1px solid var(--color-border)", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+          Go Back
+        </button>
+
+        {showPhoneModal && (
+          <PhoneVerificationModal
+            onClose={() => setShowPhoneModal(false)}
+            onVerified={() => {
+              setShowPhoneModal(false);
+              setShowPhoneGate(false); // phone verified — proceed to form
+            }}
+          />
+        )}
+      </div>
+    );
   }
 
   return (

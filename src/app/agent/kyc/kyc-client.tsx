@@ -1,7 +1,7 @@
 // src/app/agent/kyc/kyc-client.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { STATE_NAMES, getLGAs } from "@/lib/nigeria-location";
@@ -20,111 +20,34 @@ type Props = {
   existingRequest: ExistingRequest;
 };
 
-type Bank = { name: string; code: string };
-
 export default function KycClient({ agentName, agentPhone, existingRequest }: Props) {
-  const router  = useRouter();
+  const router     = useRouter();
   const isPending  = existingRequest?.status === "pending";
   const isDeclined = existingRequest?.status === "declined";
 
-  // Form state
   const [fullName,      setFullName]      = useState(agentName);
   const [phone,         setPhone]         = useState(agentPhone);
   const [whatsapp,      setWhatsapp]      = useState("");
   const [state,         setState]         = useState("Akwa Ibom");
   const [lga,           setLga]           = useState("");
-  const [bankCode,      setBankCode]      = useState("");
-  const [bankSearch,    setBankSearch]    = useState(""); // typed filter text
-  const [bankDropdownOpen, setBankDropdownOpen] = useState(false);
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountName,   setAccountName]   = useState(""); // now always Paystack-verified, never typed
   const [loading,       setLoading]       = useState(false);
   const [submitted,     setSubmitted]     = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  // ── Dynamic bank list, live from Paystack ───────────────────────────────
-  const [banks, setBanks]               = useState<Bank[]>([]);
-  const [banksLoading, setBanksLoading] = useState(true);
-
-  // ── Live account resolution state ───────────────────────────────────────
-  const [resolving, setResolving]   = useState(false);
-  const [resolveError, setResolveError] = useState("");
-
-  // ── Phone verification gate ─────────────────────────────────────────────
   const [showPhoneVerify, setShowPhoneVerify] = useState(false);
   const { data: session } = authClient.useSession();
   const phoneNumberVerified = (session?.user as { phoneNumberVerified?: boolean } | undefined)?.phoneNumberVerified ?? false;
 
   const lgaOptions = getLGAs(state);
-  const bankDropdownRef = useRef<HTMLDivElement>(null);
-
-  const selectedBank   = banks.find((b) => b.code === bankCode);
-  const filteredBanks  = bankSearch.trim()
-    ? banks.filter((b) => b.name.toLowerCase().includes(bankSearch.trim().toLowerCase()))
-    : banks;
-
-  // Close the dropdown when clicking anywhere outside it
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (bankDropdownRef.current && !bankDropdownRef.current.contains(e.target as Node)) {
-        setBankDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    fetch("/api/banks/list")
-      .then((r) => r.json())
-      .then((data) => setBanks(data.banks ?? []))
-      .catch(() => toast.error("Could not load bank list"))
-      .finally(() => setBanksLoading(false));
-  }, []);
-
-  // ── Auto-resolve the moment both bank + a full 10-digit number are set ──
-  useEffect(() => {
-    if (!bankCode || accountNumber.length !== 10) {
-      setAccountName("");
-      setResolveError("");
-      return;
-    }
-
-    let cancelled = false;
-    setResolving(true);
-    setResolveError("");
-    setAccountName("");
-
-    fetch(`/api/banks/resolve?accountNumber=${accountNumber}&bankCode=${bankCode}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (cancelled) return;
-        if (data.error) {
-          setResolveError(data.error);
-        } else {
-          setAccountName(data.accountName);
-        }
-      })
-      .catch(() => { if (!cancelled) setResolveError("Could not verify account. Try again."); })
-      .finally(() => { if (!cancelled) setResolving(false); });
-
-    return () => { cancelled = true; };
-  }, [bankCode, accountNumber]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!lga) { toast.error("Please select your LGA"); return; }
-    if (!bankCode) { toast.error("Please select your bank"); return; }
-    if (!/^\d{10}$/.test(accountNumber.trim())) {
-      toast.error("Account number must be exactly 10 digits");
-      return;
-    }
-    if (!accountName) {
-      toast.error("We couldn't verify this account yet. Check your bank and account number.");
-      return;
-    }
+    if (!lga)              { toast.error("Please select your LGA");                         return; }
+    if (!fullName.trim())  { toast.error("Please enter your full name");                    return; }
+    if (!phone.trim())     { toast.error("Please enter your phone number");                 return; }
+    if (!agreedToTerms)    { toast.error("Please read and accept the Agent Agreement");     return; }
 
-    // ── Phone verification gate — checked right before actually submitting
     if (!phoneNumberVerified) {
       setShowPhoneVerify(true);
       return;
@@ -136,23 +59,16 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
   async function actuallySubmit() {
     setLoading(true);
     try {
-      const bankName = banks.find((b) => b.code === bankCode)?.name ?? "";
-
       const res = await fetch("/api/agent/kyc/submit", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({
-          fullName, phone, whatsapp, state, lga,
-          bankName, accountNumber, accountName,
-        }),
+        body:    JSON.stringify({ fullName, phone, whatsapp, state, lga }),
       });
-
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.error ?? "Submission failed. Try again.");
         return;
       }
-
       setSubmitted(true);
     } catch {
       toast.error("Network error. Try again.");
@@ -166,39 +82,23 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
     actuallySubmit();
   }
 
-  // ── PENDING STATE ─────────────────────────────────────────────────────────
+  // ── PENDING STATE ──────────────────────────────────────────────────────────
   if (isPending || submitted) {
     return (
-      <div style={{
-        minHeight: "100dvh", background: "var(--color-bg)",
-        display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
-        padding: "24px 16px", textAlign: "center",
-      }}>
-        <div style={{
-          width: 80, height: 80, borderRadius: "50%",
-          background: "var(--color-light)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          marginBottom: 24,
-        }}>
+      <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "24px 16px", textAlign: "center" }}>
+        <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="var(--color-primary)" strokeWidth="1.6" />
             <path d="M12 7v5l3 3" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
         </div>
-
         <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 800, color: "var(--color-header)", margin: "0 0 12px", lineHeight: 1.3 }}>
           Application submitted
         </h1>
         <p style={{ fontSize: 15, color: "var(--color-text-secondary)", lineHeight: 1.6, maxWidth: 300, margin: "0 0 24px" }}>
           We'll call the number you provided to verify your identity. This usually takes less than 24 hours.
         </p>
-
-        <div style={{
-          background: "var(--color-card)", border: "1px solid var(--color-border)",
-          borderRadius: 16, padding: 16, width: "100%", maxWidth: 340,
-          textAlign: "left", marginBottom: 24,
-        }}>
+        <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 16, padding: 16, width: "100%", maxWidth: 340, textAlign: "left", marginBottom: 24 }}>
           <p style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 12px" }}>
             What happens next
           </p>
@@ -209,23 +109,14 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
             "Your verified badge will appear on all your listings",
           ].map((step, i) => (
             <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: i < 3 ? 10 : 0 }}>
-              <div style={{
-                width: 22, height: 22, borderRadius: "50%", background: "var(--color-light)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0, marginTop: 1,
-              }}>
+              <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-primary)" }}>{i + 1}</span>
               </div>
               <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.5 }}>{step}</p>
             </div>
           ))}
         </div>
-
-        <a href="/home" style={{
-          display: "inline-block", padding: "13px 32px",
-          background: "var(--color-primary)", color: "#fff", borderRadius: 14,
-          fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none",
-        }}>
+        <a href="/home" style={{ display: "inline-block", padding: "13px 32px", background: "var(--color-primary)", color: "#fff", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, textDecoration: "none" }}>
           Back to Home
         </a>
       </div>
@@ -239,29 +130,19 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
 
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
-          <button
-            onClick={() => router.back()}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 20, display: "flex", alignItems: "center", gap: 6 }}
-          >
+          <button onClick={() => router.back()}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 20, display: "flex", alignItems: "center", gap: 6 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Back</span>
           </button>
-
-          <div style={{
-            width: 52, height: 52, borderRadius: 16,
-            background: "var(--color-light)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            marginBottom: 14,
-          }}>
+          <div style={{ width: 52, height: 52, borderRadius: 16, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L4 6v6c0 4.418 3.582 8 8 8s8-3.582 8-8V6L12 2Z"
-                stroke="var(--color-primary)" strokeWidth="1.8" fill="none" strokeLinejoin="round" />
+              <path d="M12 2L4 6v6c0 4.418 3.582 8 8 8s8-3.582 8-8V6L12 2Z" stroke="var(--color-primary)" strokeWidth="1.8" fill="none" strokeLinejoin="round" />
               <path d="M9 12l2 2 4-4" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-
           <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>
             Agent Verification
           </h1>
@@ -272,17 +153,12 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
 
         {/* Declined notice */}
         {isDeclined && (
-          <div style={{
-            background: "#FEF2F2", border: "1px solid #FECACA",
-            borderRadius: 14, padding: "12px 14px", marginBottom: 20,
-          }}>
+          <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 14, padding: "12px 14px", marginBottom: 20 }}>
             <p style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 700, color: "#C62828", margin: "0 0 4px" }}>
               Previous application declined
             </p>
             {existingRequest?.adminNote && (
-              <p style={{ fontSize: 12, color: "#E57373", margin: 0 }}>
-                Reason: {existingRequest.adminNote}
-              </p>
+              <p style={{ fontSize: 12, color: "#E57373", margin: 0 }}>Reason: {existingRequest.adminNote}</p>
             )}
             <p style={{ fontSize: 12, color: "#E57373", margin: "4px 0 0" }}>
               You can resubmit with updated information below.
@@ -292,114 +168,52 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* ── SECTION: Contact ── */}
-          <div style={{
-            background: "var(--color-card)", border: "1px solid var(--color-border)",
-            borderRadius: 16, padding: 16,
-          }}>
+          {/* ── Contact ── */}
+          <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 16, padding: 16 }}>
             <p style={{ fontFamily: "var(--font-heading)", fontSize: 12, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 14px" }}>
               Contact Details
             </p>
 
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                Full Name *
-              </label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 12,
-                  border: "1.5px solid var(--color-border)", fontSize: 14,
-                  color: "var(--color-text)", background: "var(--color-bg)",
-                  boxSizing: "border-box", fontFamily: "var(--font-body)",
-                }}
-              />
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>Full Name *</label>
+              <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} required
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
             </div>
 
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                 Phone Number * <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(we'll call this)</span>
               </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="08012345678"
-                required
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 12,
-                  border: "1.5px solid var(--color-border)", fontSize: 14,
-                  color: "var(--color-text)", background: "var(--color-bg)",
-                  boxSizing: "border-box", fontFamily: "var(--font-body)",
-                }}
-              />
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08012345678" required
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
             </div>
 
             <div>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
                 WhatsApp Number <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(if different)</span>
               </label>
-              <input
-                type="tel"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="08012345678"
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 12,
-                  border: "1.5px solid var(--color-border)", fontSize: 14,
-                  color: "var(--color-text)", background: "var(--color-bg)",
-                  boxSizing: "border-box", fontFamily: "var(--font-body)",
-                }}
-              />
+              <input type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="08012345678"
+                style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }} />
             </div>
           </div>
 
-          {/* ── SECTION: Location ── */}
-          <div style={{
-            background: "var(--color-card)", border: "1px solid var(--color-border)",
-            borderRadius: 16, padding: 16,
-          }}>
+          {/* ── Location ── */}
+          <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 16, padding: 16 }}>
             <p style={{ fontFamily: "var(--font-heading)", fontSize: 12, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 14px" }}>
               Operating Area
             </p>
-
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                  State *
-                </label>
-                <select
-                  value={state}
-                  onChange={(e) => { setState(e.target.value); setLga(""); }}
-                  required
-                  style={{
-                    width: "100%", padding: "12px 14px", borderRadius: 12,
-                    border: "1.5px solid var(--color-border)", fontSize: 13,
-                    color: "var(--color-text)", background: "var(--color-bg)",
-                    boxSizing: "border-box",
-                  }}
-                >
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>State *</label>
+                <select value={state} onChange={(e) => { setState(e.target.value); setLga(""); }} required
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 13, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }}>
                   {STATE_NAMES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                  LGA *
-                </label>
-                <select
-                  value={lga}
-                  onChange={(e) => setLga(e.target.value)}
-                  required
-                  style={{
-                    width: "100%", padding: "12px 14px", borderRadius: 12,
-                    border: "1.5px solid var(--color-border)", fontSize: 13,
-                    color: "var(--color-text)", background: "var(--color-bg)",
-                    boxSizing: "border-box",
-                  }}
-                >
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>LGA *</label>
+                <select value={lga} onChange={(e) => setLga(e.target.value)} required
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 13, color: "var(--color-text)", background: "var(--color-bg)", boxSizing: "border-box" }}>
                   <option value="">Select LGA</option>
                   {lgaOptions.map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
@@ -407,192 +221,46 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
             </div>
           </div>
 
-          {/* ── SECTION: Bank Details — now with live verification ── */}
-          <div style={{
-            background: "var(--color-card)", border: "1px solid var(--color-border)",
-            borderRadius: 16, padding: 16,
-          }}>
-            <p style={{ fontFamily: "var(--font-heading)", fontSize: 12, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 4px" }}>
-              Bank Details
+          {/* ── Agent Agreement ── */}
+          <div style={{ background: "var(--color-card)", border: "1.5px solid var(--color-border)", borderRadius: 16, padding: 16 }}>
+            <p style={{ fontFamily: "var(--font-heading)", fontSize: 12, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px", margin: "0 0 14px" }}>
+              Agent Agreement
             </p>
-            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 14px" }}>
-              For receiving your 80% payout after successful inspections. We verify this lives up against your real bank — nothing typed here is taken on trust.
-            </p>
-
-            <div style={{ marginBottom: 12, position: "relative" }} ref={bankDropdownRef}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                Bank Name *
-              </label>
-
-              <button
-                type="button"
-                onClick={() => !banksLoading && setBankDropdownOpen((o) => !o)}
-                disabled={banksLoading}
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 12,
-                  border: "1.5px solid var(--color-border)", fontSize: 13,
-                  color: selectedBank ? "var(--color-text)" : "var(--color-text-muted)",
-                  background: "var(--color-bg)", boxSizing: "border-box",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  cursor: banksLoading ? "not-allowed" : "pointer", textAlign: "left",
-                }}
-              >
-                <span>{banksLoading ? "Loading banks…" : selectedBank?.name ?? "Select bank"}</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, transform: bankDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-                  <path d="M6 9l6 6 6-6" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-
-              {bankDropdownOpen && (
-                <div style={{
-                  position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, zIndex: 30,
-                  background: "var(--color-card)", border: "1.5px solid var(--color-border)",
-                  borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                  maxHeight: 280, display: "flex", flexDirection: "column", overflow: "hidden",
-                }}>
-                  <div style={{ padding: 8, borderBottom: "1px solid var(--color-border)" }}>
-                    <input
-                      type="text"
-                      autoFocus
-                      value={bankSearch}
-                      onChange={(e) => setBankSearch(e.target.value)}
-                      placeholder="Type to filter, e.g. GTBank, Access…"
-                      style={{
-                        width: "100%", padding: "9px 12px", borderRadius: 9,
-                        border: "1px solid var(--color-border)", fontSize: 13,
-                        color: "var(--color-text)", background: "var(--color-bg)",
-                        boxSizing: "border-box", outline: "none",
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ overflowY: "auto" }}>
-                    {filteredBanks.length === 0 ? (
-                      <p style={{ padding: "14px", fontSize: 12, color: "var(--color-text-muted)", textAlign: "center", margin: 0 }}>
-                        No banks match "{bankSearch}"
-                      </p>
-                    ) : (
-                      filteredBanks.map((b) => (
-                        <button
-                          key={b.code}
-                          type="button"
-                          onClick={() => {
-                            setBankCode(b.code);
-                            setBankDropdownOpen(false);
-                            setBankSearch("");
-                          }}
-                          style={{
-                            width: "100%", padding: "10px 14px", textAlign: "left",
-                            background: b.code === bankCode ? "var(--color-light)" : "transparent",
-                            border: "none", cursor: "pointer", fontSize: 13,
-                            color: b.code === bankCode ? "var(--color-primary)" : "var(--color-text)",
-                            fontWeight: b.code === bankCode ? 600 : 400,
-                          }}
-                        >
-                          {b.name}
-                        </button>
-                      ))
-                    )}
-                  </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+              {[
+                "I will pay CorperNest ₦1,000 for every client visit confirmed through the platform",
+                "Payment must be made within 24 hours of a confirmed visit",
+                "Two unpaid commissions will result in my listings being hidden for 7 days, then permanently deleted",
+                "The inspection fee I collect from a client covers showing them all available properties that match their needs — not just one listing. If a client does not like the first property, I will show them other available options",
+                "I will not redirect CorperNest clients to personal channels to avoid the platform commission",
+                "All properties I list are real, available, and accurately described",
+                "My identity details are accurate and I consent to CorperNest holding them on file",
+              ].map((point, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+                    <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <p style={{ margin: 0, fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.55 }}>{point}</p>
                 </div>
-              )}
+              ))}
             </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                Account Number * <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(10 digits)</span>
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                placeholder="0123456789"
-                required
-                style={{
-                  width: "100%", padding: "12px 14px", borderRadius: 12,
-                  border: "1.5px solid var(--color-border)", fontSize: 14,
-                  color: "var(--color-text)", background: "var(--color-bg)",
-                  boxSizing: "border-box", fontFamily: "var(--font-mono)", letterSpacing: "1px",
-                }}
-              />
-            </div>
-
-            {/* Verified account name — read-only, never typed */}
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6 }}>
-                Account Name <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(verified automatically)</span>
-              </label>
-              <div style={{
-                width: "100%", padding: "12px 14px", borderRadius: 12,
-                border: `1.5px solid ${accountName ? "#43A047" : "var(--color-border)"}`,
-                fontSize: 14, background: accountName ? "#E8F5E9" : "var(--color-bg)",
-                color: accountName ? "#2E7D32" : "var(--color-text-muted)",
-                boxSizing: "border-box", minHeight: 44, display: "flex", alignItems: "center", gap: 8,
-              }}>
-                {resolving ? (
-                  <>
-                    <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
-                    Verifying account…
-                  </>
-                ) : accountName ? (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M20 6L9 17l-5-5" stroke="#2E7D32" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    {accountName}
-                  </>
-                ) : (
-                  "Enter bank and account number above"
-                )}
-              </div>
-              {resolveError && (
-                <p style={{ fontSize: 12, color: "#E53935", margin: "6px 0 0" }}>{resolveError}</p>
-              )}
-            </div>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+              <input type="checkbox" checked={agreedToTerms} onChange={(e) => setAgreedToTerms(e.target.checked)}
+                style={{ width: 18, height: 18, marginTop: 2, flexShrink: 0, accentColor: "var(--color-primary)", cursor: "pointer" }} />
+              <span style={{ fontSize: 13, color: "var(--color-text)", lineHeight: 1.55, fontWeight: 500 }}>
+                I have read and agree to the CorperNest Agent Agreement. I understand these terms are required to list properties on this platform.
+              </span>
+            </label>
           </div>
 
-          {/* Privacy note */}
-          <div style={{
-            background: "var(--color-light)", border: "1px solid var(--color-border)",
-            borderRadius: 12, padding: "10px 14px",
-            display: "flex", alignItems: "flex-start", gap: 8,
-          }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
-              <circle cx="12" cy="12" r="10" stroke="var(--color-primary)" strokeWidth="1.6" />
-              <path d="M12 8v4M12 16h.01" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-            <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.5 }}>
-              Your bank details are stored securely and only used for processing your inspection fee payouts. They are never shared with clients.
-            </p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || resolving || !accountName}
-            style={{
-              width: "100%", padding: "15px",
-              background: (loading || resolving || !accountName) ? "var(--color-border)" : "var(--color-primary)",
-              color: "#fff", border: "none", borderRadius: 14,
-              fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15,
-              cursor: (loading || resolving || !accountName) ? "not-allowed" : "pointer",
-              transition: "background 0.2s",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            }}
-          >
+          <button type="submit" disabled={loading || !agreedToTerms}
+            style={{ width: "100%", padding: "15px", background: loading || !agreedToTerms ? "var(--color-border)" : "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: loading || !agreedToTerms ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
             {loading ? (
               <>
-                <span style={{
-                  width: 16, height: 16, borderRadius: "50%",
-                  border: "2px solid rgba(255,255,255,0.3)",
-                  borderTopColor: "#fff", animation: "spin 0.8s linear infinite",
-                  display: "inline-block",
-                }} />
+                <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
                 Submitting…
               </>
-            ) : (
-              "Submit Verification Request"
-            )}
+            ) : "Submit Verification Request"}
           </button>
         </form>
       </div>

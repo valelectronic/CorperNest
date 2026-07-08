@@ -11,25 +11,27 @@ import MyRequestsTab, { type RequestItem } from "./my-requests-tab";
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 interface Booking {
-  id:             string;
-  bookingCode:    string;
-  status:         "pending" | "scheduled" | "verified" | "completed" | "cancelled";
-  agreedDate:     string | null;
-  agreedTime:     string | null;
-  visitNote:      string | null;
-  createdAt:      string;
-  listingId:      string;
-  listingTitle:   string;
-  listingType:    string;
-  listingLga:     string;
-  listingState:   string;
-  listingPrice:   number;
-  listingAddress: string | null;
-  listingImages:  string[];
-  agentId?:       string;
-  agentName?:     string;
-  agentPhone?:    string | null;
-  hasReview?:     boolean;
+  id:              string;
+  bookingCode:     string;
+  status:          "pending" | "scheduled" | "verified" | "completed" | "cancelled";
+  agreedDate:      string | null;
+  agreedTime:      string | null;
+  visitNote:       string | null;
+  createdAt:       string;
+  listingId:       string;
+  listingTitle:    string;
+  listingType:     string;
+  listingLga:      string;
+  listingState:    string;
+  listingPrice:    number;
+  listingLandmark: string | null;
+  listingAddress:  string | null; // always null now — kept for type compat
+  listingImages:   string[];
+  agentId?:        string;
+  agentName?:      string;
+  agentPhone?:     string | null;
+  agentEmail?:     string | null;
+  hasReview?:      boolean;
 }
 
 interface RentRecord {
@@ -259,12 +261,24 @@ function BookingCard({
   onVerifyPhone,
   onUploadReceipt,
   hasRentRecord,
+  confirmingSeenId,
+  seenLoading,
+  confirmedSeenIds,
+  onConfirmSeen,
+  onCancelSeen,
+  onStartSeen,
 }: {
-  booking:              Booking;
-  phoneNumberVerified:  boolean;
-  onVerifyPhone:        () => void;
-  onUploadReceipt:      (b: Booking) => void;
-  hasRentRecord:        boolean;
+  booking:             Booking;
+  phoneNumberVerified: boolean;
+  onVerifyPhone:       () => void;
+  onUploadReceipt:     (b: Booking) => void;
+  hasRentRecord:       boolean;
+  confirmingSeenId:    string | null;
+  seenLoading:         boolean;
+  confirmedSeenIds:    Set<string>;
+  onConfirmSeen:       (bookingId: string) => void;
+  onCancelSeen:        () => void;
+  onStartSeen:         (bookingId: string) => void;
 }) {
   const isVisited = booking.status === "verified" || booking.status === "completed";
 
@@ -315,43 +329,98 @@ function BookingCard({
           </div>
         )}
 
-        {/* Property address — revealed immediately after payment */}
-        {booking.listingAddress && (
+        {/* Landmark — general area only, full address shown by agent in person */}
+        {booking.listingLandmark && (
           <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 10 }}>
-            <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Property Address</p>
-            <p style={{ margin: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.5 }}>{booking.listingAddress}</p>
-            <a href={`https://maps.google.com/?q=${encodeURIComponent(booking.listingAddress + " " + booking.listingLga + " " + booking.listingState)}`}
-              target="_blank" rel="noopener noreferrer"
-              style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8, fontSize: 12, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none" }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.8" />
-                <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="1.8" />
-              </svg>
-              Get Directions
-            </a>
+            <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Nearest Landmark</p>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--color-text)", lineHeight: 1.5 }}>
+              📍 {booking.listingLandmark}, {booking.listingLga}
+            </p>
+            <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--color-text-muted)", fontStyle: "italic" }}>
+              The agent will show you the exact address when you meet
+            </p>
           </div>
         )}
 
-        {/* Agent contact — revealed immediately after payment */}
+        {/* Agent contact — phone and email both shown after booking */}
         {booking.agentName && (
           <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 10 }}>
             <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Agent Contact</p>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>{booking.agentName}</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>{booking.agentName}</p>
               {booking.agentId && (
                 <a href={`/agent/${booking.agentId}`} style={{ fontSize: 11, color: "var(--color-primary)", fontWeight: 600, textDecoration: "none" }}>View profile →</a>
               )}
             </div>
             {booking.agentPhone ? (
-              <a href={`tel:${booking.agentPhone}`} style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13, fontWeight: 600, color: "var(--color-primary)", textDecoration: "none" }}>
+              <a href={`tel:${booking.agentPhone}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, color: "var(--color-primary)", textDecoration: "none", marginBottom: booking.agentEmail ? 6 : 0 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="currentColor" strokeWidth="1.8" fill="none" />
                 </svg>
                 {booking.agentPhone}
               </a>
             ) : (
-              <p style={{ margin: 0, fontSize: 12, color: "var(--color-text-muted)" }}>Call details will be shared by the agent</p>
+              <p style={{ margin: "0 0 6px", fontSize: 12, color: "var(--color-text-muted)" }}>No phone number on file</p>
             )}
+            {booking.agentEmail && (
+              <a href={`mailto:${booking.agentEmail}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                  <path d="M22 6l-10 7L2 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {booking.agentEmail}
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* ── "I Have Seen The Agent" — shown for pending visits ── */}
+        {(booking.status === "pending" || booking.status === "scheduled") &&
+         !confirmedSeenIds.has(booking.id) && (
+          <>
+            {confirmingSeenId === booking.id ? (
+              <div style={{ background: "var(--color-light)", border: "1.5px solid var(--color-primary)", borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
+                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)", margin: "0 0 6px" }}>
+                  Confirm your visit
+                </p>
+                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 14px", lineHeight: 1.6 }}>
+                  Confirm you physically visited <strong>{booking.listingTitle}</strong> and met the agent in person today.
+                  This creates an official record that protects you.
+                </p>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={onCancelSeen}
+                    style={{ flex: 1, padding: "12px", borderRadius: 12, fontSize: 13, fontWeight: 600, background: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-muted)", cursor: "pointer" }}>
+                    Not yet
+                  </button>
+                  <button onClick={() => onConfirmSeen(booking.id)} disabled={seenLoading}
+                    style={{ flex: 2, padding: "12px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: seenLoading ? "var(--color-border)" : "var(--color-primary)", border: "none", color: "#fff", cursor: seenLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                    {seenLoading ? (
+                      <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                    ) : "✓ Yes, I visited"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => onStartSeen(booking.id)}
+                style={{ width: "100%", padding: "13px", borderRadius: 14, background: "var(--color-primary)", border: "none", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: "pointer", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="9" cy="7" r="4" stroke="white" strokeWidth="2" />
+                  <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                I Have Seen The Agent
+              </button>
+            )}
+          </>
+        )}
+
+        {/* Confirmed seen state */}
+        {confirmedSeenIds.has(booking.id) && (
+          <div style={{ padding: "10px 12px", borderRadius: 12, background: "#E8F5E9", border: "1px solid #A5D6A7", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M20 6L9 17l-5-5" stroke="#2E7D32" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#2E7D32" }}>Visit recorded — thank you!</span>
           </div>
         )}
 
@@ -422,9 +491,30 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
   const [activeTab,          setActiveTab]          = useState<"bookings" | "rent" | "requests">("bookings");
   const [showPhoneVerify,    setShowPhoneVerify]    = useState(false);
   const [dismissedReviewIds, setDismissedReviewIds] = useState<Set<string>>(new Set());
+  const [confirmingSeenId,   setConfirmingSeenId]   = useState<string | null>(null);
+  const [seenLoading,        setSeenLoading]        = useState(false);
+  const [confirmedSeenIds,   setConfirmedSeenIds]   = useState<Set<string>>(new Set());
+
+  async function handleConfirmSeen(bookingId: string) {
+    setSeenLoading(true);
+    try {
+      const res  = await fetch(`/api/bookings/${bookingId}/seen`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Could not confirm visit"); setSeenLoading(false); return; }
+      setConfirmedSeenIds((prev) => new Set([...prev, bookingId]));
+      setConfirmingSeenId(null);
+      toast.success("Visit confirmed! Thank you.");
+      fetchBookings();
+    } catch {
+      toast.error("Network error. Try again.");
+    } finally {
+      setSeenLoading(false);
+    }
+  }
 
   const { data: session } = authClient.useSession();
-  const phoneNumberVerified = (session?.user as { phoneNumberVerified?: boolean } | undefined)?.phoneNumberVerified ?? false;
+  const sessionUser = session?.user as { phoneNumber?: string | null; phoneNumberVerified?: boolean } | undefined;
+  const phoneNumberVerified = !!(sessionUser?.phoneNumber || sessionUser?.phoneNumberVerified);
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -571,6 +661,12 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
                 onVerifyPhone={() => setShowPhoneVerify(true)}
                 onUploadReceipt={setActiveReceiptSheet}
                 hasRentRecord={rentRecordBookingIds.has(b.id)}
+                confirmingSeenId={confirmingSeenId}
+                seenLoading={seenLoading}
+                confirmedSeenIds={confirmedSeenIds}
+                onConfirmSeen={handleConfirmSeen}
+                onCancelSeen={() => setConfirmingSeenId(null)}
+                onStartSeen={(id) => setConfirmingSeenId(id)}
               />
             ))}
           </>

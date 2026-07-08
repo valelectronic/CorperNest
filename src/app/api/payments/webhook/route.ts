@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 function generateBookingCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "BK-";
+  let code    = "BK-";
   for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing signature" }, { status: 401 });
   }
 
-  const secret = process.env.PAYSTACK_SECRET_KEY!;
+  const secret      = process.env.PAYSTACK_SECRET_KEY!;
   const expectedSig = createHmac("sha512", secret).update(rawBody).digest("hex");
 
   if (signature !== expectedSig) {
@@ -39,10 +39,10 @@ export async function POST(req: NextRequest) {
     event: string;
     data: {
       reference: string;
-      amount: number;
-      status: string;
-      metadata?: { type?: string; rentRecordId?: string; bookingId?: string };
-      customer: { email: string };
+      amount:    number;
+      status:    string;
+      metadata?: { type?: string; rentRecordId?: string; bookingId?: string; agentId?: string; agentName?: string };
+      customer:  { email: string };
     };
   };
 
@@ -63,13 +63,81 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Route by metadata type ─────────────────────────────────────────────
-  // Rent record fee payments carry metadata.type === "rent_record".
-  // Everything else is treated as an inspection payment.
+  // commission   → agent paying ₦1,000 platform commission
+  // rent_record  → client paying ₦1,000 for rent receipt upload
+  // everything else → inspection payment (dormant, kept for history)
+  if (metadata?.type === "commission") {
+    if (!metadata.bookingId || !metadata.agentId) {
+      console.error("[webhook] Commission missing bookingId or agentId in metadata");
+      return NextResponse.json({ received: true });
+    }
+    return handleCommissionPayment(metadata.bookingId, metadata.agentId, reference);
+  }
+
   if (metadata?.type === "rent_record") {
     return handleRentRecord(reference, amount, event.data.customer.email);
   }
 
   return handleInspectionPayment(reference, amount, event.data.customer.email);
+}
+
+// ─── COMMISSION PAYMENT HANDLER ───────────────────────────────────────────
+
+async function handleCommissionPayment(bookingId: string, agentId: string, reference: string) {
+  if (!bookingId || !agentId) {
+    console.error("[webhook/commission] Missing bookingId or agentId in metadata");
+    return NextResponse.json({ received: true });
+  }
+
+  const [found] = await db
+    .select({ id: booking.id, commissionStatus: booking.commissionStatus, listingId: booking.listingId })
+    .from(booking)
+    .where(eq(booking.id, bookingId))
+    .limit(1);
+
+  if (!found) {
+    console.error("[webhook/commission] Booking not found:", bookingId);
+    return NextResponse.json({ received: true });
+  }
+
+  if (found.commissionStatus === "paid") {
+    console.log("[webhook/commission] Already paid, ignoring duplicate:", bookingId);
+    return NextResponse.json({ received: true });
+  }
+
+  // Mark commission as paid
+  await db
+    .update(booking)
+    .set({ commissionStatus: "paid", commissionPaidAt: new Date(), updatedAt: new Date() })
+    .where(eq(booking.id, bookingId));
+
+  // Notify agent — confirmation their payment went through
+  await createNotification({
+    userId:  agentId,
+    type:    "commission-paid",
+    title:   "Commission payment received ✓",
+    message: "Thank you! Your ₦1,000 CorperNest commission has been received. Your listings remain active.",
+    link:    "/agent",
+  });
+
+  // Email admin so they know payment came in
+  sendAdminEmail(
+    `💰 Commission Paid — ₦1,000 received`,
+    `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+        <h2 style="color:#1B2E1B;margin:0 0 4px">Commission Payment Received</h2>
+        <p style="color:#2E7D32;font-weight:600;margin:0 0 16px">₦1,000 from agent for booking ${bookingId}</p>
+        <p style="font-size:13px;color:#7A9A7A">Reference: ${reference}</p>
+        <a href="https://www.corpernest.com.ng/admin/bookings"
+           style="display:inline-block;margin-top:16px;padding:10px 20px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-size:13px">
+          View in Admin →
+        </a>
+      </div>
+    `
+  ).catch(() => {});
+
+  console.log("[webhook/commission] Commission marked paid for booking:", bookingId);
+  return NextResponse.json({ received: true });
 }
 
 // ─── INSPECTION PAYMENT HANDLER ───────────────────────────────────────────
@@ -133,23 +201,23 @@ async function handleInspectionPayment(reference: string, amount: number, custom
     .where(eq(inspectionPayment.id, payment.id));
 
   if (listingResult.length > 0) {
-    const theListing = listingResult[0];
-    const bookingId = nanoid();
+    const theListing  = listingResult[0];
+    const bookingId   = nanoid();
     const bookingCode = generateBookingCode();
 
     await db.insert(booking).values({
-      id: bookingId,
-      listingId: theListing.id,
-      renterId: payment.renterId,
-      agentId: payment.agentId,
-      inspectionPaymentId: payment.id,
+      id:                   bookingId,
+      listingId:            theListing.id,
+      renterId:             payment.renterId,
+      agentId:              payment.agentId,
+      inspectionPaymentId:  payment.id,
       bookingCode,
-      renterContact: customerEmail,
-      renterContactType: "email",
-      status: "pending",
-      confirmationStatus: "pending",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      renterContact:        customerEmail,
+      renterContactType:    "email",
+      status:               "pending",
+      confirmationStatus:   "pending",
+      createdAt:            new Date(),
+      updatedAt:            new Date(),
     });
 
     await db
@@ -158,11 +226,11 @@ async function handleInspectionPayment(reference: string, amount: number, custom
       .where(eq(listing.id, theListing.id));
 
     await createNotification({
-      userId: payment.agentId,
-      type: "booking-created",
-      title: "New Inspection Booked!",
+      userId:  payment.agentId,
+      type:    "booking-created",
+      title:   "New Inspection Booked!",
       message: `A corper just paid to inspect your ${theListing.title}. Check your bookings.`,
-      link: "/agent",
+      link:    "/agent",
     });
 
     const [agentRow, renterRow] = await Promise.all([
@@ -171,7 +239,7 @@ async function handleInspectionPayment(reference: string, amount: number, custom
       db.select({ name: user.name, phoneNumber: user.phoneNumber, phone: user.phone })
         .from(user).where(eq(user.id, payment.renterId)).limit(1),
     ]);
-    const agentPhone = agentRow[0]?.phoneNumber ?? agentRow[0]?.phone ?? "Not provided";
+    const agentPhone  = agentRow[0]?.phoneNumber  ?? agentRow[0]?.phone  ?? "Not provided";
     const renterPhone = renterRow[0]?.phoneNumber ?? renterRow[0]?.phone ?? "Not provided";
 
     await sendAdminEmail(
@@ -226,19 +294,19 @@ async function handleRentRecord(reference: string, amount: number, customerEmail
   });
 
   await createNotification({
-    userId: record.renterId,
-    type: "rent-record-confirmed",
-    title: "Rent record saved ✓",
+    userId:  record.renterId,
+    type:    "rent-record-confirmed",
+    title:   "Rent record saved ✓",
     message: `Your rent payment receipt has been recorded. Your renewal is due ${renewalDateStr}.`,
-    link: "/bookings",
+    link:    "/bookings",
   });
 
   await createNotification({
-    userId: record.agentId,
-    type: "rent-record-created",
-    title: "Client uploaded rent receipt",
+    userId:  record.agentId,
+    type:    "rent-record-created",
+    title:   "Client uploaded rent receipt",
     message: `A client has recorded their rent payment for your property. Renewal due ${renewalDateStr}.`,
-    link: "/agent",
+    link:    "/agent",
   });
 
   const renterRows = await db

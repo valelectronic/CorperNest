@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { listing } from "@/db/schema";
-import { and, eq, gte, lte, ilike, or, sql, notInArray } from "drizzle-orm";
+import { and, eq, gte, lte, ilike, or, sql, notInArray, desc } from "drizzle-orm";
 
 const PAGE_SIZE = 10;
 
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       .select()
       .from(listing)
       .where(and(...conditions))
-      .orderBy(STATUS_ORDER, listing.createdAt)
+      .orderBy(STATUS_ORDER, desc(listing.createdAt))
       .limit(PAGE_SIZE + 1)
       .offset(offset);
 

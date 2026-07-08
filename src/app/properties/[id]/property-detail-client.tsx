@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
+import PhoneVerificationModal from "@/components/phone-verification-modal";
 import { toast } from "sonner";
 
 // ─── AMENITY / TYPE MAPS ──────────────────────────────────────────────────────
@@ -171,89 +173,13 @@ function ZoomViewer({
   );
 }
 
-// ─── SET DATE SHEET ───────────────────────────────────────────────────────────
-
-function SetDateSheet({
-  bookingId, listingTitle, onClose, onSuccess,
-}: {
-  bookingId: string; listingTitle: string; onClose: () => void; onSuccess: () => void;
-}) {
-  const [date, setDate]       = useState("");
-  const [time, setTime]       = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split("T")[0];
-
-  async function handleSubmit() {
-    if (!date || !time) { toast.error("Please select both a date and time"); return; }
-    const [h, m] = time.split(":").map(Number);
-    const ampm   = h >= 12 ? "PM" : "AM";
-    const hour12 = h % 12 === 0 ? 12 : h % 12;
-    const formatted = `${hour12}:${m.toString().padStart(2, "0")} ${ampm}`;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/bookings/set-date", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, agreedDate: date, agreedTime: formatted }),
-      });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error ?? "Failed to set date"); }
-      toast.success("Visit scheduled! Check your bookings for agent details.");
-      onSuccess();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)" }} />
-      <div style={{ position: "relative", background: "var(--color-card)", borderRadius: "22px 22px 0 0", padding: "8px 20px 40px", display: "flex", flexDirection: "column" }}>
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--color-border)", margin: "8px auto 20px" }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14, background: "#E8F5E9", border: "1px solid #C0DD97", marginBottom: 20 }}>
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#2E7D32", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M20 6L9 17l-5-5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <div>
-            <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "#1B5E20", margin: 0 }}>Payment successful!</p>
-            <p style={{ fontSize: 12, color: "#2E7D32", margin: 0 }}>Now schedule your visit to unlock agent contact</p>
-          </div>
-        </div>
-        <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 800, color: "var(--color-header)", margin: "0 0 6px" }}>Schedule your visit</p>
-        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px" }}>
-          Pick when you want to inspect <strong>{listingTitle}</strong>. Agent phone and full address will be revealed immediately.
-        </p>
-        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>Visit Date</label>
-        <input type="date" value={date} min={minDate} onChange={(e) => setDate(e.target.value)}
-          style={{ width: "100%", padding: "13px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", marginBottom: 16, boxSizing: "border-box", fontFamily: "var(--font-body)" }} />
-        <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 6, display: "block" }}>Preferred Time</label>
-        <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
-          style={{ width: "100%", padding: "13px 14px", borderRadius: 12, border: "1.5px solid var(--color-border)", fontSize: 14, color: "var(--color-text)", background: "var(--color-bg)", marginBottom: 24, boxSizing: "border-box", fontFamily: "var(--font-body)" }} />
-        <button onClick={handleSubmit} disabled={loading || !date || !time}
-          style={{ width: "100%", padding: "15px", background: loading || !date || !time ? "var(--color-border)" : "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: loading || !date || !time ? "not-allowed" : "pointer", marginBottom: 10 }}>
-          {loading ? "Scheduling…" : "Confirm Visit Date"}
-        </button>
-        <button onClick={onClose}
-          style={{ width: "100%", padding: "15px", background: "var(--color-bg)", color: "var(--color-text-muted)", border: "1px solid var(--color-border)", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15, cursor: "pointer" }}>
-          I'll do this from My Bookings later
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function PropertyDetailClient({
   listing, agentName, isLoggedIn, isWatchlisted, autoOpenBooking,
 }: Props) {
-  const router       = useRouter();
-  const searchParams = useSearchParams();
+  const router = useRouter();
 
   // Use slug for all URLs when available, fall back to raw id for older listings ← ADDED
   const linkPath = listing.slug ?? listing.id;
@@ -261,14 +187,21 @@ export default function PropertyDetailClient({
   const [activeImage,       setActiveImage]       = useState(0);
   const [watching,          setWatching]          = useState(isWatchlisted);
   const [toggling,          setToggling]          = useState(false);
-  const [bookingSheetOpen,  setBookingSheetOpen]  = useState(autoOpenBooking && isLoggedIn);
-  const [payLoading,        setPayLoading]        = useState(false);
-  const [verifying,         setVerifying]         = useState(false);
-  const [bookingId,         setBookingId]         = useState<string | null>(null);
-  const [showDateSheet,     setShowDateSheet]     = useState(false);
   const [isPaused,          setIsPaused]          = useState(false);
   const [zoomOpen,          setZoomOpen]          = useState(false);
+  const [showPhoneVerify,   setShowPhoneVerify]   = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Check by phoneNumber field existence — in this app, phoneNumber is
+  // only written to the DB after successful OTP verification. So if it
+  // exists in session, the number is verified. No need to check the
+  // phoneNumberVerified flag which Better Auth may not include in session.
+  const { data: session } = authClient.useSession();
+  const sessionUser = session?.user as {
+    phoneNumber?: string | null;
+    phoneNumberVerified?: boolean;
+  } | undefined;
+  const hasVerifiedPhone = !!(sessionUser?.phoneNumber || sessionUser?.phoneNumberVerified);
 
   const images          = listing.images ?? [];
   const hasMultiple      = images.length > 1;
@@ -298,70 +231,20 @@ export default function PropertyDetailClient({
     setTimeout(() => setIsPaused(false), 6000);
   }
 
-  const verifyPayment = useCallback(async (ref: string) => {
-    setVerifying(true);
-    try {
-      const res  = await fetch(`/api/payments/verify/${ref}`);
-      const data = await res.json();
-      if (data.paid) {
-        if (data.bookingId) { setBookingId(data.bookingId); setShowDateSheet(true); }
-        else if (data.pending) {
-          setTimeout(async () => {
-            const res2  = await fetch(`/api/payments/verify/${ref}`);
-            const data2 = await res2.json();
-            if (data2.paid && data2.bookingId) { setBookingId(data2.bookingId); setShowDateSheet(true); }
-            else { toast.success("Payment confirmed! Your booking will appear in My Bookings shortly."); }
-            setVerifying(false);
-          }, 3000);
-          return;
-        }
-      } else { toast.error("Payment could not be verified. Contact support if you were charged."); }
-    } catch { toast.error("Could not verify payment. Check My Bookings or contact support."); }
-    finally { setVerifying(false); }
-  }, []);
-
-  useEffect(() => {
-    const paymentStatus = searchParams.get("payment");
-    const ref           = searchParams.get("ref");
-    if (paymentStatus === "success" && ref) {
-      window.history.replaceState({}, "", `/properties/${linkPath}`);
-      verifyPayment(ref);
-    }
-  }, [searchParams, linkPath, verifyPayment]);
-
-  useEffect(() => {
-    if (autoOpenBooking && !isLoggedIn) {
-      router.push(`/signin?callbackUrl=/properties/${linkPath}?action=book`);
-    }
-  }, [autoOpenBooking, isLoggedIn, router, linkPath]);
-
-  async function handlePay() {
-    if (payLoading) return;
-    setPayLoading(true);
-    try {
-      const res  = await fetch("/api/payments/initiate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listingId: listing.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.error ?? "Could not start payment. Try again."); return; }
-
-      // Already paid this agent — booking was created directly, no Paystack needed
-      if (data.alreadyPaid && data.bookingId) {
-        toast.success("Already paid for this agent — booking created, no new charge!");
-        setBookingId(data.bookingId);
-        setShowDateSheet(true);
-        return;
-      }
-
-      window.location.href = data.authorizationUrl;
-    } catch { toast.error("Network error. Please try again."); }
-    finally { setPayLoading(false); }
-  }
-
+  // ── Phase 4: Free booking — navigate to T&Cs page ─────────────────────────
+  // Checks phone verification first. If not verified, shows the modal
+  // inline — user stays on this page, verifies, then continues to T&Cs.
+  // No redirect bouncing.
   function handleBookInspection() {
-    if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${linkPath}?action=book`); return; }
-    setBookingSheetOpen(true);
+    if (!isLoggedIn) {
+      router.push(`/signin?redirect=/properties/${linkPath}`);
+      return;
+    }
+    if (!hasVerifiedPhone) {
+      setShowPhoneVerify(true);
+      return;
+    }
+    router.push(`/inspection-terms/${listing.id}`);
   }
 
   async function handleWatchlistToggle() {
@@ -428,14 +311,6 @@ export default function PropertyDetailClient({
           </button>
         </div>
       </div>
-
-      {/* ── VERIFYING OVERLAY ── */}
-      {verifying && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.6)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-          <div style={{ width: 56, height: 56, borderRadius: "50%", border: "3px solid var(--color-primary)", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
-          <p style={{ color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 15 }}>Verifying payment…</p>
-        </div>
-      )}
 
       {/* ── IMAGE GALLERY — auto-swap + tap to zoom ── */}
       <div
@@ -544,9 +419,7 @@ export default function PropertyDetailClient({
               </p>
               {agencyFeeNaira !== null && (
                 <div style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, background: "#FFF8E1", border: "1px solid #FAC775" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6" stroke="#B45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <span style={{ fontSize: 12, color: "#B45309", fontWeight: 800 }}>₦</span>
                   <p style={{ fontSize: 12, color: "#B45309", margin: 0, fontWeight: 700 }}>
                     Agency fee: {listing.agencyFeePercent}% — ₦{agencyFeeNaira.toLocaleString()}
                   </p>
@@ -643,7 +516,7 @@ export default function PropertyDetailClient({
           </div>
         )}
 
-        {/* Inspection fee notice */}
+        {/* Free inspection notice */}
         <div style={{ backgroundColor: "#EAF3DE", border: "1px solid #C0DD97", borderRadius: 20, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -652,10 +525,10 @@ export default function PropertyDetailClient({
             </svg>
             <div>
               <p style={{ fontFamily: "var(--font-heading)", fontSize: 14, fontWeight: 700, color: "#27500A", margin: "0 0 4px" }}>
-                One inspection fee covers all
+                Free inspection — verified agent
               </p>
               <p style={{ fontSize: 13, color: "#3B6D11", margin: 0, lineHeight: 1.6 }}>
-                Pay a flat ₦5,000 inspection fee to unlock this agent's contact and tour all their properties in one visit.
+                Booking through CorperNest is free. You pay the agent directly when you meet. One inspection covers all their available properties.
               </p>
             </div>
           </div>
@@ -666,13 +539,20 @@ export default function PropertyDetailClient({
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, padding: "12px 16px", paddingBottom: "calc(12px + env(safe-area-inset-bottom))", zIndex: 40, backgroundColor: "var(--color-bg)", borderTop: "1px solid var(--color-border)" }}>
         <div style={{ maxWidth: 672, margin: "0 auto" }}>
           {isAvailable ? (
-            <button onClick={handleBookInspection}
-              style={{ width: "100%", padding: "16px", borderRadius: 16, border: "none", backgroundColor: "var(--color-primary)", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              Book Inspection — ₦5,000
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+            isLoggedIn ? (
+              <button onClick={handleBookInspection}
+                style={{ width: "100%", padding: "16px", borderRadius: 16, border: "none", backgroundColor: "var(--color-primary)", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                Book Free Inspection
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ) : (
+              <button onClick={() => router.push(`/signin?redirect=/properties/${linkPath}`)}
+                style={{ width: "100%", padding: "16px", borderRadius: 16, border: "none", backgroundColor: "var(--color-primary)", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>
+                Sign in to Book Free Inspection
+              </button>
+            )
           ) : (
             <div style={{ width: "100%", padding: "16px", borderRadius: 16, backgroundColor: "var(--color-bg)", border: "1.5px solid var(--color-border)", color: "var(--color-text-muted)", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 14, textAlign: "center" }}>
               This property is currently {listing.status.replace(/-/g, " ")}
@@ -681,81 +561,16 @@ export default function PropertyDetailClient({
         </div>
       </div>
 
-      {/* ── BOOKING BOTTOM SHEET ── */}
-      {bookingSheetOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 50, backgroundColor: "rgba(0,0,0,0.5)" }}
-          onClick={() => setBookingSheetOpen(false)} />
-      )}
-      <div style={{
-        position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
-        backgroundColor: "var(--color-card)", borderRadius: "22px 22px 0 0",
-        transform: bookingSheetOpen ? "translateY(0)" : "translateY(100%)",
-        transition: "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-        maxWidth: 672, margin: "0 auto",
-        paddingBottom: "env(safe-area-inset-bottom, 16px)",
-      }}>
-        <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px" }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: "var(--color-border)" }} />
-        </div>
-        <div style={{ padding: "4px 20px 24px" }}>
-          <p style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 800, color: "var(--color-header)", margin: "0 0 4px" }}>
-            Book Inspection
-          </p>
-          <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px" }}>
-            Pay ₦5,000 to unlock agent contact and schedule a visit.
-          </p>
-
-          <div style={{ backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 16, padding: "14px 16px", marginBottom: 20, display: "flex", flexDirection: "column", gap: 10 }}>
-            {[
-              "Agent's phone number revealed",
-              "Full property address unlocked",
-              "Tour all properties by this agent",
-              "Secure visit verification on arrival",
-            ].map((item) => (
-              <div key={item} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 6L9 17l-5-5" stroke="var(--color-primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>{item}</p>
-              </div>
-            ))}
-          </div>
-
-          <button onClick={handlePay} disabled={payLoading}
-            style={{ width: "100%", padding: "15px", borderRadius: 14, border: "none", backgroundColor: payLoading ? "var(--color-border)" : "var(--color-primary)", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: payLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
-            {payLoading ? (
-              <>
-                <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
-                Starting payment…
-              </>
-            ) : (
-              <>
-                Pay ₦5,000 securely
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </>
-            )}
-          </button>
-
-          <p style={{ fontSize: 12, color: "var(--color-text-muted)", textAlign: "center", margin: "0 0 10px" }}>
-            🔒 Secured by Paystack · Your card is never stored
-          </p>
-
-          <button onClick={() => setBookingSheetOpen(false)}
-            style={{ width: "100%", padding: "14px", borderRadius: 14, backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-muted)", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-            Cancel
-          </button>
-        </div>
-      </div>
-
-      {/* ── SET DATE SHEET ── */}
-      {showDateSheet && bookingId && (
-        <SetDateSheet
-          bookingId={bookingId}
-          listingTitle={listing.title}
-          onClose={() => { setShowDateSheet(false); router.push("/bookings"); }}
-          onSuccess={() => { setShowDateSheet(false); router.push("/bookings"); }}
+      {/* ── PHONE VERIFICATION MODAL ── */}
+      {/* Shown inline when client tries to book without a verified number.
+          On success, continues straight to the T&Cs page — no redirect. */}
+      {showPhoneVerify && (
+        <PhoneVerificationModal
+          onClose={() => setShowPhoneVerify(false)}
+          onVerified={() => {
+            setShowPhoneVerify(false);
+            router.push(`/inspection-terms/${listing.id}`);
+          }}
         />
       )}
 

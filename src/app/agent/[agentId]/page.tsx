@@ -21,6 +21,9 @@ export default async function AgentProfilePage({
       agentVerified: user.agentVerified,
       state:         user.state,
       createdAt:     user.createdAt,
+      email:         user.email,
+      phone:         user.phone,
+      phoneNumber:   user.phoneNumber,
     })
     .from(user)
     .where(and(eq(user.id, agentId), eq(user.agentVerified, true)))
@@ -91,7 +94,13 @@ export default async function AgentProfilePage({
 
   return (
     <AgentProfileClient
-      agent={{ ...agent, lga, createdAt: agent.createdAt.toISOString() }}
+      agent={{
+        ...agent,
+        lga,
+        createdAt:   agent.createdAt.toISOString(),
+        phone:       agent.phoneNumber ?? agent.phone ?? null,
+        email:       agent.email,
+      }}
       listings={listings.map((l) => ({ ...l, images: l.images ?? [] }))}
       avgRating={avgRating}
       totalReviews={totalReviews}

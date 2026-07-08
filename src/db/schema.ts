@@ -295,6 +295,8 @@ export const booking = pgTable(
     preferredPeriod: text("preferred_period"),
     // Optional note from corper to agent at booking time
     visitNote: text("visit_note"),
+    commissionStatus: text("commission_status"),
+    commissionPaidAt: timestamp("commission_paid_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -307,6 +309,42 @@ export const booking = pgTable(
     index("booking_code_idx").on(table.bookingCode),
     index("booking_confirmationStatus_idx").on(table.confirmationStatus),
     index("booking_inspectionPaymentId_idx").on(table.inspectionPaymentId),
+  ],
+);
+
+// ─── BOOKING REQUEST ─────────────────────────────────────────────────────────
+export const bookingRequest = pgTable(
+  "booking_request",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    listingId: text("listing_id")
+      .notNull()
+      .references(() => listing.id, { onDelete: "cascade" }),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // pending  — T&Cs accepted, admin needs to call client then approve
+    // approved — admin approved, real booking created, both sides notified
+    // declined — admin declined (not serious, wrong number, etc.)
+    status: text("status").default("pending").notNull(),
+    termsAcceptedAt: timestamp("terms_accepted_at").notNull(),
+    approvedAt: timestamp("approved_at"),
+    approvedBy: text("approved_by"),
+    declineReason: text("decline_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("booking_request_clientId_idx").on(table.clientId),
+    index("booking_request_listingId_idx").on(table.listingId),
+    index("booking_request_agentId_idx").on(table.agentId),
+    index("booking_request_status_idx").on(table.status),
   ],
 );
 
@@ -583,6 +621,8 @@ export const userRelations = relations(user, ({ many }) => ({
  reviewsGiven:    many(review, { relationName: "reviewsGiven"    }),
 reviewsReceived: many(review, { relationName: "reviewsReceived" }),
 rentRecords:     many(rentRecord),
+bookingRequestsAsClient: many(bookingRequest),
+bookingRequestsAsAgent:  many(bookingRequest),
 }));
 
 
@@ -633,6 +673,7 @@ export const listingRelations = relations(listing, ({ one, many }) => ({
   agent: one(user, { fields: [listing.agentId], references: [user.id] }),
   bookings: many(booking),
   watchlistEntries: many(watchlist),
+  bookingRequests: many(bookingRequest),
 }));
 
 export const inspectionPaymentRelations = relations(inspectionPayment, ({ one, many }) => ({
@@ -699,6 +740,21 @@ export const bookingRelations = relations(booking, ({ one, many }) => ({
     references: [inspectionPayment.id],
   }),
   visitVerifications: many(visitVerification),
+}));
+
+export const bookingRequestRelations = relations(bookingRequest, ({ one }) => ({
+  client: one(user, {
+    fields: [bookingRequest.clientId],
+    references: [user.id],
+  }),
+  listing: one(listing, {
+    fields: [bookingRequest.listingId],
+    references: [listing.id],
+  }),
+  agent: one(user, {
+    fields: [bookingRequest.agentId],
+    references: [user.id],
+  }),
 }));
 
 export const visitVerificationRelations = relations(visitVerification, ({ one }) => ({

@@ -16,9 +16,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // ← REMOVE the role !== "agent" check entirely
-  // Any logged-in user can submit KYC
-
   const existingUser = await db
     .select({ agentVerified: userTable.agentVerified })
     .from(userTable)
@@ -29,7 +26,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Already verified" }, { status: 400 });
   }
 
-  // Check for existing pending/approved submission
   const existing = await db
     .select({ id: agentKycRequest.id, status: agentKycRequest.status })
     .from(agentKycRequest)
@@ -45,87 +41,90 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { fullName, phone, whatsapp, state, lga, bankName, accountNumber, accountName } = body as {
-    fullName:      string;
-    phone:         string;
-    whatsapp?:     string;
-    state:         string;
-    lga:           string;
-    bankName:      string;
-    accountNumber: string;
-    accountName:   string;
+  // Bank details removed — commission is collected manually, no Paystack
+  // payout to agents. We only need contact and location details now.
+  const { fullName, phone, whatsapp, state, lga } = body as {
+    fullName:  string;
+    phone:     string;
+    whatsapp?: string;
+    state:     string;
+    lga:       string;
   };
 
-  if (!fullName || !phone || !state || !lga || !bankName || !accountNumber || !accountName) {
+  if (!fullName || !phone || !state || !lga) {
     return NextResponse.json({ error: "All required fields must be filled" }, { status: 400 });
   }
 
-  if (!/^\d{10}$/.test(accountNumber.trim())) {
-    return NextResponse.json({ error: "Account number must be exactly 10 digits" }, { status: 400 });
-  }
+  // Shared values for both insert and update
+  const kycData = {
+    fullName,
+    phone:         phone.trim(),
+    whatsapp:      whatsapp?.trim() || null,
+    state,
+    lga,
+    // Bank fields kept in schema for backward compat with old records
+    // but sent as empty strings for new submissions
+    bankName:      "",
+    accountNumber: "",
+    accountName:   "",
+    status:        "pending" as const,
+    adminNote:     null,
+    reviewedAt:    null,
+    updatedAt:     new Date(),
+  };
 
   if (existing.length > 0 && existing[0].status === "declined") {
     await db
       .update(agentKycRequest)
-      .set({
-        fullName,
-        phone:         phone.trim(),
-        whatsapp:      whatsapp?.trim() || null,
-        state,
-        lga,
-        bankName,
-        accountNumber: accountNumber.trim(),
-        accountName:   accountName.trim(),
-        status:        "pending",
-        adminNote:     null,
-        reviewedAt:    null,
-        updatedAt:     new Date(),
-      })
+      .set(kycData)
       .where(eq(agentKycRequest.agentId, session.user.id));
   } else {
     await db.insert(agentKycRequest).values({
-      id:            nanoid(),
-      agentId:       session.user.id,
-      fullName,
-      phone:         phone.trim(),
-      whatsapp:      whatsapp?.trim() || null,
-      state,
-      lga,
-      bankName,
-      accountNumber: accountNumber.trim(),
-      accountName:   accountName.trim(),
-      status:        "pending",
-      createdAt:     new Date(),
-      updatedAt:     new Date(),
+      id:        nanoid(),
+      agentId:   session.user.id,
+      createdAt: new Date(),
+      ...kycData,
     });
   }
 
-  // ← THE FIX: set role=agent on every submit (insert or resubmit)
+  // Set role to agent on every submit
   await db
     .update(userTable)
     .set({ role: "agent" })
     .where(eq(userTable.id, session.user.id));
 
-    // Admin email alert — new KYC submission
-await sendAdminEmail(
-  `New KYC Request — ${fullName}`,
-  `
-    <h2>Agent KYC Submission</h2>
-    <table cellpadding="6">
-      <tr><td><b>Name</b></td><td>${fullName}</td></tr>
-      <tr><td><b>Email</b></td><td>${session.user.email}</td></tr>
-      <tr><td><b>Phone</b></td><td>${phone.trim()}</td></tr>
-      <tr><td><b>WhatsApp</b></td><td>${whatsapp?.trim() || "—"}</td></tr>
-      <tr><td><b>State</b></td><td>${state}</td></tr>
-      <tr><td><b>LGA</b></td><td>${lga}</td></tr>
-      <tr><td><b>Bank</b></td><td>${bankName}</td></tr>
-      <tr><td><b>Account Number</b></td><td>${accountNumber.trim()}</td></tr>
-      <tr><td><b>Account Name</b></td><td>${accountName.trim()}</td></tr>
-      <tr><td><b>Submitted</b></td><td>${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}</td></tr>
-    </table>
-    <p><a href="https://www.corpernest.com.ng/admin/kyc">Review on Admin Dashboard →</a></p>
-  `
-);
+  // Admin email — no bank details since we collect commission manually
+  await sendAdminEmail(
+    `New KYC Request — ${fullName}`,
+    `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+        <h2 style="color:#1B2E1B;margin:0 0 20px">New Agent KYC Submission</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A;width:140px">Name</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9;font-weight:700">${fullName}</td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Email</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${session.user.email}</td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Phone</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">
+                <a href="tel:${phone.trim()}" style="color:#2E7D32;font-weight:700">${phone.trim()}</a>
+              </td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">WhatsApp</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${whatsapp?.trim() || "—"}</td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">State</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${state}</td></tr>
+          <tr><td style="padding:10px 0;color:#7A9A7A">LGA</td>
+              <td style="padding:10px 0">${lga}</td></tr>
+        </table>
+        <p style="font-size:12px;color:#7A9A7A;margin:20px 0 0">
+          Submitted ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })} WAT
+        </p>
+        <a href="https://www.corpernest.com.ng/admin/agents"
+           style="display:inline-block;margin-top:16px;padding:10px 20px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600">
+          Review on Admin Dashboard →
+        </a>
+      </div>
+    `
+  );
 
-return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true });
 }

@@ -32,6 +32,8 @@ type Props = {
     state:         string | null;
     lga:           string | null;
     createdAt:     string;
+    phone:         string | null;
+    email:         string | null;
   };
   listings:       AgentListing[];
   avgRating:      number;
@@ -141,6 +143,44 @@ export default function AgentProfileClient({
               </div>
             ))}
           </div>
+
+          {/* Contact details — shown if phone or email available */}
+          {(agent.phone || agent.email) && (
+            <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: 14, padding: "12px 14px" }}>
+              <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Contact Agent
+              </p>
+              {agent.phone && (
+                <a href={`tel:${agent.phone}`}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: agent.email ? "1px solid var(--color-border)" : "none", textDecoration: "none" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 01.01 1.18 2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" stroke="var(--color-primary)" strokeWidth="1.8" fill="none" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-muted)" }}>Phone</p>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--color-primary)" }}>{agent.phone}</p>
+                  </div>
+                </a>
+              )}
+              {agent.email && (
+                <a href={`mailto:${agent.email}`}
+                  style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: agent.phone ? 10 : 0, textDecoration: "none" }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 10, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinejoin="round" />
+                      <path d="M22 6l-10 7L2 6" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-muted)" }}>Email</p>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "var(--color-primary)" }}>{agent.email}</p>
+                  </div>
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Live listings */}

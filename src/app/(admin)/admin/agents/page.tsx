@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { user, listing, agentKycRequest } from "@/db/schema";
 import { eq, desc, count, sql } from "drizzle-orm";
 import RevokeAgentButton from "@/components/revoke-agent-button";
+import AgentControlButtons from "@/components/agent-control-buttons";
 
 export const revalidate = 30;
 
@@ -124,7 +125,7 @@ function AgentCard({ agent, verified }: {
         </div>
       )}
 
-      {/* Footer: dates + revoke action */}
+      {/* Footer: dates + agent controls */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>
@@ -136,7 +137,12 @@ function AgentCard({ agent, verified }: {
             </p>
           )}
         </div>
-        {verified && <RevokeAgentButton agentId={agent.id} agentName={agent.name} />}
+        {verified && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AgentControlButtons agentId={agent.id} />
+            <RevokeAgentButton agentId={agent.id} agentName={agent.name} />
+          </div>
+        )}
       </div>
     </div>
   );

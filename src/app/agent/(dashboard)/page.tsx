@@ -101,6 +101,16 @@ export default async function AgentPage() {
     .from(booking)
     .where(and(eq(booking.agentId, agentId), eq(booking.status, "completed")));
 
+  // Fetch agent's phone verification status — passed to dashboard
+  // so we can show a warning banner if they haven't verified yet
+  const [agentRow] = await db
+    .select({ phoneNumber: user.phoneNumber, phone: user.phone })
+    .from(user)
+    .where(eq(user.id, agentId))
+    .limit(1);
+
+  const hasVerifiedPhone = !!(agentRow?.phoneNumber ?? agentRow?.phone);
+
   return (
     <AgentDashboardClient
       agentName={agentName}
@@ -109,6 +119,7 @@ export default async function AgentPage() {
       expiringListings={expiringListings}
       staleListings={staleListings}
       completedCount={completedBookings.length}
+      hasVerifiedPhone={hasVerifiedPhone}
     />
   );
 }

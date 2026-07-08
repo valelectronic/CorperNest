@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import MatchSelectionSheet from "@/components/match-selection-sheet";
+import PhoneVerificationModal from "@/components/phone-verification-modal";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ type Props = {
   expiringListings: Listing[];
   staleListings:    Listing[];
   completedCount:   number;
+  hasVerifiedPhone: boolean;
 };
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -701,8 +703,9 @@ function CommissionCard({ bookingId }: { bookingId: string }) {
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function AgentDashboardClient(mainProps: Props) {
-  const { agentName, listings, incomingBookings, expiringListings, staleListings, completedCount } = mainProps;
+  const { agentName, listings, incomingBookings, expiringListings, staleListings, completedCount, hasVerifiedPhone } = mainProps;
   const router = useRouter();
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false);
 
   const [statusMap, setStatusMap]           = useState<Record<string, string>>(
     Object.fromEntries(listings.map((l) => [l.id, l.status]))
@@ -797,6 +800,27 @@ export default function AgentDashboardClient(mainProps: Props) {
 
       <header style={{ background: "#1B2E1B", padding: "14px 16px 0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
+
+          {/* ── Phone not verified warning — shown inside header so it's unmissable ── */}
+          {!hasVerifiedPhone && (
+            <div style={{
+              background: "#E53935", borderRadius: 10, padding: "10px 14px",
+              marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+            }}>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ margin: "0 0 2px", fontSize: 12, fontWeight: 700, color: "#fff" }}>
+                  ⚠ Clients cannot see your phone number
+                </p>
+                <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>
+                  Verify your number so clients can reach you after booking
+                </p>
+              </div>
+              <button onClick={() => setShowPhoneVerify(true)}
+                style={{ padding: "8px 14px", borderRadius: 8, background: "#fff", color: "#C62828", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", flexShrink: 0 }}>
+                Verify Now
+              </button>
+            </div>
+          )}
 
           {/* ── Row 1: Identity + Home button ── */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
@@ -1162,6 +1186,18 @@ export default function AgentDashboardClient(mainProps: Props) {
             setMatchSheetId(null);
             setOpenRequestId(null);
             fetchRequests();
+          }}
+        />
+      )}
+
+      {showPhoneVerify && (
+        <PhoneVerificationModal
+          onClose={() => setShowPhoneVerify(false)}
+          onVerified={() => {
+            setShowPhoneVerify(false);
+            // Reload page so the warning banner disappears and
+            // clients can now see the agent's phone number
+            window.location.reload();
           }}
         />
       )}

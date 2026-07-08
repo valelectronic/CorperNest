@@ -123,13 +123,10 @@ function StarInput({ value, onChange }: { value: number; onChange: (v: number) =
 
 // ─── REVIEW PROMPT CARD ───────────────────────────────────────────────────────
 
-function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmitted: (bookingId: string) => void }) {
+function ReviewPromptCard({ booking, onSubmitted, onDismiss }: { booking: Booking; onSubmitted: (bookingId: string) => void; onDismiss: (bookingId: string) => void }) {
   const [rating,     setRating]     = useState(0);
   const [comment,    setComment]    = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [dismissed,  setDismissed]  = useState(false);
-
-  if (dismissed) return null;
 
   async function handleSubmit() {
     if (!rating) { toast.error("Please select a star rating"); return; }
@@ -164,7 +161,7 @@ function ReviewPromptCard({ booking, onSubmitted }: { booking: Booking; onSubmit
             <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-muted)" }}>{booking.listingTitle} · {booking.agentName}</p>
           </div>
         </div>
-        <button onClick={() => setDismissed(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", padding: 4, flexShrink: 0 }}>
+        <button onClick={() => onDismiss(booking.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", padding: 4, flexShrink: 0 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
             <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
@@ -490,7 +487,16 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
   const [activeReceiptSheet, setActiveReceiptSheet] = useState<Booking | null>(null);
   const [activeTab,          setActiveTab]          = useState<"bookings" | "rent" | "requests">("bookings");
   const [showPhoneVerify,    setShowPhoneVerify]    = useState(false);
-  const [dismissedReviewIds, setDismissedReviewIds] = useState<Set<string>>(new Set());
+  const [dismissedReviewIds, setDismissedReviewIds] = useState<Set<string>>(() => {
+    // Restore dismissed review IDs from localStorage on mount so the
+    // review card never reappears after the client has already rated or dismissed
+    try {
+      const saved = localStorage.getItem("cn_dismissed_reviews");
+      return saved ? new Set(JSON.parse(saved)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
   const [confirmingSeenId,   setConfirmingSeenId]   = useState<string | null>(null);
   const [seenLoading,        setSeenLoading]        = useState(false);
   const [confirmedSeenIds,   setConfirmedSeenIds]   = useState<Set<string>>(new Set());
@@ -566,7 +572,11 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
   }, [searchParams, fetchRentRecords]);
 
   function handleReviewSubmitted(bookingId: string) {
-    setDismissedReviewIds((prev) => new Set([...prev, bookingId]));
+    setDismissedReviewIds((prev) => {
+      const next = new Set([...prev, bookingId]);
+      try { localStorage.setItem("cn_dismissed_reviews", JSON.stringify([...next])); } catch {}
+      return next;
+    });
     fetchBookings();
   }
 
@@ -575,6 +585,14 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
     // Refresh bookings so the warning banner disappears and the agent
     // can now see the renter's phone number on their side
     fetchBookings();
+  }
+
+  function handleReviewDismissed(bookingId: string) {
+    setDismissedReviewIds((prev) => {
+      const next = new Set([...prev, bookingId]);
+      try { localStorage.setItem("cn_dismissed_reviews", JSON.stringify([...next])); } catch {}
+      return next;
+    });
   }
 
   const pendingReviews   = bookings.filter((b) => b.status === "verified" && !b.hasReview && !dismissedReviewIds.has(b.id));
@@ -646,7 +664,7 @@ export default function BookingsClient({ currentUserId, currentUserName }: Props
                   Rate your visits
                 </p>
                 {pendingReviews.map((b) => (
-                  <ReviewPromptCard key={b.id} booking={b} onSubmitted={handleReviewSubmitted} />
+                  <ReviewPromptCard key={b.id} booking={b} onSubmitted={handleReviewSubmitted} onDismiss={handleReviewDismissed} />
                 ))}
               </div>
             )}

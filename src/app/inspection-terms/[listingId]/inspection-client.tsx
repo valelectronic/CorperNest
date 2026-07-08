@@ -152,8 +152,8 @@ export default function InspectionTermsClient({
             },
             {
               icon: "🏠",
-              title: "The inspection fee covers all properties shown",
-              body: "If you visit and do not like the first property, the agent is expected to show you other available options — you do not need to pay again for the same visit.",
+              title: "You can ask about other available properties",
+              body: "If you visit and the property doesn't suit you, you can politely ask the agent if they have other options available. However, this is not mandatory — if the agent only has one property or nothing else matches what you need, they are not obligated to provide alternatives. Please make your enquiry calmly and respectfully.",
             },
             {
               icon: "📞",

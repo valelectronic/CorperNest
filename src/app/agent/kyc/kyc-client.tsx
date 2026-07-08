@@ -228,12 +228,11 @@ export default function KycClient({ agentName, agentPhone, existingRequest }: Pr
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
               {[
-                "I will pay CorperNest ₦1,000 for every client visit confirmed through the platform",
-                "Payment must be made within 24 hours of a confirmed visit",
-                "Two unpaid commissions will result in my listings being hidden for 7 days, then permanently deleted",
-                "The inspection fee I collect from a client covers showing them all available properties that match their needs — not just one listing. If a client does not like the first property, I will show them other available options",
-                "I will not redirect CorperNest clients to personal channels to avoid the platform commission",
                 "All properties I list are real, available, and accurately described",
+                "My identity details are accurate and I consent to CorperNest holding them on file",
+                "I will not redirect CorperNest clients to personal channels to avoid the platform commission",
+                "If a client visits and does not like the property booked, I will make a genuine effort to check if I have other available options that match their needs. However, I am not obligated to provide alternatives if I do not have other suitable properties available at that time",
+                "I will pay CorperNest ₦1,000 for every client visit confirmed through the platform, within 24 hours of confirmation",
                 "My identity details are accurate and I consent to CorperNest holding them on file",
               ].map((point, i) => (
                 <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>

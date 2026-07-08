@@ -93,8 +93,9 @@ export async function POST(
     link:    "/agent",
   });
 
-  // Notify admin — this is the trigger to manually send commission request
-  sendAdminEmail(
+  // Notify admin — awaited so Vercel doesn't kill before email sends
+  try {
+    await sendAdminEmail(
     `✅ Visit Confirmed — ${clientName} saw ${agentName}`,
     `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
@@ -128,6 +129,9 @@ export async function POST(
       </div>
     `
   ).catch((err) => console.error("[seen] Admin email failed:", err));
+  } catch (err) {
+    console.error("[seen] Admin email failed:", err);
+  }
 
   return NextResponse.json({ success: true });
 }

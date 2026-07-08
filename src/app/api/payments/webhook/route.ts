@@ -120,21 +120,25 @@ async function handleCommissionPayment(bookingId: string, agentId: string, refer
     link:    "/agent",
   });
 
-  // Email admin so they know payment came in
-  sendAdminEmail(
-    `💰 Commission Paid — ₦1,000 received`,
-    `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-        <h2 style="color:#1B2E1B;margin:0 0 4px">Commission Payment Received</h2>
-        <p style="color:#2E7D32;font-weight:600;margin:0 0 16px">₦1,000 from agent for booking ${bookingId}</p>
-        <p style="font-size:13px;color:#7A9A7A">Reference: ${reference}</p>
-        <a href="https://www.corpernest.com.ng/admin/bookings"
-           style="display:inline-block;margin-top:16px;padding:10px 20px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-size:13px">
-          View in Admin →
-        </a>
-      </div>
-    `
-  ).catch(() => {});
+  // Email admin so they know payment came in — awaited before return
+  try {
+    await sendAdminEmail(
+      `💰 Commission Paid — ₦1,000 received`,
+      `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h2 style="color:#1B2E1B;margin:0 0 4px">Commission Payment Received</h2>
+          <p style="color:#2E7D32;font-weight:600;margin:0 0 16px">₦1,000 from agent for booking ${bookingId}</p>
+          <p style="font-size:13px;color:#7A9A7A">Reference: ${reference}</p>
+          <a href="https://www.corpernest.com.ng/admin/bookings"
+             style="display:inline-block;margin-top:16px;padding:10px 20px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-size:13px">
+            View in Admin →
+          </a>
+        </div>
+      `
+    );
+  } catch (err) {
+    console.error("[webhook/commission] Admin email failed:", err);
+  }
 
   console.log("[webhook/commission] Commission marked paid for booking:", bookingId);
   return NextResponse.json({ received: true });
@@ -317,31 +321,35 @@ async function handleRentRecord(reference: string, amount: number, customerEmail
 
   const renter = renterRows[0];
 
-  sendAdminEmail(
-    `Rent Record Uploaded — ₦${record.rentAmount.toLocaleString()}`,
-    `
-      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-        <h2 style="color:#1B2E1B;margin:0 0 4px">Rent Receipt Uploaded</h2>
-        <p style="color:#7A9A7A;margin:0 0 24px;font-size:13px">₦1,000 documentation fee paid</p>
-        <table style="width:100%;border-collapse:collapse;font-size:14px">
-          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A;width:140px">Client</td>
-              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${renter?.name ?? "—"} (${renter?.email ?? customerEmail})</td></tr>
-          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Rent Amount</td>
-              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">₦${record.rentAmount.toLocaleString()}</td></tr>
-          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Duration</td>
-              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${record.durationMonths} months</td></tr>
-          <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Renewal Due</td>
-              <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${renewalDateStr}</td></tr>
-          <tr><td style="padding:10px 0;color:#7A9A7A">Paystack Ref</td>
-              <td style="padding:10px 0">${reference}</td></tr>
-        </table>
-        <a href="${record.receiptUrl}" target="_blank"
-           style="display:inline-block;margin-top:20px;padding:10px 20px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600">
-          View Receipt →
-        </a>
-      </div>
-    `
-  ).catch((err) => console.error("[webhook] Rent record admin email failed:", err));
+  try {
+    await sendAdminEmail(
+      `Rent Record Uploaded — ₦${record.rentAmount.toLocaleString()}`,
+      `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+          <h2 style="color:#1B2E1B;margin:0 0 4px">Rent Receipt Uploaded</h2>
+          <p style="color:#7A9A7A;margin:0 0 24px;font-size:13px">₦1,000 documentation fee paid</p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px">
+            <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A;width:140px">Client</td>
+                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${renter?.name ?? "—"} (${renter?.email ?? customerEmail})</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Rent Amount</td>
+                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">₦${record.rentAmount.toLocaleString()}</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Duration</td>
+                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${record.durationMonths} months</td></tr>
+            <tr><td style="padding:10px 0;border-bottom:1px solid #E8F5E9;color:#7A9A7A">Renewal Due</td>
+                <td style="padding:10px 0;border-bottom:1px solid #E8F5E9">${renewalDateStr}</td></tr>
+            <tr><td style="padding:10px 0;color:#7A9A7A">Paystack Ref</td>
+                <td style="padding:10px 0">${reference}</td></tr>
+          </table>
+          <a href="${record.receiptUrl}" target="_blank"
+             style="display:inline-block;margin-top:20px;padding:10px 20px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600">
+            View Receipt →
+          </a>
+        </div>
+      `
+    );
+  } catch (err) {
+    console.error("[webhook] Rent record admin email failed:", err);
+  }
 
   return NextResponse.json({ received: true });
 }

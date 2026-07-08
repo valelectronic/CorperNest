@@ -102,8 +102,9 @@ export async function POST(req: NextRequest) {
     updatedAt:   new Date(),
   });
 
-  // Notify admin — this is the trigger for you to call the client
-  sendAdminEmail(
+  // Notify admin — await it so Vercel doesn't kill the function before email sends
+  try {
+    await sendAdminEmail(
     `🔔 New Inspection Request — Call Client Now`,
     `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
@@ -143,6 +144,9 @@ export async function POST(req: NextRequest) {
       </div>
     `
   ).catch((err) => console.error("[booking/request] Admin email failed:", err));
+  } catch (err) {
+    console.error("[booking/request] Admin email failed:", err);
+  }
 
   return NextResponse.json({ success: true, requestId });
 }

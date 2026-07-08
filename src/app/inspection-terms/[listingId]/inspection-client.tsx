@@ -91,7 +91,7 @@ export default function InspectionTermsClient({
 
   // ── T&Cs page ───────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100dvh", background: "var(--color-bg)", paddingBottom: 40 }}>
+    <div style={{ minHeight: "100dvh", background: "var(--color-bg)", paddingBottom: 120 }}>
 
       {/* Header */}
       <div style={{ position: "sticky", top: 0, zIndex: 30, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, background: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}>
@@ -101,9 +101,18 @@ export default function InspectionTermsClient({
             <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <p style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 700, color: "var(--color-header)", margin: 0 }}>
-          Before You Book
-        </p>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 700, color: "var(--color-header)", margin: 0 }}>
+            Before You Book
+          </p>
+        </div>
+        {/* Scroll hint — draws attention downward immediately */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20, background: "var(--color-light)", border: "1px solid var(--color-border)" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-primary)" }}>Read & accept below</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ animation: "bounce 1.5s infinite" }}>
+            <path d="M12 5v14M5 12l7 7 7-7" stroke="var(--color-primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
       </div>
 
       <div style={{ maxWidth: 480, margin: "0 auto", padding: "20px 16px" }}>
@@ -139,27 +148,27 @@ export default function InspectionTermsClient({
             {
               icon: "💰",
               title: "You will pay the agent directly when you meet",
-              body: "When you arrive to view the property, the agent will charge you an inspection fee directly — cash or transfer. This fee goes entirely to the agent, not to CorperNest. This fee covers the agent's time and service for that visit.",
+              body: "When you arrive to view the property, the agent will charge you an inspection fee directly — cash or transfer. This fee goes entirely to the agent, not to CorperNest.",
             },
             {
               icon: "🏠",
               title: "The inspection fee covers all properties shown",
-              body: "If you visit and do not like the first property, the agent is expected to show you other available options that match what you are looking for — you do not need to pay again for the same visit. The fee covers the agent's time for that inspection session.",
+              body: "If you visit and do not like the first property, the agent is expected to show you other available options — you do not need to pay again for the same visit.",
             },
             {
               icon: "📞",
               title: "We will call you first",
-              body: "Our team will call you on your verified number to explain everything and confirm your visit before connecting you to the agent. Please pick up when we call.",
+              body: "Our team will call you on your verified number to confirm your visit before connecting you to the agent. Please pick up when we call.",
             },
             {
               icon: "✅",
               title: "Tap 'I Have Seen The Agent' after your visit",
-              body: "After meeting the agent, tap the confirmation button in your bookings. This creates an official record of your inspection and protects you if any dispute ever arises.",
+              body: "After meeting the agent, tap the confirmation button in your bookings. This creates an official record of your inspection.",
             },
             {
               icon: "🛡️",
               title: "This agent has been verified by CorperNest",
-              body: "Every agent on our platform has passed our identity verification. Their full details — name, phone, and bank account — are on file with us. If anything goes wrong, contact us immediately.",
+              body: "Every agent on our platform has passed our identity verification. Their details are on file with us. If anything goes wrong, contact us immediately.",
             },
           ].map((item, i) => (
             <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
@@ -179,30 +188,51 @@ export default function InspectionTermsClient({
         </div>
 
         {/* Acceptance note */}
-        <div style={{ background: "var(--color-light)", border: "1px solid var(--color-border)", borderRadius: 14, padding: "12px 14px", marginBottom: 20 }}>
+        <div style={{ background: "var(--color-light)", border: "1px solid var(--color-border)", borderRadius: 14, padding: "12px 14px" }}>
           <p style={{ margin: 0, fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
             By tapping <strong>Accept & Request Inspection</strong>, {clientName.split(" ")[0]}, you confirm you have read and understood how CorperNest inspections work, and you agree to pay the agent their inspection fee directly when you meet.
           </p>
         </div>
 
-        {/* Accept button */}
-        <button onClick={handleAccept} disabled={loading}
-          style={{ width: "100%", padding: "16px", background: loading ? "var(--color-border)" : "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 12 }}>
-          {loading ? (
-            <>
-              <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
-              Submitting…
-            </>
-          ) : "Accept & Request Inspection"}
-        </button>
-
-        <button onClick={() => router.back()}
-          style={{ width: "100%", padding: "14px", background: "none", color: "var(--color-text-muted)", border: "1px solid var(--color-border)", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-          Cancel
-        </button>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      {/* ── STICKY ACCEPT BUTTON — always visible at bottom ── */}
+      {/* User sees this immediately on landing, no scrolling needed to find the action */}
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 40,
+        background: "var(--color-bg)",
+        borderTop: "1px solid var(--color-border)",
+        padding: "12px 16px",
+        paddingBottom: "calc(12px + env(safe-area-inset-bottom))",
+      }}>
+        <div style={{ maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
+          <button onClick={handleAccept} disabled={loading}
+            style={{ width: "100%", padding: "16px", background: loading ? "var(--color-border)" : "var(--color-primary)", color: "#fff", border: "none", borderRadius: 14, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {loading ? (
+              <>
+                <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                Submitting…
+              </>
+            ) : (
+              <>
+                Accept & Request Inspection
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </>
+            )}
+          </button>
+          <button onClick={() => router.back()}
+            style={{ width: "100%", padding: "12px", background: "none", color: "var(--color-text-muted)", border: "none", fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes spin   { to { transform: rotate(360deg); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+      `}</style>
     </div>
   );
 }

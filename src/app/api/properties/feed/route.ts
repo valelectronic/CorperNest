@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { listing } from "@/db/schema";
-import { and, eq, gte, lte, ilike, or, sql, notInArray, desc } from "drizzle-orm";
+import { and, eq, gte, lte, ilike, or, notInArray, desc } from "drizzle-orm";
 
 const PAGE_SIZE = 10;
 
-// Statuses never shown to the public
-const HIDDEN_STATUSES = ["under-review", "flagged"];
-
-const STATUS_ORDER = sql`CASE
-  WHEN ${listing.status} = 'available'         THEN 1
-  WHEN ${listing.status} = 'reserved'          THEN 2
-  WHEN ${listing.status} = 'temp-unavailable'  THEN 3
-  WHEN ${listing.status} = 'occupied'          THEN 4
-  ELSE 5
-END`;
+// Only available listings shown publicly.
+// reserved        → active booking exists — off market
+// occupied        → rented — nothing to book
+// temp-unavailable → agent made it unavailable
+// under-review    → awaiting admin approval
+// flagged         → flagged by admin
+// needs-correction → sent back to agent for edits
+const HIDDEN_STATUSES = [
+  "under-review",
+  "flagged",
+  "needs-correction",
+  "reserved",
+  "occupied",
+  "temp-unavailable",
+];
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -32,7 +37,6 @@ export async function GET(req: NextRequest) {
   const conditions = [
     eq(listing.isActive, true),
     eq(listing.state, state),
-    // Never expose under-review or flagged listings to the public feed
     notInArray(listing.status, HIDDEN_STATUSES),
   ];
 
@@ -44,7 +48,7 @@ export async function GET(req: NextRequest) {
   if (keyword.trim()) {
     conditions.push(
       or(
-        ilike(listing.title, `%${keyword.trim()}%`),
+        ilike(listing.title,       `%${keyword.trim()}%`),
         ilike(listing.description, `%${keyword.trim()}%`),
       )!
     );
@@ -55,7 +59,7 @@ export async function GET(req: NextRequest) {
       .select()
       .from(listing)
       .where(and(...conditions))
-      .orderBy(STATUS_ORDER, desc(listing.createdAt))
+      .orderBy(desc(listing.createdAt)) // newest available listings first
       .limit(PAGE_SIZE + 1)
       .offset(offset);
 

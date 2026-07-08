@@ -81,6 +81,16 @@ export async function POST(req: NextRequest) {
     updatedAt:          new Date(),
   });
 
+  // ── Mark listing as reserved ──────────────────────────────────────────────
+  // Removes the property from the public feed immediately so no other
+  // client can book it while this inspection is in progress.
+  // Admin releases it back to "available" if the client passes,
+  // or marks it "occupied" if the client rents it.
+  await db
+    .update(listing)
+    .set({ status: "reserved", updatedAt: new Date() })
+    .where(eq(listing.id, request.listingId));
+
   // Mark request as approved
   await db
     .update(bookingRequest)

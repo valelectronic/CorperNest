@@ -3,28 +3,25 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { listing, watchlist } from "@/db/schema";
-import { and, eq, desc, notInArray } from "drizzle-orm";
+import { and, eq, sql, desc, notInArray } from "drizzle-orm";
 import HomeClient from "./home-client";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 10;
 
-// Only available listings are shown publicly.
-// reserved        → someone has an active booking — off market
-// occupied        → property is rented — nothing to book
-// temp-unavailable → agent made it unavailable
-// under-review    → awaiting admin approval
-// flagged         → flagged by admin
-// needs-correction → sent back to agent for edits
-const HIDDEN_STATUSES = [
-  "under-review",
-  "flagged",
-  "needs-correction",
-  "reserved",
-  "occupied",
-  "temp-unavailable",
-];
+// Available listings float to top, reserved/occupied shown below
+// so clients can see everything but available ones are always first
+const STATUS_ORDER = sql`CASE
+  WHEN ${listing.status} = 'available'         THEN 1
+  WHEN ${listing.status} = 'reserved'          THEN 2
+  WHEN ${listing.status} = 'occupied'          THEN 3
+  WHEN ${listing.status} = 'temp-unavailable'  THEN 4
+  ELSE 5
+END`;
+
+// Only hide admin-internal statuses — clients never need to see these
+const HIDDEN_STATUSES = ["under-review", "flagged", "needs-correction"];
 
 export default async function HomePage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -43,7 +40,7 @@ export default async function HomePage() {
         notInArray(listing.status, HIDDEN_STATUSES),
       )
     )
-    .orderBy(desc(listing.createdAt)) // newest available listings first
+    .orderBy(STATUS_ORDER, desc(listing.createdAt))
     .limit(PAGE_SIZE);
 
   const allListings = await db

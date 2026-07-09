@@ -434,13 +434,18 @@ function PropertyRequestRow(props: {
           </p>
           {/* Budget + landmark surfaced here, no click needed — this is the
               info an agent actually needs to judge fit at a glance */}
-          {(request.minBudget && request.maxBudget) || request.landmark ? (
+          {((request.minBudget != null && request.minBudget > 0) || (request.maxBudget != null && request.maxBudget > 0)) || request.landmark ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-              {request.minBudget && request.maxBudget && (
+              {(request.minBudget != null && request.minBudget > 0) || (request.maxBudget != null && request.maxBudget > 0) ? (
                 <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "var(--color-light)", color: "var(--color-primary)" }}>
-                  ₦{(request.minBudget / 1000).toFixed(0)}k – ₦{(request.maxBudget / 1000).toFixed(0)}k/yr
+                  {request.minBudget != null && request.minBudget > 0 && request.maxBudget != null && request.maxBudget > 0
+                    ? `₦${(request.minBudget / 1000).toFixed(0)}k – ₦${(request.maxBudget / 1000).toFixed(0)}k/yr`
+                    : request.maxBudget != null && request.maxBudget > 0
+                    ? `Up to ₦${(request.maxBudget / 1000).toFixed(0)}k/yr`
+                    : `From ₦${(request.minBudget! / 1000).toFixed(0)}k/yr`
+                  }
                 </span>
-              )}
+              ) : null}
               {request.landmark && (
                 <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
                   📍 {request.landmark}
@@ -656,8 +661,29 @@ function CommissionCard({ bookingId }: { bookingId: string }) {
         body:    JSON.stringify({ bookingId }),
       });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.error ?? "Could not start payment"); setLoading(false); return; }
+
+      if (!res.ok) {
+        toast.error(data.error ?? "Could not start payment. Try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Guard against missing URL — if undefined, spinner would run forever
+      if (!data.authorizationUrl) {
+        toast.error("Payment link not received. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      // Small safety timeout — if redirect doesn't fire in 5s, reset loading
+      // so the agent can try again rather than seeing a stuck spinner
+      const redirectTimeout = setTimeout(() => setLoading(false), 5000);
+
       window.location.href = data.authorizationUrl;
+
+      // Clear timeout if redirect fired successfully
+      clearTimeout(redirectTimeout);
+
     } catch {
       toast.error("Network error. Try again.");
       setLoading(false);

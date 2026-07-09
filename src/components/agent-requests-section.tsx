@@ -79,7 +79,18 @@ function RequestRow({
       {isOpen && (
         <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--color-border)" }}>
           <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-            <Detail label="Budget" value={request.minBudget && request.maxBudget ? `₦${request.minBudget.toLocaleString()} - ₦${request.maxBudget.toLocaleString()}/yr` : "Not specified"} />
+            <Detail
+              label="Budget"
+              value={
+                request.minBudget != null && request.maxBudget != null && request.minBudget > 0 && request.maxBudget > 0
+                  ? `₦${request.minBudget.toLocaleString()} – ₦${request.maxBudget.toLocaleString()}/yr`
+                  : request.maxBudget != null && request.maxBudget > 0
+                  ? `Up to ₦${request.maxBudget.toLocaleString()}/yr`
+                  : request.minBudget != null && request.minBudget > 0
+                  ? `From ₦${request.minBudget.toLocaleString()}/yr`
+                  : "Not specified"
+              }
+            />
             {request.landmark && <Detail label="Landmark" value={request.landmark} />}
             {request.notes && <Detail label="Notes" value={request.notes} />}
           </div>

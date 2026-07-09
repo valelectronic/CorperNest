@@ -359,6 +359,18 @@ export default function AdminBookingsClient({ bookings }: { bookings: AdminBooki
                     listingStatus={b.listingStatus}
                   />
                 )}
+
+                {/* Release button for pending bookings — admin can release anytime */}
+                {b.status === "pending" && (
+                  <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10, marginTop: 4 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", margin: "0 0 6px" }}>
+                      {Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 86400000) >= 3
+                        ? `⚠ ${Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 86400000)}d since approval — client may have ghosted`
+                        : "Manage listing status"}
+                    </p>
+                    <ListingStatusControl listingId={b.listingId} currentStatus={b.listingStatus} />
+                  </div>
+                )}
               </div>
             </div>
           );

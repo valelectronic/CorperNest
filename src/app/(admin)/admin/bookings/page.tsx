@@ -8,8 +8,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { booking, listing, user } from "@/db/schema";
-import { eq, desc, inArray, lt, and } from "drizzle-orm";
-import { headers } from "next/headers";
+import { eq, desc, inArray, and, lt } from "drizzle-orm";import { headers } from "next/headers";
 import AdminBookingsClient from "./bookings-client";
 
 export const revalidate = 60;
@@ -21,7 +20,7 @@ export default async function AdminBookingsPage() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || session.user.email !== ADMIN_EMAIL) redirect("/home");
 
-  // ── 30-day auto-cleanup ───────────────────────────────────────────────────
+  // ── 30-day completed booking cleanup ──────────────────────────────────────
   // Runs on every page load. Deletes bookings with no activity for 30+ days.
   // "No activity" means updatedAt hasn't changed in 30 days.
   // This keeps the admin view clean without needing a cron job.

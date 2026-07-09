@@ -399,23 +399,75 @@ export default function HomeClient({
       {/* ── MAIN CONTENT ── */}
       <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
 
-        {/* Welcome banner — trimmed, no personal name */}
-        {!hasSearched && !loadError && (
-          <div
-            className="rounded-2xl px-4 py-4"
-            style={{ background: "linear-gradient(135deg, #1B2E1B 0%, #2E7D32 100%)" }}
-          >
-            <p className="text-xs mb-1" style={{ color: "#7A9A7A", letterSpacing: "0.5px" }}>
-              FIND YOUR HOME
-            </p>
-            <p className="text-xs" style={{ color: "#A5C8A5" }}>
-              Verified properties in Akwa Ibom — inspect before you pay rent.
-            </p>
-          </div>
-        )}
+        {/* Price range filter chips — replaces the old "Find Your Home" banner */}
+        <div>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 10px" }}>
+            Filter by price
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {[
+              { label: "All",         min: "",       max: ""       },
+              { label: "Under ₦100k", min: "0",      max: "100000" },
+              { label: "₦100k–200k",  min: "100000", max: "200000" },
+              { label: "₦200k–300k",  min: "200000", max: "300000" },
+              { label: "₦300k–500k",  min: "300000", max: "500000" },
+              { label: "Above ₦500k", min: "500000", max: ""       },
+            ].map((range) => {
+              const isActive = minPrice === range.min && maxPrice === range.max;
+              return (
+                <button
+                  key={range.label}
+                  onClick={async () => {
+                    // Update state for active highlight
+                    setMinPrice(range.min);
+                    setMaxPrice(range.max);
+                    setMinPriceRaw(range.min);
+                    setMaxPriceRaw(range.max);
 
-        {!hasSearched && !loadError && (
-          <Link
+                    // Build query directly with new values to avoid stale ref
+                    setLoading(true);
+                    setLoadError(false);
+                    try {
+                      const params = new URLSearchParams();
+                      params.set("page", "1");
+                      params.set("state", STATE);
+                      if (lga)         params.set("lga", lga);
+                      if (type)        params.set("type", type);
+                      if (purpose)     params.set("purpose", purpose);
+                      if (range.min)   params.set("minPrice", range.min);
+                      if (range.max)   params.set("maxPrice", range.max);
+                      if (searchInput) params.set("keyword", searchInput.trim());
+                      const res  = await fetch(`/api/properties/feed?${params.toString()}`);
+                      if (!res.ok) throw new Error();
+                      const data = await res.json();
+                      setListings(data.listings ?? []);
+                      setPage(1);
+                      setHasMore(data.hasMore ?? false);
+                      setHasSearched(true);
+                    } catch {
+                      setLoadError(true);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  style={{
+                    padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                    border: "1.5px solid",
+                    borderColor: isActive ? "var(--color-primary)" : "var(--color-border)",
+                    background: isActive ? "var(--color-primary)" : "var(--color-bg)",
+                    color: isActive ? "#fff" : "var(--color-text-muted)",
+                    cursor: "pointer", fontFamily: "var(--font-body)",
+                  }}
+                >
+                  {range.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Can't find what you want — always visible */}
+        <Link
             href="/request-property"
             style={{
               display: "block", textDecoration: "none",
@@ -447,7 +499,6 @@ export default function HomeClient({
               </svg>
             </div>
           </Link>
-        )}
 
         {/* Skeleton loader */}
         {loading && (

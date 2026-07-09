@@ -1,11 +1,11 @@
 // src/app/admin/payments/page.tsx
 import { db } from "@/lib/db";
-import { inspectionPayment, user, payoutSplit } from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { inspectionPayment, user, payoutSplit, booking, listing } from "@/db/schema";
+import { eq, desc, sql, and, isNotNull } from "drizzle-orm";
 
 export const revalidate = 30;
 
-async function getPayments() {
+async function getInspectionPayments() {
   const rows = await db
     .select({
       id:          inspectionPayment.id,
@@ -19,6 +19,32 @@ async function getPayments() {
     .from(inspectionPayment)
     .innerJoin(user, eq(inspectionPayment.renterId, user.id))
     .orderBy(desc(inspectionPayment.createdAt));
+
+  return rows;
+}
+
+async function getCommissionPayments() {
+  // Reads from booking table where agent has paid commission
+  const rows = await db
+    .select({
+      id:               booking.id,
+      bookingCode:      booking.bookingCode,
+      commissionPaidAt: booking.commissionPaidAt,
+      agentName:        user.name,
+      agentEmail:       user.email,
+      listingTitle:     listing.title,
+      listingLga:       listing.lga,
+    })
+    .from(booking)
+    .innerJoin(user, eq(booking.agentId, user.id))
+    .innerJoin(listing, eq(booking.listingId, listing.id))
+    .where(
+      and(
+        eq(booking.commissionStatus, "paid"),
+        isNotNull(booking.commissionPaidAt)
+      )
+    )
+    .orderBy(desc(booking.commissionPaidAt));
 
   return rows;
 }
@@ -44,7 +70,7 @@ async function getPayoutSummary() {
   };
 }
 
-function paymentStatusBadge(status: string) {
+function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string }> = {
     paid:    { bg: "#E8F5E9", color: "#2E7D32" },
     pending: { bg: "#FFF8E1", color: "#B45309" },
@@ -52,17 +78,14 @@ function paymentStatusBadge(status: string) {
   };
   const s = map[status] ?? { bg: "#F5F5F5", color: "#666" };
   return (
-    <span style={{
-      display: "inline-block", padding: "3px 10px", borderRadius: 20,
-      fontSize: 11, fontWeight: 700, background: s.bg, color: s.color,
-      textTransform: "capitalize", flexShrink: 0,
-    }}>
+    <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700, background: s.bg, color: s.color, textTransform: "capitalize", flexShrink: 0 }}>
       {status}
     </span>
   );
 }
 
-function formatDate(d: Date | string) {
+function formatDate(d: Date | string | null) {
+  if (!d) return "—";
   return new Date(d).toLocaleDateString("en-NG", {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
@@ -74,161 +97,131 @@ function formatNaira(kobo: number) {
 }
 
 export default async function AdminPaymentsPage() {
-  const [payments, payouts] = await Promise.all([getPayments(), getPayoutSummary()]);
+  const [payments, commissions, payouts] = await Promise.all([
+    getInspectionPayments(),
+    getCommissionPayments(),
+    getPayoutSummary(),
+  ]);
 
-  const paid             = payments.filter((p) => p.status === "paid");
-  const totalCollected   = paid.reduce((sum, p) => sum + p.amount, 0);
-  const platformRevenue  = Math.round(totalCollected * 0.2);
+  const paid           = payments.filter((p) => p.status === "paid");
+  const totalCollected = paid.reduce((sum, p) => sum + p.amount, 0);
+  const platformRevenue = Math.round(totalCollected * 0.2);
+
+  // Commission: ₦1,000 = 100000 kobo per paid commission
+  const totalCommission = commissions.length * 100000;
 
   const summaryCards = [
-    { label: "Total Collected",  value: formatNaira(totalCollected),      sub: `${paid.length} paid inspections`,       accent: false },
-    { label: "Platform Revenue", value: formatNaira(platformRevenue),      sub: "20% of total",                          accent: true  },
-    { label: "Pending Payouts",  value: formatNaira(payouts.pendingAmount), sub: `${payouts.pendingCount} splits pending`, accent: false },
-    { label: "Paid Out",         value: formatNaira(payouts.paidAmount),    sub: `${payouts.paidCount} splits paid`,       accent: false },
+    { label: "Inspection Fees",    value: formatNaira(totalCollected),       sub: `${paid.length} paid inspections`,        accent: false },
+    { label: "Commission Earned",  value: `₦${(totalCommission / 100).toLocaleString()}`, sub: `${commissions.length} agent commissions`, accent: true  },
+    { label: "Pending Payouts",    value: formatNaira(payouts.pendingAmount), sub: `${payouts.pendingCount} splits pending`,  accent: false },
+    { label: "Paid Out",           value: formatNaira(payouts.paidAmount),    sub: `${payouts.paidCount} splits paid`,        accent: false },
   ];
 
   return (
-    <div style={{ padding: "24px 16px 48px", maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ padding: "24px 16px 80px", maxWidth: 720, margin: "0 auto" }}>
 
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 800, color: "var(--color-header)", margin: "0 0 4px" }}>
           Payments
         </h1>
         <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>
-          Inspection fees and payout status
+          Inspection fees and agent commissions
         </p>
       </div>
 
-      {/* Summary cards — 2 cols on mobile, 4 on desktop */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 24 }}>
+      {/* Summary cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 32 }}>
         {summaryCards.map((c) => (
-          <div key={c.label} style={{
-            background: "var(--color-card)", border: "1px solid var(--color-border)",
-            borderRadius: 14, padding: "14px 16px",
-            borderLeft: c.accent ? "3px solid var(--color-primary)" : undefined,
-          }}>
-            <p style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px", fontFamily: "var(--font-heading)" }}>
+          <div key={c.label} style={{ background: c.accent ? "var(--color-primary)" : "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 16, padding: "16px" }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: c.accent ? "rgba(255,255,255,0.7)" : "var(--color-text-muted)", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               {c.label}
             </p>
-            <p style={{ fontSize: 20, fontWeight: 800, color: "var(--color-header)", margin: "0 0 3px", fontFamily: "var(--font-heading)", lineHeight: 1 }}>
+            <p style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 800, color: c.accent ? "#fff" : "var(--color-header)", margin: "0 0 4px", lineHeight: 1 }}>
               {c.value}
             </p>
-            <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>{c.sub}</p>
+            <p style={{ fontSize: 11, color: c.accent ? "rgba(255,255,255,0.6)" : "var(--color-text-muted)", margin: 0 }}>
+              {c.sub}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Payout warning */}
-      {payouts.pendingAmount > 0 && (
-        <div style={{
-          background: "#FFF8E1", border: "1px solid #FDE68A",
-          borderRadius: 12, padding: "12px 14px", marginBottom: 20,
-          display: "flex", alignItems: "flex-start", gap: 10,
-        }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
-            <circle cx="12" cy="12" r="10" stroke="#B45309" strokeWidth="1.8" />
-            <path d="M12 8v4M12 16h.01" stroke="#B45309" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-          <p style={{ fontSize: 13, color: "#B45309", margin: 0, lineHeight: 1.5 }}>
-            <strong>{formatNaira(payouts.pendingAmount)}</strong> in pending agent payouts — mark as paid after manual transfer.
-          </p>
-        </div>
-      )}
+      {/* ── COMMISSION PAYMENTS ── */}
+      <div style={{ marginBottom: 32 }}>
+        <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 700, color: "var(--color-header)", margin: "0 0 14px" }}>
+          Agent Commissions · {commissions.length}
+        </h2>
 
-      {/* Empty */}
-      {payments.length === 0 && (
-        <div style={{
-          background: "var(--color-card)", border: "1px solid var(--color-border)",
-          borderRadius: 16, padding: "48px 24px", textAlign: "center",
-        }}>
-          <p style={{ fontSize: 14, color: "var(--color-text-muted)", margin: 0 }}>No payments yet</p>
-        </div>
-      )}
-
-      {/* Payment rows — card style on mobile */}
-      {payments.length > 0 && (
-        <div style={{
-          background: "var(--color-card)", border: "1px solid var(--color-border)",
-          borderRadius: 16, overflow: "hidden",
-        }}>
-
-          {/* Desktop table header */}
-          <div style={{ padding: "11px 16px", borderBottom: "1px solid var(--color-border)", background: "var(--color-bg)" }}>
-            <style>{`
-              .payments-header { display: none; }
-              .payments-row-grid { display: flex; flex-direction: column; gap: 6px; }
-              .payments-ref { display: block; }
-              .payments-amount-inline { display: inline; }
-              @media (min-width: 600px) {
-                .payments-header { display: grid !important; grid-template-columns: 1fr 1fr 110px 90px; gap: 16px; }
-                .payments-row-grid { display: grid !important; grid-template-columns: 1fr 1fr 110px 90px; gap: 16px; flex-direction: unset; align-items: center; }
-              }
-            `}</style>
-            <div className="payments-header" style={{ gap: 16 }}>
-              {["Renter", "Reference", "Amount", "Status"].map((h) => (
-                <p key={h} style={{
-                  fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)",
-                  textTransform: "uppercase", letterSpacing: "0.05em", margin: 0,
-                  fontFamily: "var(--font-heading)",
-                }}>
-                  {h}
-                </p>
-              ))}
-            </div>
+        {commissions.length === 0 ? (
+          <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 14, padding: "24px", textAlign: "center" }}>
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0 }}>No commission payments yet</p>
           </div>
-
-          {payments.map((p, i) => (
-            <div
-              key={p.id}
-              className="payments-row-grid"
-              style={{
-                padding: "14px 16px",
-                borderBottom: i < payments.length - 1 ? "1px solid var(--color-border)" : "none",
-              }}
-            >
-              {/* Renter */}
-              <div>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 600, fontSize: 13, color: "var(--color-header)", margin: "0 0 2px" }}>
-                  {p.renterName}
-                </p>
-                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>{p.renterEmail}</p>
-              </div>
-
-              {/* Ref + date */}
-              <div>
-                <p style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--color-text)", margin: "0 0 2px", wordBreak: "break-all" }}>
-                  {p.paystackRef}
-                </p>
-                <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>{formatDate(p.createdAt)}</p>
-              </div>
-
-              {/* Amount + badge row on mobile */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "var(--color-header)", margin: 0, fontFamily: "var(--font-heading)" }}>
-                  {formatNaira(p.amount)}
-                </p>
-                {/* Badge shown here on mobile, separate column on desktop */}
-                <div className="payments-badge-mobile">
-                  {paymentStatusBadge(p.status)}
+        ) : (
+          <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 14, overflow: "hidden" }}>
+            {commissions.map((c, i) => (
+              <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i < commissions.length - 1 ? "1px solid var(--color-border)" : "none" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: "0 0 2px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, color: "var(--color-header)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {c.agentName}
+                  </p>
+                  <p style={{ margin: "0 0 2px", fontSize: 11, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {c.agentEmail}
+                  </p>
+                  <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-muted)" }}>
+                    {c.listingTitle} · {c.listingLga} · {c.bookingCode}
+                  </p>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 12, color: "var(--color-text-muted)" }}>
+                    {formatDate(c.commissionPaidAt)}
+                  </p>
+                  <p style={{ margin: "0 0 4px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-primary)" }}>
+                    ₦1,000
+                  </p>
+                  <StatusBadge status="paid" />
                 </div>
               </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-              {/* Badge — desktop only column */}
-              <div className="payments-badge-desktop" style={{ display: "none" }}>
-                {paymentStatusBadge(p.status)}
+      {/* ── INSPECTION PAYMENTS ── */}
+      <div>
+        <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 700, color: "var(--color-header)", margin: "0 0 14px" }}>
+          Inspection Fees · {payments.length}
+        </h2>
+
+        <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 14, overflow: "hidden" }}>
+          {payments.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: 0, padding: 24, textAlign: "center" }}>No inspection payments yet</p>
+          ) : payments.map((p, i) => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: i < payments.length - 1 ? "1px solid var(--color-border)" : "none" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: "0 0 2px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 13, color: "var(--color-header)" }}>
+                  {p.renterName}
+                </p>
+                <p style={{ margin: "0 0 2px", fontSize: 11, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.renterEmail}
+                </p>
+                <p style={{ margin: 0, fontSize: 11, color: "var(--color-text-muted)", fontFamily: "var(--font-mono)" }}>
+                  {p.paystackRef}
+                </p>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <p style={{ margin: "0 0 4px", fontSize: 12, color: "var(--color-text-muted)" }}>
+                  {formatDate(p.createdAt)}
+                </p>
+                <p style={{ margin: "0 0 4px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-primary)" }}>
+                  {formatNaira(p.amount)}
+                </p>
+                <StatusBadge status={p.status} />
               </div>
             </div>
           ))}
-
-          <style>{`
-            @media (min-width: 600px) {
-              .payments-badge-mobile  { display: none !important; }
-              .payments-badge-desktop { display: flex !important; align-items: center; }
-            }
-          `}</style>
         </div>
-      )}
+      </div>
+
     </div>
   );
 }

@@ -85,7 +85,7 @@ export default function HomeClient({
   const STATE = "Akwa Ibom";
   const lgaOptions = getLGAs(STATE);
 
-  const activeFilterCount = [lga, type, purpose, minPrice, maxPrice].filter(Boolean).length;
+  const activeFilterCount = [lga, purpose].filter(Boolean).length;
 
   const filtersRef = useRef({ lga, type, purpose, minPrice, maxPrice });
   useEffect(() => {
@@ -207,8 +207,7 @@ export default function HomeClient({
           <div
             className="flex items-center gap-2 flex-1 min-w-0 px-3 py-2.5 rounded-xl"
             style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
+          >            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="shrink-0">
               <circle cx="11" cy="11" r="8" stroke="var(--color-text-muted)" strokeWidth="1.8" />
               <path d="M21 21l-4.35-4.35" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
@@ -295,35 +294,142 @@ export default function HomeClient({
           </button>
         </div>
 
+        {/* ── Type chips ── */}
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", margin: "0 -16px", padding: "0 16px" }}>
+          <div style={{ display: "flex", gap: 8, width: "max-content" }}>
+            {[
+              { label: "All types",     value: "" },
+              { label: "Self Contained", value: "self-con" },
+              { label: "Mini Flat",      value: "mini-flat" },
+              { label: "1 Bedroom",      value: "1-bed" },
+              { label: "2 Bedroom",      value: "2-bed" },
+              { label: "3 Bedroom",      value: "3-bed" },
+              { label: "Single Room",    value: "room" },
+            ].map((t) => {
+              const isActive = type === t.value;
+              return (
+                <button
+                  key={t.value}
+                  onClick={async () => {
+                    setType(t.value);
+                    setLoading(true);
+                    setLoadError(false);
+                    try {
+                      const params = new URLSearchParams();
+                      params.set("page", "1");
+                      params.set("state", STATE);
+                      if (lga)         params.set("lga", lga);
+                      if (t.value)     params.set("type", t.value);
+                      if (purpose)     params.set("purpose", purpose);
+                      if (minPrice)    params.set("minPrice", minPrice);
+                      if (maxPrice)    params.set("maxPrice", maxPrice);
+                      if (searchInput) params.set("keyword", searchInput.trim());
+                      const res  = await fetch(`/api/properties/feed?${params.toString()}`);
+                      if (!res.ok) throw new Error();
+                      const data = await res.json();
+                      setListings(data.listings ?? []);
+                      setPage(1);
+                      setHasMore(data.hasMore ?? false);
+                      setHasSearched(true);
+                    } catch {
+                      setLoadError(true);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  style={{
+                    padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                    border: "1.5px solid",
+                    borderColor: isActive ? "var(--color-primary)" : "var(--color-border)",
+                    background: isActive ? "var(--color-primary)" : "var(--color-bg)",
+                    color: isActive ? "#fff" : "var(--color-text-muted)",
+                    cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Price chips — horizontal scroll, no DB hit, instant UX ── */}
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", margin: "0 -16px", padding: "0 16px" }}>
+          <div style={{ display: "flex", gap: 8, width: "max-content" }}>
+            {[
+              { label: "All prices",  min: "",       max: ""       },
+              { label: "Under ₦100k", min: "0",      max: "100000" },
+              { label: "₦100–200k",   min: "100000", max: "200000" },
+              { label: "₦200–300k",   min: "200000", max: "300000" },
+              { label: "₦300–500k",   min: "300000", max: "500000" },
+              { label: "Above ₦500k", min: "500000", max: ""       },
+            ].map((range) => {
+              const isActive = minPrice === range.min && maxPrice === range.max;
+              return (
+                <button
+                  key={range.label}
+                  onClick={async () => {
+                    setMinPrice(range.min);
+                    setMaxPrice(range.max);
+                    setMinPriceRaw(range.min);
+                    setMaxPriceRaw(range.max);
+                    setLoading(true);
+                    setLoadError(false);
+                    try {
+                      const params = new URLSearchParams();
+                      params.set("page", "1");
+                      params.set("state", STATE);
+                      if (lga)         params.set("lga", lga);
+                      if (type)        params.set("type", type);
+                      if (purpose)     params.set("purpose", purpose);
+                      if (range.min)   params.set("minPrice", range.min);
+                      if (range.max)   params.set("maxPrice", range.max);
+                      if (searchInput) params.set("keyword", searchInput.trim());
+                      const res  = await fetch(`/api/properties/feed?${params.toString()}`);
+                      if (!res.ok) throw new Error();
+                      const data = await res.json();
+                      setListings(data.listings ?? []);
+                      setPage(1);
+                      setHasMore(data.hasMore ?? false);
+                      setHasSearched(true);
+                    } catch {
+                      setLoadError(true);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  style={{
+                    padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+                    border: "1.5px solid",
+                    borderColor: isActive ? "var(--color-primary)" : "var(--color-border)",
+                    background: isActive ? "var(--color-primary)" : "var(--color-bg)",
+                    color: isActive ? "#fff" : "var(--color-text-muted)",
+                    cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0,
+                  }}
+                >
+                  {range.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {filtersOpen && (
           <div
             className="rounded-2xl p-4 space-y-3"
             style={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}
           >
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>LGA</label>
-                <select
-                  value={lga}
-                  onChange={(e) => setLga(e.target.value)}
-                  className="w-full text-xs px-3 py-2 rounded-xl focus:outline-none"
-                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
-                >
-                  <option value="">All LGAs</option>
-                  {lgaOptions.map((l) => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>Type</label>
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
-                  className="w-full text-xs px-3 py-2 rounded-xl focus:outline-none"
-                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
-                >
-                  {PROPERTY_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>Area (LGA)</label>
+              <select
+                value={lga}
+                onChange={(e) => setLga(e.target.value)}
+                className="w-full text-xs px-3 py-2 rounded-xl focus:outline-none"
+                style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
+              >
+                <option value="">All areas</option>
+                {lgaOptions.map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
             </div>
 
             <div>
@@ -348,27 +454,7 @@ export default function HomeClient({
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-text-muted)" }}>
-                Price range (₦) — updates after you stop typing
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text" inputMode="numeric" value={minPriceRaw}
-                  onChange={(e) => setMinPriceRaw(e.target.value)}
-                  placeholder="Min e.g. 100000"
-                  className="text-xs px-3 py-2 rounded-xl focus:outline-none"
-                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
-                />
-                <input
-                  type="text" inputMode="numeric" value={maxPriceRaw}
-                  onChange={(e) => setMaxPriceRaw(e.target.value)}
-                  placeholder="Max e.g. 300000"
-                  className="text-xs px-3 py-2 rounded-xl focus:outline-none"
-                  style={{ border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text)" }}
-                />
-              </div>
-            </div>
+            {/* Price is now handled by the chips above — no text inputs needed */}
 
             {activeFilterCount > 0 && (
               <button
@@ -398,73 +484,6 @@ export default function HomeClient({
 
       {/* ── MAIN CONTENT ── */}
       <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
-
-        {/* Price range filter chips — replaces the old "Find Your Home" banner */}
-        <div>
-          <p style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 10px" }}>
-            Filter by price
-          </p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {[
-              { label: "All",         min: "",       max: ""       },
-              { label: "Under ₦100k", min: "0",      max: "100000" },
-              { label: "₦100k–200k",  min: "100000", max: "200000" },
-              { label: "₦200k–300k",  min: "200000", max: "300000" },
-              { label: "₦300k–500k",  min: "300000", max: "500000" },
-              { label: "Above ₦500k", min: "500000", max: ""       },
-            ].map((range) => {
-              const isActive = minPrice === range.min && maxPrice === range.max;
-              return (
-                <button
-                  key={range.label}
-                  onClick={async () => {
-                    // Update state for active highlight
-                    setMinPrice(range.min);
-                    setMaxPrice(range.max);
-                    setMinPriceRaw(range.min);
-                    setMaxPriceRaw(range.max);
-
-                    // Build query directly with new values to avoid stale ref
-                    setLoading(true);
-                    setLoadError(false);
-                    try {
-                      const params = new URLSearchParams();
-                      params.set("page", "1");
-                      params.set("state", STATE);
-                      if (lga)         params.set("lga", lga);
-                      if (type)        params.set("type", type);
-                      if (purpose)     params.set("purpose", purpose);
-                      if (range.min)   params.set("minPrice", range.min);
-                      if (range.max)   params.set("maxPrice", range.max);
-                      if (searchInput) params.set("keyword", searchInput.trim());
-                      const res  = await fetch(`/api/properties/feed?${params.toString()}`);
-                      if (!res.ok) throw new Error();
-                      const data = await res.json();
-                      setListings(data.listings ?? []);
-                      setPage(1);
-                      setHasMore(data.hasMore ?? false);
-                      setHasSearched(true);
-                    } catch {
-                      setLoadError(true);
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  style={{
-                    padding: "8px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                    border: "1.5px solid",
-                    borderColor: isActive ? "var(--color-primary)" : "var(--color-border)",
-                    background: isActive ? "var(--color-primary)" : "var(--color-bg)",
-                    color: isActive ? "#fff" : "var(--color-text-muted)",
-                    cursor: "pointer", fontFamily: "var(--font-body)",
-                  }}
-                >
-                  {range.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         {/* Can't find what you want — always visible */}
         <Link

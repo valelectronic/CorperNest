@@ -56,7 +56,7 @@ export default function LandingClient() {
 
         {/* CTAs */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 36 }}>
-          <Link href="/signup" style={{
+          <Link href="/home" style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             padding: "17px 24px", borderRadius: 14, fontSize: 15, fontWeight: 700,
             background: "#1B5E20", color: "#fff", textDecoration: "none",
@@ -296,7 +296,7 @@ export default function LandingClient() {
 
       {/* ── FINAL CTA ── */}
       <section style={{ padding: "40px 20px 48px", maxWidth: 540, margin: "0 auto", textAlign: "center" }}>
-        <Link href="/signup" style={{
+        <Link href="/home" style={{
           display: "block", padding: "18px 24px", borderRadius: 14,
           fontSize: 16, fontWeight: 700, background: "#1B5E20", color: "#fff",
           textDecoration: "none", marginBottom: 14,

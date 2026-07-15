@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
@@ -24,11 +23,12 @@ END`;
 const HIDDEN_STATUSES = ["under-review", "flagged", "needs-correction"];
 
 export default async function HomePage() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/signin");
+  // No redirect — guests can browse listings freely without an account.
+  // Session is optional: used only for the greeting and watchlist state.
+  const session = await auth.api.getSession({ headers: await headers() }).catch(() => null);
 
-  const userId   = session.user.id;
-  const userName = session.user.name;
+  const userId   = session?.user.id   ?? null;
+  const userName = session?.user.name ?? null;
 
   const listings = await db
     .select()
@@ -54,10 +54,13 @@ export default async function HomePage() {
       )
     );
 
-  const watchlisted = await db
-    .select({ listingId: watchlist.listingId })
-    .from(watchlist)
-    .where(eq(watchlist.renterId, userId));
+  // Only fetch watchlist for logged-in users — empty array for guests
+  const watchlisted = userId
+    ? await db
+        .select({ listingId: watchlist.listingId })
+        .from(watchlist)
+        .where(eq(watchlist.renterId, userId))
+    : [];
 
   const watchlistedIds = new Set(watchlisted.map((w) => w.listingId));
 

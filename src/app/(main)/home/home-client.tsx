@@ -21,7 +21,7 @@ const PROPERTY_TYPES = [
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 type Props = {
-  userName: string;
+  userName: string | null;
   initialListings: PropertyCardData[];
   totalCount: number;
   pageSize: number;

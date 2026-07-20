@@ -269,7 +269,7 @@ export default function PropertyDetailClient({
 
       {/* ── HEADER ── */}
       <div style={{ position: "sticky", top: 0, zIndex: 30, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}>
-        <button onClick={() => router.back()}
+        <button onClick={() => router.push("/home")}
           style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

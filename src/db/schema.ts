@@ -1,630 +1,530 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, integer } from "drizzle-orm/pg-core";
+import {
+  pgTable, text, timestamp, boolean,
+  index, integer,
+} from "drizzle-orm/pg-core";
+
+// ─── USER ────────────────────────────────────────────────────────────────────
 
 export const user = pgTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").default(false).notNull(),
-  image: text("image"),
-  agentVerified: boolean("agent_verified").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-  phone: text("phone"),
-  role: text("role").default("user"),
-  phoneNumber: text("phone_number").unique(),
-phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
-  verificationLevel: text("verification_level").default("basic"),
-  ninVerified: boolean("nin_verified").default(false),
-  state: text("state"),
-  callUpNumber: text("call_up_number"),
+  id:                   text("id").primaryKey(),
+  name:                 text("name").notNull(),
+  email:                text("email").notNull().unique(),
+  emailVerified:        boolean("email_verified").default(false).notNull(),
+  image:                text("image"),
+  agentVerified:        boolean("agent_verified").default(false).notNull(),
+  createdAt:            timestamp("created_at").defaultNow().notNull(),
+  updatedAt:            timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+  phone:                text("phone"),
+  role:                 text("role").default("user"),
+  phoneNumber:          text("phone_number").unique(),
+  phoneNumberVerified:  boolean("phone_number_verified").default(false).notNull(),
+  verificationLevel:    text("verification_level").default("basic"),
+  ninVerified:          boolean("nin_verified").default(false),
+  state:                text("state"),
+  callUpNumber:         text("call_up_number"),
+  // Marketplace seller verification
+  marketAccountNumber:  text("market_account_number"),
+  marketBankCode:       text("market_bank_code"),
+  marketAccountName:    text("market_account_name"),
+  marketSellerVerified: boolean("market_seller_verified").default(false),
 });
 
-export const session = pgTable(
-  "session",
-  {
-    id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at").notNull(),
-    token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-    ipAddress: text("ip_address"),
-    userAgent: text("user_agent"),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-  },
-  (table) => [index("session_userId_idx").on(table.userId)],
-);
+// ─── SESSION ─────────────────────────────────────────────────────────────────
 
-export const account = pgTable(
-  "account",
-  {
-    id: text("id").primaryKey(),
-    accountId: text("account_id").notNull(),
-    providerId: text("provider_id").notNull(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    accessToken: text("access_token"),
-    refreshToken: text("refresh_token"),
-    idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at"),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-    scope: text("scope"),
-    password: text("password"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-  },
-  (table) => [index("account_userId_idx").on(table.userId)],
-);
+export const session = pgTable("session", {
+  id:        text("id").primaryKey(),
+  expiresAt: timestamp("expires_at").notNull(),
+  token:     text("token").notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").$onUpdate(() => new Date()).notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  userId:    text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+}, (t) => [index("session_userId_idx").on(t.userId)]);
 
-export const verification = pgTable(
-  "verification",
-  {
-    id: text("id").primaryKey(),
-    identifier: text("identifier").notNull(),
-    value: text("value").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => /* @__PURE__ */ new Date())
-      .notNull(),
-  },
-  (table) => [index("verification_identifier_idx").on(table.identifier)],
-);
+// ─── ACCOUNT ─────────────────────────────────────────────────────────────────
 
-export const listing = pgTable(
-  "listing",
-  {
-    id: text("id").primaryKey(),
-    agentId: text("agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    // Auto-generated from type + lga e.g. "Self Contained in Uyo"
-    title: text("title").notNull(),
-    // URL-friendly slug e.g. "self-contained-uyo-akwa-ibom-x7k2"
-    // Generated on creation, used for public share links instead of raw ID
-    slug: text("slug").unique(),
-    description: text("description").notNull(),
-    address: text("address").notNull(),
-    landmark:text("landmark"), 
-    agencyFeePercent: integer("agency_fee_percent"),
-    lga: text("lga").notNull(),
-    state: text("state").notNull(),
-    price: integer("price").notNull(),
-    // rent | sale
-    listingPurpose: text("listing_purpose").default("rent").notNull(),
-    // self-con | mini-flat | 1-bed | 2-bed | room
-    type: text("type").notNull(),
-    // available | reserved | occupied | temp-unavailable | under-review | flagged
-    status: text("status").default("under-review").notNull(),
-    landlordName: text("landlord_name"),
-    landlordPhone: text("landlord_phone"),
-    landlordOtpVerified: boolean("landlord_otp_verified").default(false),
-    images: text("images").array().default([]),
-    // Standard amenities stored as slugs e.g. ["running-water", "prepaid-meter"]
-    amenities: text("amenities").array().default([]),
-    // Extra amenities agent types manually e.g. ["Boys quarters"]
-    customAmenities: text("custom_amenities").array().default([]),
-    isActive: boolean("is_active").default(true).notNull(),
-    lastStatusUpdate: timestamp("last_status_update").defaultNow().notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("listing_agentId_idx").on(table.agentId),
-    index("listing_status_idx").on(table.status),
-    index("listing_state_idx").on(table.state),
-    index("listing_purpose_idx").on(table.listingPurpose),
-  ],
-);
+export const account = pgTable("account", {
+  id:                     text("id").primaryKey(),
+  accountId:              text("account_id").notNull(),
+  providerId:             text("provider_id").notNull(),
+  userId:                 text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  accessToken:            text("access_token"),
+  refreshToken:           text("refresh_token"),
+  idToken:                text("id_token"),
+  accessTokenExpiresAt:   timestamp("access_token_expires_at"),
+  refreshTokenExpiresAt:  timestamp("refresh_token_expires_at"),
+  scope:                  text("scope"),
+  password:               text("password"),
+  createdAt:              timestamp("created_at").defaultNow().notNull(),
+  updatedAt:              timestamp("updated_at").$onUpdate(() => new Date()).notNull(),
+}, (t) => [index("account_userId_idx").on(t.userId)]);
 
-// ─── INSPECTION PAYMENT ──────────────────────────────────────────────────────
-// One payment per corper-agent pair
-// Covers inspection of ALL listings by that agent
-// Expires after CNV code is successfully verified
-export const inspectionPayment = pgTable(
-  "inspection_payment",
-  {
-    id: text("id").primaryKey(),
-    renterId: text("renter_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    agentId: text("agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    listingId: text("listing_id").references(() => listing.id, { onDelete: "set null" }),
-    // Paystack payment reference — null until Phase 5 payment is built
-    paystackRef: text("paystack_ref"),
-    // Fixed platform fee in kobo (500000 = ₦5,000)
-    amount: integer("amount").default(500000).notNull(),
-    // pending | paid | expired
-    // pending: payment initiated but not confirmed
-    // paid: Paystack confirmed payment
-    // expired: CNV code verified, inspection session closed
-    status: text("status").default("pending").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("inspection_payment_renterId_idx").on(table.renterId),
-    index("inspection_payment_agentId_idx").on(table.agentId),
-    index("inspection_payment_status_idx").on(table.status),
-  ],
-);
+// ─── VERIFICATION ─────────────────────────────────────────────────────────────
+
+export const verification = pgTable("verification", {
+  id:         text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value:      text("value").notNull(),
+  expiresAt:  timestamp("expires_at").notNull(),
+  createdAt:  timestamp("created_at").defaultNow().notNull(),
+  updatedAt:  timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [index("verification_identifier_idx").on(t.identifier)]);
+
+// ─── LISTING ─────────────────────────────────────────────────────────────────
+
+export const listing = pgTable("listing", {
+  id:               text("id").primaryKey(),
+  agentId:          text("agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  title:            text("title").notNull(),
+  slug:             text("slug").unique(),
+  description:      text("description").notNull(),
+  address:          text("address").notNull(),
+  landmark:         text("landmark"),
+  agencyFeePercent: integer("agency_fee_percent"),
+  lga:              text("lga").notNull(),
+  state:            text("state").notNull(),
+  price:            integer("price").notNull(),
+  listingPurpose:   text("listing_purpose").default("rent").notNull(), // rent | sale
+  type:             text("type").notNull(),
+  status:           text("status").default("under-review").notNull(), // available | reserved | occupied | temp-unavailable | under-review | flagged
+  landlordName:     text("landlord_name"),
+  landlordPhone:    text("landlord_phone"),
+  landlordOtpVerified: boolean("landlord_otp_verified").default(false),
+  images:           text("images").array().default([]),
+  amenities:        text("amenities").array().default([]),
+  customAmenities:  text("custom_amenities").array().default([]),
+  isActive:         boolean("is_active").default(true).notNull(),
+  lastStatusUpdate: timestamp("last_status_update").defaultNow().notNull(),
+  createdAt:        timestamp("created_at").defaultNow().notNull(),
+  updatedAt:        timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("listing_agentId_idx").on(t.agentId),
+  index("listing_status_idx").on(t.status),
+  index("listing_state_idx").on(t.state),
+  index("listing_purpose_idx").on(t.listingPurpose),
+]);
+
+// ─── INSPECTION PAYMENT ───────────────────────────────────────────────────────
+
+export const inspectionPayment = pgTable("inspection_payment", {
+  id:          text("id").primaryKey(),
+  renterId:    text("renter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  agentId:     text("agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  listingId:   text("listing_id").references(() => listing.id, { onDelete: "set null" }),
+  paystackRef: text("paystack_ref"),
+  amount:      integer("amount").default(500000).notNull(),
+  status:      text("status").default("pending").notNull(), // pending | paid | expired
+  createdAt:   timestamp("created_at").defaultNow().notNull(),
+  updatedAt:   timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("inspection_payment_renterId_idx").on(t.renterId),
+  index("inspection_payment_agentId_idx").on(t.agentId),
+  index("inspection_payment_status_idx").on(t.status),
+]);
 
 // ─── REFERRAL ────────────────────────────────────────────────────────────────
-// Created when Agent A refers a corper to Agent B (both must be on platform)
-// Referral links to the original inspection payment
-// On acceptance, corper's inspection unlocks Agent B's listings too
-export const referral = pgTable(
-  "referral",
-  {
-    id: text("id").primaryKey(),
-    // The original inspection payment being extended via referral
-    inspectionPaymentId: text("inspection_payment_id")
-      .notNull()
-      .references(() => inspectionPayment.id, { onDelete: "cascade" }),
-    // Agent A — the one who refers and earns 20%
-    referringAgentId: text("referring_agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    // Agent B — the one who receives the corper and earns 60%
-    receivingAgentId: text("receiving_agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    // pending | accepted | declined
-    // pending: Agent A sent referral, waiting for Agent B
-    // accepted: Agent B accepted, corper can now see Agent B's listings
-    // declined: Agent B declined, corper stays with Agent A only
-    status: text("status").default("pending").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("referral_inspectionPaymentId_idx").on(table.inspectionPaymentId),
-    index("referral_referringAgentId_idx").on(table.referringAgentId),
-    index("referral_receivingAgentId_idx").on(table.receivingAgentId),
-  ],
-);
 
-// ─── PAYOUT SPLIT ────────────────────────────────────────────────────────────
-// Records how each inspection payment is split between platform and agent(s)
-// Created when payment is confirmed (Phase 5)
-// One inspection_payment creates 2 rows (no referral) or 3 rows (with referral)
-//
-// WITHOUT REFERRAL (2 rows):
-//   platform     20%  ₦1,000
-//   agent        80%  ₦4,000
-//
-// WITH REFERRAL (3 rows):
-//   platform          20%  ₦1,000
-//   referring-agent   20%  ₦1,000
-//   receiving-agent   60%  ₦3,000
-export const payoutSplit = pgTable(
-  "payout_split",
-  {
-    id: text("id").primaryKey(),
-    inspectionPaymentId: text("inspection_payment_id")
-      .notNull()
-      .references(() => inspectionPayment.id, { onDelete: "cascade" }),
-    // platform | referring-agent | receiving-agent | sole-agent
-    recipientType: text("recipient_type").notNull(),
-    // null for platform, userId for agents
-    recipientId: text("recipient_id")
-      .references(() => user.id, { onDelete: "set null" }),
-    // Actual naira amount in kobo e.g. 100000 = ₦1,000
-    amount: integer("amount").notNull(),
-    // Percentage e.g. 20, 60, 80
-    percentage: integer("percentage").notNull(),
-    // pending | paid
-    // pending: payment confirmed, payout not yet sent
-    // paid: manually transferred to agent's bank account
-    status: text("status").default("pending").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("payout_split_inspectionPaymentId_idx").on(table.inspectionPaymentId),
-    index("payout_split_recipientId_idx").on(table.recipientId),
-    index("payout_split_status_idx").on(table.status),
-  ],
-);
+export const referral = pgTable("referral", {
+  id:                   text("id").primaryKey(),
+  inspectionPaymentId:  text("inspection_payment_id").notNull().references(() => inspectionPayment.id, { onDelete: "cascade" }),
+  referringAgentId:     text("referring_agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  receivingAgentId:     text("receiving_agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  status:               text("status").default("pending").notNull(), // pending | accepted | declined
+  createdAt:            timestamp("created_at").defaultNow().notNull(),
+  updatedAt:            timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("referral_inspectionPaymentId_idx").on(t.inspectionPaymentId),
+  index("referral_referringAgentId_idx").on(t.referringAgentId),
+  index("referral_receivingAgentId_idx").on(t.receivingAgentId),
+]);
+
+// ─── PAYOUT SPLIT ─────────────────────────────────────────────────────────────
+
+export const payoutSplit = pgTable("payout_split", {
+  id:                   text("id").primaryKey(),
+  inspectionPaymentId:  text("inspection_payment_id").notNull().references(() => inspectionPayment.id, { onDelete: "cascade" }),
+  recipientType:        text("recipient_type").notNull(), // platform | referring-agent | receiving-agent | sole-agent
+  recipientId:          text("recipient_id").references(() => user.id, { onDelete: "set null" }),
+  amount:               integer("amount").notNull(),
+  percentage:           integer("percentage").notNull(),
+  status:               text("status").default("pending").notNull(), // pending | paid
+  createdAt:            timestamp("created_at").defaultNow().notNull(),
+  updatedAt:            timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("payout_split_inspectionPaymentId_idx").on(t.inspectionPaymentId),
+  index("payout_split_recipientId_idx").on(t.recipientId),
+  index("payout_split_status_idx").on(t.status),
+]);
 
 // ─── BOOKING ─────────────────────────────────────────────────────────────────
-export const booking = pgTable(
-  "booking",
-  {
-    id: text("id").primaryKey(),
-    listingId: text("listing_id")
-      .notNull()
-      .references(() => listing.id, { onDelete: "cascade" }),
-    renterId: text("renter_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    agentId: text("agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    // Links booking to the inspection payment that unlocked it
-    // null until Phase 5 payment is built
-    inspectionPaymentId: text("inspection_payment_id")
-      .references(() => inspectionPayment.id, { onDelete: "set null" }),
-    bookingCode: text("booking_code").notNull().unique(),
-    // Phone or email used at payment — null until Phase 5
-    renterContact: text("renter_contact"),
-    renterContactType: text("renter_contact_type"),
-    // pending | scheduled | verified | completed | cancelled
-    // pending: booking created, corper hasn't set visit date yet
-    // scheduled: corper set date+time, full details revealed to both sides
-    // verified: CNV code confirmed on visit day
-    // completed: visit done, booking closed
-    // cancelled: either party cancelled
-    status: text("status").default("pending").notNull(),
-    // kept for schema compatibility — not used in MVP flow
-    confirmationStatus: text("confirmation_status").default("pending").notNull(),
-    // Set by corper when they confirm their preferred visit date
-    agreedDate: timestamp("agreed_date"),
-    // Set by corper as text e.g. "2:00 PM" — agent sees this and confirms
-    agreedTime: text("agreed_time"),
-    // Tracks when admin was last notified of unconfirmed booking
-    // Admin uses this to manually follow up with agent
-    lastAdminAlert: timestamp("last_admin_alert"),
-    visitDate: timestamp("visit_date"),
-    // "this-week" | "next-week" | "flexible"
-    preferredPeriod: text("preferred_period"),
-    // Optional note from corper to agent at booking time
-    visitNote: text("visit_note"),
-    commissionStatus: text("commission_status"),
-    commissionPaidAt: timestamp("commission_paid_at"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("booking_agentId_idx").on(table.agentId),
-    index("booking_renterId_idx").on(table.renterId),
-    index("booking_code_idx").on(table.bookingCode),
-    index("booking_confirmationStatus_idx").on(table.confirmationStatus),
-    index("booking_inspectionPaymentId_idx").on(table.inspectionPaymentId),
-  ],
-);
 
-// ─── BOOKING REQUEST ─────────────────────────────────────────────────────────
-export const bookingRequest = pgTable(
-  "booking_request",
-  {
-    id: text("id").primaryKey(),
-    clientId: text("client_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    listingId: text("listing_id")
-      .notNull()
-      .references(() => listing.id, { onDelete: "cascade" }),
-    agentId: text("agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    // pending  — T&Cs accepted, admin needs to call client then approve
-    // approved — admin approved, real booking created, both sides notified
-    // declined — admin declined (not serious, wrong number, etc.)
-    status: text("status").default("pending").notNull(),
-    termsAcceptedAt: timestamp("terms_accepted_at").notNull(),
-    approvedAt: timestamp("approved_at"),
-    approvedBy: text("approved_by"),
-    declineReason: text("decline_reason"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("booking_request_clientId_idx").on(table.clientId),
-    index("booking_request_listingId_idx").on(table.listingId),
-    index("booking_request_agentId_idx").on(table.agentId),
-    index("booking_request_status_idx").on(table.status),
-  ],
-);
+export const booking = pgTable("booking", {
+  id:                   text("id").primaryKey(),
+  listingId:            text("listing_id").notNull().references(() => listing.id, { onDelete: "cascade" }),
+  renterId:             text("renter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  agentId:              text("agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  inspectionPaymentId:  text("inspection_payment_id").references(() => inspectionPayment.id, { onDelete: "set null" }),
+  bookingCode:          text("booking_code").notNull().unique(),
+  renterContact:        text("renter_contact"),
+  renterContactType:    text("renter_contact_type"),
+  status:               text("status").default("pending").notNull(), // pending | scheduled | verified | completed | cancelled
+  confirmationStatus:   text("confirmation_status").default("pending").notNull(),
+  agreedDate:           timestamp("agreed_date"),
+  agreedTime:           text("agreed_time"),
+  lastAdminAlert:       timestamp("last_admin_alert"),
+  visitDate:            timestamp("visit_date"),
+  preferredPeriod:      text("preferred_period"), // this-week | next-week | flexible
+  visitNote:            text("visit_note"),
+  commissionStatus:     text("commission_status"),
+  commissionPaidAt:     timestamp("commission_paid_at"),
+  createdAt:            timestamp("created_at").defaultNow().notNull(),
+  updatedAt:            timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("booking_agentId_idx").on(t.agentId),
+  index("booking_renterId_idx").on(t.renterId),
+  index("booking_code_idx").on(t.bookingCode),
+  index("booking_confirmationStatus_idx").on(t.confirmationStatus),
+  index("booking_inspectionPaymentId_idx").on(t.inspectionPaymentId),
+]);
 
-// ─── VISIT VERIFICATION ──────────────────────────────────────────────────────
-export const visitVerification = pgTable(
-  "visit_verification",
-  {
-    id: text("id").primaryKey(),
-    bookingId: text("booking_id")
-      .notNull()
-      .references(() => booking.id, { onDelete: "cascade" }),
-    code: text("code").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    used: boolean("used").default(false).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("visit_verification_bookingId_idx").on(table.bookingId),
-    index("visit_verification_code_idx").on(table.code),
-  ],
-);
+// ─── BOOKING REQUEST ──────────────────────────────────────────────────────────
 
-// ─── WATCHLIST ───────────────────────────────────────────────────────────────
-export const watchlist = pgTable(
-  "watchlist",
-  {
-    id: text("id").primaryKey(),
-    renterId: text("renter_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    listingId: text("listing_id")
-      .notNull()
-      .references(() => listing.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("watchlist_renterId_idx").on(table.renterId),
-    index("watchlist_listingId_idx").on(table.listingId),
-  ],
-);
+export const bookingRequest = pgTable("booking_request", {
+  id:               text("id").primaryKey(),
+  clientId:         text("client_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  listingId:        text("listing_id").notNull().references(() => listing.id, { onDelete: "cascade" }),
+  agentId:          text("agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  status:           text("status").default("pending").notNull(), // pending | approved | declined
+  termsAcceptedAt:  timestamp("terms_accepted_at").notNull(),
+  approvedAt:       timestamp("approved_at"),
+  approvedBy:       text("approved_by"),
+  declineReason:    text("decline_reason"),
+  createdAt:        timestamp("created_at").defaultNow().notNull(),
+  updatedAt:        timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("booking_request_clientId_idx").on(t.clientId),
+  index("booking_request_listingId_idx").on(t.listingId),
+  index("booking_request_agentId_idx").on(t.agentId),
+  index("booking_request_status_idx").on(t.status),
+]);
 
-// ─── PROPERTY REQUEST ────────────────────────────────────────────────────────
-export const propertyRequest = pgTable(
-  "property_request",
-  {
-    id:         text("id").primaryKey(),
-    renterId:   text("renter_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    lga:        text("lga").notNull(),
-    state:      text("state").notNull(),
-    type:       text("type").notNull(),
-    listingPurpose: text("listing_purpose").default("rent").notNull(),
-    landmark:   text("landmark"),
-    minBudget:  integer("min_budget"),
-    maxBudget:  integer("max_budget"),
-    notes:      text("notes"),
-    status:     text("status").default("open").notNull(),
-    createdAt:  timestamp("created_at").defaultNow().notNull(),
-    expiresAt:  timestamp("expires_at").notNull(),
-    updatedAt:  timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("property_request_renterId_idx").on(table.renterId),
-    index("property_request_status_idx").on(table.status),
-    index("property_request_lga_idx").on(table.lga),
-  ],
-);
+// ─── VISIT VERIFICATION ───────────────────────────────────────────────────────
 
-export const requestMatch = pgTable(
-  "request_match",
-  {
-    id:          text("id").primaryKey(),
-    requestId:   text("request_id")
-      .notNull()
-      .references(() => propertyRequest.id, { onDelete: "cascade" }),
-       status: text("status").notNull().default("pending"),
-        reviewedAt: timestamp("reviewed_at"),
-        reviewedBy: text("reviewed_by").references(() => user.id, { onDelete: "set null" }),
-        rejectionReason: text("rejection_reason"),
-    listingId:   text("listing_id")
-      .notNull()
-      .references(() => listing.id, { onDelete: "cascade" }),
-    note:        text("note"),
-    matchedBy:   text("matched_by").notNull(),
-    createdAt:   timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("request_match_requestId_idx").on(table.requestId),
-    index("request_match_listingId_idx").on(table.listingId),
-  ],
-);
+export const visitVerification = pgTable("visit_verification", {
+  id:        text("id").primaryKey(),
+  bookingId: text("booking_id").notNull().references(() => booking.id, { onDelete: "cascade" }),
+  code:      text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used:      boolean("used").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("visit_verification_bookingId_idx").on(t.bookingId),
+  index("visit_verification_code_idx").on(t.code),
+]);
 
-//  NOTIFICATION ───────────────────────────────────────────────────────────────
+// ─── WATCHLIST ────────────────────────────────────────────────────────────────
 
-export const notification = pgTable(
-  "notification",
-  {
-    id:        text("id").primaryKey(),
-    userId:    text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-    // booking-created | date-confirmed | both-confirmed |
-    // agent-verified  | inspection-reminder
-    type:      text("type").notNull(),
-    title:     text("title").notNull(),
-    message:   text("message").notNull(),
-    // Optional deep-link — e.g. /properties/abc or /bookings/xyz
-    link:      text("link"),
-    read:      boolean("read").default(false).notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("notification_user_read_idx").on(table.userId, table.read),
-    index("notification_createdAt_idx").on(table.createdAt),
-  ],
-);
+export const watchlist = pgTable("watchlist", {
+  id:        text("id").primaryKey(),
+  renterId:  text("renter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  listingId: text("listing_id").notNull().references(() => listing.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("watchlist_renterId_idx").on(t.renterId),
+  index("watchlist_listingId_idx").on(t.listingId),
+]);
 
+// ─── PROPERTY REQUEST ─────────────────────────────────────────────────────────
 
-// ─── AGENT KYC REQUEST ───────────────────────────────────────────────────────
-// Submitted by agent when applying for verification
-// Admin reviews and updates user.agentVerified directly
-// status: pending | approved | declined
-export const agentKycRequest = pgTable(
-  "agent_kyc_request",
-  {
-    id:            text("id").primaryKey(),
-    agentId:       text("agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    // Contact
-    fullName:      text("full_name").notNull(),
-    phone:         text("phone").notNull(),
-    whatsapp:      text("whatsapp"),
-    // Location — where they operate
-    state:         text("state").notNull(),
-    lga:           text("lga").notNull(),
-    // Bank details for payouts
-    bankName:      text("bank_name").notNull(),
-    accountNumber: text("account_number").notNull(),
-    accountName:   text("account_name").notNull(),
-    // Review
-    // pending | approved | declined
-    status:        text("status").default("pending").notNull(),
-    adminNote:     text("admin_note"),
-    reviewedAt:    timestamp("reviewed_at"),
-    createdAt:     timestamp("created_at").defaultNow().notNull(),
-    updatedAt:     timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("kyc_agentId_idx").on(table.agentId),
-    index("kyc_status_idx").on(table.status),
-  ],
-);
+export const propertyRequest = pgTable("property_request", {
+  id:             text("id").primaryKey(),
+  renterId:       text("renter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  lga:            text("lga").notNull(),
+  state:          text("state").notNull(),
+  type:           text("type").notNull(),
+  listingPurpose: text("listing_purpose").default("rent").notNull(),
+  landmark:       text("landmark"),
+  minBudget:      integer("min_budget"),
+  maxBudget:      integer("max_budget"),
+  notes:          text("notes"),
+  status:         text("status").default("open").notNull(),
+  createdAt:      timestamp("created_at").defaultNow().notNull(),
+  expiresAt:      timestamp("expires_at").notNull(),
+  updatedAt:      timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("property_request_renterId_idx").on(t.renterId),
+  index("property_request_status_idx").on(t.status),
+  index("property_request_lga_idx").on(t.lga),
+]);
 
-export const review = pgTable(
-  "review",
-  {
-    id:         text("id").primaryKey(),
-    // The verified booking this review is for
-    bookingId:  text("booking_id")
-      .notNull()
-      .references(() => booking.id, { onDelete: "cascade" }),
-    // The client who is leaving the review
-    reviewerId: text("reviewer_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    // The agent being reviewed
-    agentId:    text("agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    // 1–5 stars
-    rating:     integer("rating").notNull(),
-    // Optional short comment — max ~500 chars enforced on the API
-    comment:    text("comment"),
-    createdAt:  timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("review_agentId_idx").on(table.agentId),
-    index("review_reviewerId_idx").on(table.reviewerId),
-    index("review_bookingId_idx").on(table.bookingId),
-  ],
-);
+// ─── REQUEST MATCH ────────────────────────────────────────────────────────────
 
-export const rentRecord = pgTable(
-  "rent_record",
-  {
-    id:           text("id").primaryKey(),
- 
-    // The verified booking this rent record is tied to
-    bookingId:    text("booking_id")
-      .notNull()
-      .references(() => booking.id, { onDelete: "cascade" }),
- 
-    // The client who uploaded the receipt
-    renterId:     text("renter_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
- 
-    // The agent for this booking
-    agentId:      text("agent_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
- 
-    // The listing this rent is for
-    listingId:    text("listing_id")
-      .notNull()
-      .references(() => listing.id, { onDelete: "cascade" }),
- 
-    // Rent amount in naira as typed by the client
-    rentAmount:   integer("rent_amount").notNull(),
- 
-    // Duration: "6" | "12" | "24" months
-    durationMonths: integer("duration_months").notNull(),
- 
-    // Date client paid rent (from their receipt)
-    paymentDate:  timestamp("payment_date").notNull(),
- 
-    // Calculated: paymentDate + durationMonths
-    // Renewal reminder fires 30 days before this
-    renewalDate:  timestamp("renewal_date").notNull(),
- 
-    // Cloudinary URL of the uploaded receipt image
-    receiptUrl:   text("receipt_url").notNull(),
-    receiptStatus: text("receipt_status").default("pending").notNull(),
-    adminNote:     text("admin_note"),
- 
-    // Paystack reference for the ₦1,000 documentation fee
-    paystackRef:  text("paystack_ref"),
- 
-    // Whether the ₦1,000 fee has been confirmed paid
-    feePaid:      boolean("fee_paid").default(false).notNull(),
- 
-    // Whether a renewal reminder has been sent
-    reminderSent: boolean("reminder_sent").default(false).notNull(),
- 
-    createdAt:    timestamp("created_at").defaultNow().notNull(),
-    updatedAt:    timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("rent_record_renterId_idx").on(table.renterId),
-    index("rent_record_agentId_idx").on(table.agentId),
-    index("rent_record_bookingId_idx").on(table.bookingId),
-    index("rent_record_renewalDate_idx").on(table.renewalDate),
-    index("rent_record_receiptStatus_idx").on(table.receiptStatus),
-  ],
-);
+export const requestMatch = pgTable("request_match", {
+  id:              text("id").primaryKey(),
+  requestId:       text("request_id").notNull().references(() => propertyRequest.id, { onDelete: "cascade" }),
+  listingId:       text("listing_id").notNull().references(() => listing.id, { onDelete: "cascade" }),
+  status:          text("status").notNull().default("pending"),
+  reviewedAt:      timestamp("reviewed_at"),
+  reviewedBy:      text("reviewed_by").references(() => user.id, { onDelete: "set null" }),
+  rejectionReason: text("rejection_reason"),
+  note:            text("note"),
+  matchedBy:       text("matched_by").notNull(),
+  createdAt:       timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("request_match_requestId_idx").on(t.requestId),
+  index("request_match_listingId_idx").on(t.listingId),
+]);
 
+// ─── NOTIFICATION ─────────────────────────────────────────────────────────────
 
-// ─── RELATIONS ───────────────────────────────────────────────────────────────
+export const notification = pgTable("notification", {
+  id:        text("id").primaryKey(),
+  userId:    text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  type:      text("type").notNull(),
+  title:     text("title").notNull(),
+  message:   text("message").notNull(),
+  link:      text("link"),
+  read:      boolean("read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("notification_user_read_idx").on(t.userId, t.read),
+  index("notification_createdAt_idx").on(t.createdAt),
+]);
+
+// ─── PUSH SUBSCRIPTION (PWA off-platform notifications) ──────────────────────
+
+export const pushSubscription = pgTable("push_subscription", {
+  id:        text("id").primaryKey(),
+  userId:    text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  endpoint:  text("endpoint").notNull().unique(),
+  p256dh:    text("p256dh").notNull(),
+  auth:      text("auth").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("push_sub_userId_idx").on(t.userId),
+]);
+
+// ─── AGENT KYC REQUEST ────────────────────────────────────────────────────────
+
+export const agentKycRequest = pgTable("agent_kyc_request", {
+  id:            text("id").primaryKey(),
+  agentId:       text("agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  fullName:      text("full_name").notNull(),
+  phone:         text("phone").notNull(),
+  whatsapp:      text("whatsapp"),
+  state:         text("state").notNull(),
+  lga:           text("lga").notNull(),
+  bankName:      text("bank_name").notNull(),
+  accountNumber: text("account_number").notNull(),
+  accountName:   text("account_name").notNull(),
+  status:        text("status").default("pending").notNull(), // pending | approved | declined
+  adminNote:     text("admin_note"),
+  reviewedAt:    timestamp("reviewed_at"),
+  createdAt:     timestamp("created_at").defaultNow().notNull(),
+  updatedAt:     timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("kyc_agentId_idx").on(t.agentId),
+  index("kyc_status_idx").on(t.status),
+]);
+
+// ─── REVIEW ───────────────────────────────────────────────────────────────────
+
+export const review = pgTable("review", {
+  id:         text("id").primaryKey(),
+  bookingId:  text("booking_id").notNull().references(() => booking.id, { onDelete: "cascade" }),
+  reviewerId: text("reviewer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  agentId:    text("agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  rating:     integer("rating").notNull(),
+  comment:    text("comment"),
+  createdAt:  timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("review_agentId_idx").on(t.agentId),
+  index("review_reviewerId_idx").on(t.reviewerId),
+  index("review_bookingId_idx").on(t.bookingId),
+]);
+
+// ─── RENT RECORD ──────────────────────────────────────────────────────────────
+
+export const rentRecord = pgTable("rent_record", {
+  id:             text("id").primaryKey(),
+  bookingId:      text("booking_id").notNull().references(() => booking.id, { onDelete: "cascade" }),
+  renterId:       text("renter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  agentId:        text("agent_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  listingId:      text("listing_id").notNull().references(() => listing.id, { onDelete: "cascade" }),
+  rentAmount:     integer("rent_amount").notNull(),
+  durationMonths: integer("duration_months").notNull(),
+  paymentDate:    timestamp("payment_date").notNull(),
+  renewalDate:    timestamp("renewal_date").notNull(),
+  receiptUrl:     text("receipt_url").notNull(),
+  receiptStatus:  text("receipt_status").default("pending").notNull(),
+  adminNote:      text("admin_note"),
+  paystackRef:    text("paystack_ref"),
+  feePaid:        boolean("fee_paid").default(false).notNull(),
+  reminderSent:   boolean("reminder_sent").default(false).notNull(),
+  createdAt:      timestamp("created_at").defaultNow().notNull(),
+  updatedAt:      timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("rent_record_renterId_idx").on(t.renterId),
+  index("rent_record_agentId_idx").on(t.agentId),
+  index("rent_record_bookingId_idx").on(t.bookingId),
+  index("rent_record_renewalDate_idx").on(t.renewalDate),
+  index("rent_record_receiptStatus_idx").on(t.receiptStatus),
+]);
+
+// ─── MARKETPLACE LISTING ──────────────────────────────────────────────────────
+
+export const marketplaceListing = pgTable("marketplace_listing", {
+  id:                   text("id").primaryKey(),
+  sellerId:             text("seller_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  title:                text("title").notNull(),
+  category:             text("category").notNull(), // Furniture | Electronics | Kitchen | Clothing | Appliances | Books | Sports | Other
+  condition:            text("condition").notNull(), // new | fairly-used
+  description:          text("description").notNull(),
+  price:                integer("price").notNull(), // in kobo
+  state:                text("state").notNull(),    // Nigerian state e.g. "Akwa Ibom"
+  lga:                  text("lga").notNull(),      // LGA within that state e.g. "Eket"
+  landmark:             text("landmark").notNull(), // specific pickup point e.g. "Near NYSC Secretariat"
+  images:               text("images").array().default([]), // max 3 Cloudinary URLs
+  status:               text("status").default("pending").notNull(), // pending | active | reserved | sold | flagged | deleted
+  agreementAcceptedAt:  timestamp("agreement_accepted_at"),
+  approvedAt:           timestamp("approved_at"),
+  expiresAt:            timestamp("expires_at"), // approvedAt + 7 days
+  createdAt:            timestamp("created_at").defaultNow().notNull(),
+  updatedAt:            timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("market_listing_sellerId_idx").on(t.sellerId),
+  index("market_listing_status_idx").on(t.status),
+  index("market_listing_category_idx").on(t.category),
+  index("market_listing_state_idx").on(t.state),
+  index("market_listing_lga_idx").on(t.lga),
+]);
+
+// ─── MARKETPLACE TRANSACTION ──────────────────────────────────────────────────
+
+export const marketplaceTransaction = pgTable("marketplace_transaction", {
+  id:            text("id").primaryKey(),
+  listingId:     text("listing_id").notNull().references(() => marketplaceListing.id, { onDelete: "cascade" }),
+  buyerId:       text("buyer_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  sellerId:      text("seller_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  amount:        integer("amount").notNull(),       // full price in kobo
+  commission:    integer("commission").notNull(),   // 8% in kobo
+  sellerPayout:  integer("seller_payout").notNull(), // 92% in kobo
+  paystackRef:   text("paystack_ref"),
+  status:        text("status").default("pending").notNull(), // pending | escrow | released | refunded | disputed
+  sellerRating:  integer("seller_rating"),          // 1-5 stars — set by buyer on completion
+  paidAt:        timestamp("paid_at"),
+  confirmedAt:   timestamp("confirmed_at"),          // buyer tapped Item Received
+  releasedAt:    timestamp("released_at"),           // admin manually paid out
+  createdAt:     timestamp("created_at").defaultNow().notNull(),
+  updatedAt:     timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
+}, (t) => [
+  index("market_txn_listingId_idx").on(t.listingId),
+  index("market_txn_buyerId_idx").on(t.buyerId),
+  index("market_txn_sellerId_idx").on(t.sellerId),
+  index("market_txn_status_idx").on(t.status),
+]);
+
+// ─── MARKETPLACE REPORT ───────────────────────────────────────────────────────
+
+export const marketplaceReport = pgTable("marketplace_report", {
+  id:            text("id").primaryKey(),
+  listingId:     text("listing_id").notNull().references(() => marketplaceListing.id, { onDelete: "cascade" }),
+  transactionId: text("transaction_id").references(() => marketplaceTransaction.id, { onDelete: "set null" }),
+  reporterId:    text("reporter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  reason:        text("reason").notNull(),
+  status:        text("status").default("open").notNull(), // open | resolved
+  createdAt:     timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("market_report_listingId_idx").on(t.listingId),
+  index("market_report_reporterId_idx").on(t.reporterId),
+]);
+
+// ─── RELATIONS ────────────────────────────────────────────────────────────────
 
 export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
-  listings: many(listing),
-  bookingsAsAgent: many(booking, { relationName: "agentBookings" }),
-  bookingsAsRenter: many(booking, { relationName: "renterBookings" }),
-  watchlist: many(watchlist),
-  propertyRequests: many(propertyRequest),
+  sessions:                   many(session),
+  accounts:                   many(account),
+  listings:                   many(listing),
+  bookingsAsAgent:            many(booking, { relationName: "agentBookings" }),
+  bookingsAsRenter:           many(booking, { relationName: "renterBookings" }),
+  watchlist:                  many(watchlist),
+  propertyRequests:           many(propertyRequest),
   inspectionPaymentsAsRenter: many(inspectionPayment, { relationName: "renterPayments" }),
-  inspectionPaymentsAsAgent: many(inspectionPayment, { relationName: "agentPayments" }),
-  referralsAsReferring: many(referral, { relationName: "referringAgent" }),
-  referralsAsReceiving: many(referral, { relationName: "receivingAgent" }),
-  payoutSplits: many(payoutSplit),
-  notifications: many(notification),
-  agentKycRequests: many(agentKycRequest),
- reviewsGiven:    many(review, { relationName: "reviewsGiven"    }),
-reviewsReceived: many(review, { relationName: "reviewsReceived" }),
-rentRecords:     many(rentRecord),
-bookingRequestsAsClient: many(bookingRequest),
-bookingRequestsAsAgent:  many(bookingRequest),
+  inspectionPaymentsAsAgent:  many(inspectionPayment, { relationName: "agentPayments" }),
+  referralsAsReferring:       many(referral, { relationName: "referringAgent" }),
+  referralsAsReceiving:       many(referral, { relationName: "receivingAgent" }),
+  payoutSplits:               many(payoutSplit),
+  notifications:              many(notification),
+  pushSubscriptions:          many(pushSubscription),
+  agentKycRequests:           many(agentKycRequest),
+  reviewsGiven:               many(review, { relationName: "reviewsGiven" }),
+  reviewsReceived:            many(review, { relationName: "reviewsReceived" }),
+  rentRecords:                many(rentRecord),
+  bookingRequestsAsClient:    many(bookingRequest),
+  bookingRequestsAsAgent:     many(bookingRequest),
+  marketplaceListings:        many(marketplaceListing),
+  marketplacePurchases:       many(marketplaceTransaction, { relationName: "buyerTransactions" }),
+  marketplaceSales:           many(marketplaceTransaction, { relationName: "sellerTransactions" }),
 }));
 
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, { fields: [session.userId], references: [user.id] }),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, { fields: [account.userId], references: [user.id] }),
+}));
+
+export const listingRelations = relations(listing, ({ one, many }) => ({
+  agent:          one(user, { fields: [listing.agentId], references: [user.id] }),
+  bookings:       many(booking),
+  watchlistEntries: many(watchlist),
+  bookingRequests: many(bookingRequest),
+}));
+
+export const inspectionPaymentRelations = relations(inspectionPayment, ({ one, many }) => ({
+  renter:      one(user, { fields: [inspectionPayment.renterId], references: [user.id], relationName: "renterPayments" }),
+  agent:       one(user, { fields: [inspectionPayment.agentId],  references: [user.id], relationName: "agentPayments"  }),
+  bookings:    many(booking),
+  referral:    one(referral, { fields: [inspectionPayment.id], references: [referral.inspectionPaymentId] }),
+  payoutSplits: many(payoutSplit),
+}));
+
+export const referralRelations = relations(referral, ({ one }) => ({
+  inspectionPayment: one(inspectionPayment, { fields: [referral.inspectionPaymentId], references: [inspectionPayment.id] }),
+  referringAgent:    one(user, { fields: [referral.referringAgentId], references: [user.id], relationName: "referringAgent" }),
+  receivingAgent:    one(user, { fields: [referral.receivingAgentId], references: [user.id], relationName: "receivingAgent" }),
+}));
+
+export const payoutSplitRelations = relations(payoutSplit, ({ one }) => ({
+  inspectionPayment: one(inspectionPayment, { fields: [payoutSplit.inspectionPaymentId], references: [inspectionPayment.id] }),
+  recipient:         one(user, { fields: [payoutSplit.recipientId], references: [user.id] }),
+}));
+
+export const bookingRelations = relations(booking, ({ one, many }) => ({
+  listing:            one(listing, { fields: [booking.listingId], references: [listing.id] }),
+  renter:             one(user, { fields: [booking.renterId], references: [user.id], relationName: "renterBookings" }),
+  agent:              one(user, { fields: [booking.agentId],  references: [user.id], relationName: "agentBookings"  }),
+  inspectionPayment:  one(inspectionPayment, { fields: [booking.inspectionPaymentId], references: [inspectionPayment.id] }),
+  visitVerifications: many(visitVerification),
+}));
+
+export const bookingRequestRelations = relations(bookingRequest, ({ one }) => ({
+  client:  one(user,    { fields: [bookingRequest.clientId],  references: [user.id]    }),
+  listing: one(listing, { fields: [bookingRequest.listingId], references: [listing.id] }),
+  agent:   one(user,    { fields: [bookingRequest.agentId],   references: [user.id]    }),
+}));
+
+export const visitVerificationRelations = relations(visitVerification, ({ one }) => ({
+  booking: one(booking, { fields: [visitVerification.bookingId], references: [booking.id] }),
+}));
+
+export const watchlistRelations = relations(watchlist, ({ one }) => ({
+  renter:  one(user,    { fields: [watchlist.renterId],  references: [user.id]    }),
+  listing: one(listing, { fields: [watchlist.listingId], references: [listing.id] }),
+}));
 
 export const propertyRequestRelations = relations(propertyRequest, ({ one, many }) => ({
   renter:  one(user, { fields: [propertyRequest.renterId], references: [user.id] }),
@@ -633,22 +533,19 @@ export const propertyRequestRelations = relations(propertyRequest, ({ one, many 
 
 export const requestMatchRelations = relations(requestMatch, ({ one }) => ({
   request: one(propertyRequest, { fields: [requestMatch.requestId], references: [propertyRequest.id] }),
-  listing: one(listing, { fields: [requestMatch.listingId], references: [listing.id] }),
+  listing: one(listing,         { fields: [requestMatch.listingId], references: [listing.id]         }),
 }));
 
+export const notificationRelations = relations(notification, ({ one }) => ({
+  user: one(user, { fields: [notification.userId], references: [user.id] }),
+}));
+
+export const pushSubscriptionRelations = relations(pushSubscription, ({ one }) => ({
+  user: one(user, { fields: [pushSubscription.userId], references: [user.id] }),
+}));
 
 export const agentKycRequestRelations = relations(agentKycRequest, ({ one }) => ({
-  agent: one(user, {
-    fields: [agentKycRequest.agentId],
-    references: [user.id],
-  }),
-}));
-
-export const rentRecordRelations = relations(rentRecord, ({ one }) => ({
-  booking: one(booking,  { fields: [rentRecord.bookingId],  references: [booking.id]  }),
-  renter:  one(user,     { fields: [rentRecord.renterId],   references: [user.id]     }),
-  agent:   one(user,     { fields: [rentRecord.agentId],    references: [user.id]     }),
-  listing: one(listing,  { fields: [rentRecord.listingId],  references: [listing.id]  }),
+  agent: one(user, { fields: [agentKycRequest.agentId], references: [user.id] }),
 }));
 
 export const reviewRelations = relations(review, ({ one }) => ({
@@ -657,114 +554,27 @@ export const reviewRelations = relations(review, ({ one }) => ({
   agent:    one(user,    { fields: [review.agentId],    references: [user.id], relationName: "reviewsReceived" }),
 }));
 
-export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, { fields: [session.userId], references: [user.id] }),
+export const rentRecordRelations = relations(rentRecord, ({ one }) => ({
+  booking: one(booking, { fields: [rentRecord.bookingId], references: [booking.id]  }),
+  renter:  one(user,    { fields: [rentRecord.renterId],  references: [user.id]     }),
+  agent:   one(user,    { fields: [rentRecord.agentId],   references: [user.id]     }),
+  listing: one(listing, { fields: [rentRecord.listingId], references: [listing.id]  }),
 }));
 
-export const notificationRelations = relations(notification, ({ one }) => ({
-  user: one(user, { fields: [notification.userId], references: [user.id] }),
+export const marketplaceListingRelations = relations(marketplaceListing, ({ one, many }) => ({
+  seller:       one(user, { fields: [marketplaceListing.sellerId], references: [user.id] }),
+  transactions: many(marketplaceTransaction),
+  reports:      many(marketplaceReport),
 }));
 
-export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, { fields: [account.userId], references: [user.id] }),
+export const marketplaceTransactionRelations = relations(marketplaceTransaction, ({ one }) => ({
+  listing: one(marketplaceListing, { fields: [marketplaceTransaction.listingId], references: [marketplaceListing.id] }),
+  buyer:   one(user, { fields: [marketplaceTransaction.buyerId],   references: [user.id], relationName: "buyerTransactions"  }),
+  seller:  one(user, { fields: [marketplaceTransaction.sellerId],  references: [user.id], relationName: "sellerTransactions" }),
 }));
 
-export const listingRelations = relations(listing, ({ one, many }) => ({
-  agent: one(user, { fields: [listing.agentId], references: [user.id] }),
-  bookings: many(booking),
-  watchlistEntries: many(watchlist),
-  bookingRequests: many(bookingRequest),
-}));
-
-export const inspectionPaymentRelations = relations(inspectionPayment, ({ one, many }) => ({
-  renter: one(user, {
-    fields: [inspectionPayment.renterId],
-    references: [user.id],
-    relationName: "renterPayments",
-  }),
-  agent: one(user, {
-    fields: [inspectionPayment.agentId],
-    references: [user.id],
-    relationName: "agentPayments",
-  }),
-  bookings: many(booking),
-  referral: one(referral, {
-    fields: [inspectionPayment.id],
-    references: [referral.inspectionPaymentId],
-  }),
-  payoutSplits: many(payoutSplit),
-}));
-
-export const referralRelations = relations(referral, ({ one }) => ({
-  inspectionPayment: one(inspectionPayment, {
-    fields: [referral.inspectionPaymentId],
-    references: [inspectionPayment.id],
-  }),
-  referringAgent: one(user, {
-    fields: [referral.referringAgentId],
-    references: [user.id],
-    relationName: "referringAgent",
-  }),
-  receivingAgent: one(user, {
-    fields: [referral.receivingAgentId],
-    references: [user.id],
-    relationName: "receivingAgent",
-  }),
-}));
-
-export const payoutSplitRelations = relations(payoutSplit, ({ one }) => ({
-  inspectionPayment: one(inspectionPayment, {
-    fields: [payoutSplit.inspectionPaymentId],
-    references: [inspectionPayment.id],
-  }),
-  recipient: one(user, {
-    fields: [payoutSplit.recipientId],
-    references: [user.id],
-  }),
-}));
-
-export const bookingRelations = relations(booking, ({ one, many }) => ({
-  listing: one(listing, { fields: [booking.listingId], references: [listing.id] }),
-  renter: one(user, {
-    fields: [booking.renterId],
-    references: [user.id],
-    relationName: "renterBookings",
-  }),
-  agent: one(user, {
-    fields: [booking.agentId],
-    references: [user.id],
-    relationName: "agentBookings",
-  }),
-  inspectionPayment: one(inspectionPayment, {
-    fields: [booking.inspectionPaymentId],
-    references: [inspectionPayment.id],
-  }),
-  visitVerifications: many(visitVerification),
-}));
-
-export const bookingRequestRelations = relations(bookingRequest, ({ one }) => ({
-  client: one(user, {
-    fields: [bookingRequest.clientId],
-    references: [user.id],
-  }),
-  listing: one(listing, {
-    fields: [bookingRequest.listingId],
-    references: [listing.id],
-  }),
-  agent: one(user, {
-    fields: [bookingRequest.agentId],
-    references: [user.id],
-  }),
-}));
-
-export const visitVerificationRelations = relations(visitVerification, ({ one }) => ({
-  booking: one(booking, {
-    fields: [visitVerification.bookingId],
-    references: [booking.id],
-  }),
-}));
-
-export const watchlistRelations = relations(watchlist, ({ one }) => ({
-  renter: one(user, { fields: [watchlist.renterId], references: [user.id] }),
-  listing: one(listing, { fields: [watchlist.listingId], references: [listing.id] }),
+export const marketplaceReportRelations = relations(marketplaceReport, ({ one }) => ({
+  listing:     one(marketplaceListing,    { fields: [marketplaceReport.listingId],     references: [marketplaceListing.id]    }),
+  transaction: one(marketplaceTransaction, { fields: [marketplaceReport.transactionId], references: [marketplaceTransaction.id] }),
+  reporter:    one(user,                  { fields: [marketplaceReport.reporterId],     references: [user.id]                  }),
 }));

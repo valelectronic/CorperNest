@@ -51,10 +51,9 @@ export async function GET(
   const photoUrl  = (row.images ?? [])[0] ?? null;
   const condLabel = row.condition === "new" ? "✨ New" : row.condition === "fairly-used" ? "♻️ Fairly Used" : "🔀 Mixed";
 
-  return new ImageResponse(
+  const imageResponse = new ImageResponse(
     (
       <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "row", backgroundColor: "#ffffff", fontFamily: "sans-serif" }}>
-
         {/* Left — photo */}
         <div style={{ width: 630, height: 630, position: "relative", flexShrink: 0, backgroundColor: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {photoUrl ? (
@@ -134,4 +133,8 @@ export async function GET(
     ),
     { width: 1200, height: 630 }
   );
+
+  // Prevent platforms from caching stale images
+  imageResponse.headers.set("Cache-Control", "no-store, max-age=0");
+  return imageResponse;
 }

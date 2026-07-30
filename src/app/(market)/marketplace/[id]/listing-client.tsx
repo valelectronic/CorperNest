@@ -340,8 +340,8 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
       `📍 ${listing.lga}, ${listing.state}${receipt}\n` +
       `🔒 Buy safely via Escrow on CorperNest\n\n` +
       `👉 ${url}\n\n` +
-      `📲 Join our community: https://chat.whatsapp.com/GqaBzJjdPdlDMwjvaGQQeJ\n` +
-      `🐦 Follow us: https://x.com/_Corpernest`;
+      `📲 Community: chat.whatsapp.com/GqaBzJjdPdlDMwjvaGQQeJ\n` +
+      `Follow us on X: @_Corpernest`;
 
     if (navigator.share) {
       navigator.share({ title: listing.title, text, url }).catch(() => {});

@@ -25,24 +25,46 @@ const dmMono = DM_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default:  "CorperNest — Verified Housing in Eket",
+    default:  "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
     template: "%s | CorperNest",
   },
   description:
-    "Find verified, scam-free rentals in Eket, Akwa Ibom. Pay ₦5,000 to tour with a verified agent and move in with confidence.",
+    "CorperNest helps Nigerians relocating to new cities find verified scam-free housing and buy or sell items safely via escrow. Verified agents, secure payments, no fraud. Currently serving Eket, Akwa Ibom — expanding across Nigeria.",
   metadataBase: new URL("https://www.corpernest.com.ng"),
   keywords: [
+    // Housing — broad
+    "verified housing Nigeria",
+    "no scam property Nigeria",
+    "safe house rent Nigeria",
+    "verified agent Nigeria",
+    "house rent Nigeria relocating",
+    "furnished apartment Nigeria",
+    "agent verified rental Nigeria",
+    // Housing — specific
     "houses for rent in Eket",
     "NYSC accommodation Eket Akwa Ibom",
     "verified properties Eket",
     "corper accommodation Eket",
     "rent apartment Eket Akwa Ibom",
-    "no scam housing Nigeria",
-    "verified housing marketplace Nigeria",
-    "NYSC corper housing",
     "self contained Eket",
     "mini flat Eket",
+    "NYSC corper housing",
+    // Marketplace — broad
+    "safe marketplace Nigeria",
+    "buy and sell Nigeria escrow",
+    "verified seller Nigeria",
+    "escrow payment marketplace Nigeria",
+    "no scam buy sell Nigeria",
+    "second hand items Nigeria",
+    // Marketplace — specific
+    "buy and sell Eket",
+    "corper marketplace Nigeria",
+    "NYSC buy sell items",
+    "sell items Eket Akwa Ibom",
+    // Brand
     "CorperNest",
+    "CorperNest marketplace",
+    "CorperNest housing",
   ],
   alternates: {
     canonical: "https://www.corpernest.com.ng",
@@ -51,22 +73,22 @@ export const metadata: Metadata = {
     type:        "website",
     url:         "https://www.corpernest.com.ng",
     siteName:    "CorperNest",
-    title:       "CorperNest — Verified Housing in Eket",
-    description: "Verified rentals in Eket, Akwa Ibom. Pay ₦5,000 to tour with a verified agent. No scams.",
+    title:       "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
+    description: "Find verified scam-free housing and buy or sell items safely via escrow. Verified agents, secure payments. Currently in Eket, Akwa Ibom — expanding across Nigeria.",
     locale:      "en_NG",
     images: [
       {
         url:    "/og-image.png",
         width:  1200,
         height: 630,
-        alt:    "CorperNest — Verified Housing in Eket, Akwa Ibom",
+        alt:    "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
       },
     ],
   },
   twitter: {
     card:        "summary_large_image",
-    title:       "CorperNest — Verified Housing in Eket",
-    description: "Verified rentals in Eket, Akwa Ibom. Pay ₦5,000 to tour with a verified agent. No scams.",
+    title:       "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
+    description: "Find verified housing and buy or sell items safely via escrow. No scams. Currently in Eket, Akwa Ibom.",
     images:      ["/og-image.png"],
   },
   robots: {

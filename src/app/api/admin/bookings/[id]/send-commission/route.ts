@@ -1,8 +1,9 @@
 // src/app/api/admin/bookings/[id]/send-commission/route.ts
 //
 // Admin manually triggers commission request after a visit is confirmed.
-// Sets commissionStatus to "requested" on the booking and sends the agent
-// an in-app notification with a payment card on their dashboard.
+// Works for BOTH pending and verified bookings — admin can override
+// when agent confirms visit but client never tapped the button.
+// Only blocked if commission is already paid.
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -37,10 +38,12 @@ export async function POST(
     .where(eq(booking.id, bookingId))
     .limit(1);
 
-  if (!found) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
-  if (found.status !== "verified") {
-    return NextResponse.json({ error: "Visit not confirmed yet" }, { status: 409 });
+  if (!found) {
+    return NextResponse.json({ error: "Booking not found" }, { status: 404 });
   }
+
+  // Only block if commission is already paid
+  // Status check removed — admin can send commission for pending bookings too
   if (found.commissionStatus === "paid") {
     return NextResponse.json({ error: "Commission already paid" }, { status: 409 });
   }

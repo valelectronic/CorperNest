@@ -1,14 +1,16 @@
 // src/app/admin/listings/page.tsx
 import { db } from "@/lib/db";
 import { listing, user } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, notInArray } from "drizzle-orm";
 import AdminListingsClient from "./listings-client";
 
 export const revalidate = 30;
 
-async function getPendingListings() {
-  const rows = await db
-    .select({
+export default async function AdminListingsPage() {
+  const [pending, recentlyDeclined, active] = await Promise.all([
+
+    // Pending — awaiting review
+    db.select({
       id:               listing.id,
       title:            listing.title,
       description:      listing.description,
@@ -22,8 +24,8 @@ async function getPendingListings() {
       status:           listing.status,
       images:           listing.images,
       amenities:        listing.amenities,
-      customAmenities:  listing.customAmenities,   // ← added
-      agencyFeePercent: listing.agencyFeePercent,  // ← added
+      customAmenities:  listing.customAmenities,
+      agencyFeePercent: listing.agencyFeePercent,
       createdAt:        listing.createdAt,
       agentId:          listing.agentId,
       agentName:        user.name,
@@ -33,14 +35,10 @@ async function getPendingListings() {
     .from(listing)
     .innerJoin(user, eq(listing.agentId, user.id))
     .where(eq(listing.status, "under-review"))
-    .orderBy(desc(listing.createdAt));
+    .orderBy(desc(listing.createdAt)),
 
-  return rows;
-}
-
-async function getRecentlyReviewed() {
-  const rows = await db
-    .select({
+    // Recently flagged/declined
+    db.select({
       id:        listing.id,
       title:     listing.title,
       status:    listing.status,
@@ -51,42 +49,33 @@ async function getRecentlyReviewed() {
     .innerJoin(user, eq(listing.agentId, user.id))
     .where(eq(listing.status, "flagged"))
     .orderBy(desc(listing.updatedAt))
-    .limit(10);
+    .limit(10),
 
-  return rows;
-}
-
-export default async function AdminListingsPage() {
-  const [pending, recentlyDeclined] = await Promise.all([
-    getPendingListings(),
-    getRecentlyReviewed(),
+    // Active listings — admin can delete or flag any of these
+    db.select({
+      id:        listing.id,
+      title:     listing.title,
+      price:     listing.price,
+      status:    listing.status,
+      type:      listing.type,
+      lga:       listing.lga,
+      images:    listing.images,
+      createdAt: listing.createdAt,
+      agentName: user.name,
+      agentId:   listing.agentId,
+    })
+    .from(listing)
+    .innerJoin(user, eq(listing.agentId, user.id))
+    .where(notInArray(listing.status, ["under-review", "flagged"]))
+    .orderBy(desc(listing.createdAt))
+    .limit(100),
   ]);
 
-  // Check duplicates for each pending listing
-  const { ilike, and, eq: deq, notInArray } = await import("drizzle-orm");
-  const pendingWithDuplicates = await Promise.all(
-    pending.map(async (l) => {
-      if (!l.landmark || !l.type || !l.lga) return { ...l, possibleDuplicate: false };
-      try {
-        const dupes = await db
-          .select({ id: listing.id })
-          .from(listing)
-          .where(
-            and(
-              deq(listing.lga, l.lga),
-              deq(listing.type, l.type),
-              deq(listing.isActive, true),
-              notInArray(listing.status, ["under-review", "flagged"]),
-              ilike(listing.landmark, `%${l.landmark.slice(0, 20)}%`),
-            )
-          )
-          .limit(1);
-        return { ...l, possibleDuplicate: dupes.length > 0 };
-      } catch {
-        return { ...l, possibleDuplicate: false };
-      }
-    })
+  return (
+    <AdminListingsClient
+      pending={pending}
+      recentlyDeclined={recentlyDeclined}
+      active={active}
+    />
   );
-
-  return <AdminListingsClient pending={pendingWithDuplicates} recentlyDeclined={recentlyDeclined} />;
 }

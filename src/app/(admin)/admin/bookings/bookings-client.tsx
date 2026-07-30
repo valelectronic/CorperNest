@@ -369,6 +369,26 @@ export default function AdminBookingsClient({ bookings }: { bookings: AdminBooki
                         : "Manage listing status"}
                     </p>
                     <ListingStatusControl listingId={b.listingId} currentStatus={b.listingStatus} />
+                    {/* Admin override — send commission without waiting for client */}
+<div style={{ padding: "12px", borderRadius: 12, backgroundColor: "#FFFBEB", border: "1.5px solid #FCD34D", marginTop: 10 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+        stroke="#D97706" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+    <p style={{ fontSize: 12, fontWeight: 700, color: "#92400E", margin: 0 }}>
+      Agent confirmed visit — client didn't tap the button?
+    </p>
+  </div>
+  <p style={{ fontSize: 11, color: "#92400E", margin: "0 0 10px", lineHeight: 1.5, opacity: 0.85 }}>
+    If the agent called to confirm the visit happened, you can send the commission request directly without waiting for the client.
+  </p>
+  <CommissionAction
+    bookingId={b.id}
+    initialStatus={b.commissionStatus}
+    listingStatus={b.listingStatus}
+  />
+</div>
                   </div>
                 )}
               </div>

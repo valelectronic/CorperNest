@@ -1,8 +1,11 @@
 // src/app/api/payments/webhook/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { inspectionPayment, booking, listing, rentRecord, user } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  inspectionPayment, booking, listing, rentRecord, user,
+  marketplaceTransaction, marketplaceListing, marketplaceAvailabilityRequest,
+} from "@/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createHmac } from "crypto";
 import { createNotification } from "@/lib/create-notification";
@@ -41,8 +44,24 @@ export async function POST(req: NextRequest) {
       reference: string;
       amount:    number;
       status:    string;
-      metadata?: { type?: string; rentRecordId?: string; bookingId?: string; agentId?: string; agentName?: string };
-      customer:  { email: string };
+      metadata?: {
+        type?:        string;
+        rentRecordId?: string;
+        bookingId?:   string;
+        agentId?:     string;
+        agentName?:   string;
+        // Marketplace fields
+        transactionId?:         string;
+        availabilityRequestId?: string;
+        listingId?:             string;
+        sellerId?:              string;
+        buyerName?:             string;
+        listingTitle?:          string;
+        agreedPrice?:           number;
+        commission?:            number;
+        sellerPayout?:          number;
+      };
+      customer: { email: string };
     };
   };
 
@@ -63,9 +82,10 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Route by metadata type ─────────────────────────────────────────────
-  // commission   → agent paying ₦1,000 platform commission
-  // rent_record  → client paying ₦1,000 for rent receipt upload
-  // everything else → inspection payment (dormant, kept for history)
+  if (metadata?.type === "marketplace") {
+    return handleMarketplacePurchase(reference, amount, metadata, event.data.customer.email);
+  }
+
   if (metadata?.type === "commission") {
     if (!metadata.bookingId || !metadata.agentId) {
       console.error("[webhook] Commission missing bookingId or agentId in metadata");
@@ -79,6 +99,137 @@ export async function POST(req: NextRequest) {
   }
 
   return handleInspectionPayment(reference, amount, event.data.customer.email);
+}
+
+// ─── MARKETPLACE PURCHASE HANDLER ─────────────────────────────────────────────
+
+async function handleMarketplacePurchase(
+  reference: string,
+  amount:    number,
+  metadata:  {
+    transactionId?:         string;
+    availabilityRequestId?: string;
+    listingId?:             string;
+    sellerId?:              string;
+    buyerName?:             string;
+    listingTitle?:          string;
+    agreedPrice?:           number;
+    commission?:            number;
+    sellerPayout?:          number;
+  },
+  _customerEmail: string
+) {
+  const {
+    transactionId, availabilityRequestId, listingId,
+    sellerId, buyerName, listingTitle, agreedPrice, commission, sellerPayout,
+  } = metadata;
+
+  if (!transactionId || !listingId || !sellerId) {
+    console.error("[webhook/marketplace] Missing metadata fields:", metadata);
+    return NextResponse.json({ received: true });
+  }
+
+  const [txn] = await db
+    .select()
+    .from(marketplaceTransaction)
+    .where(eq(marketplaceTransaction.id, transactionId))
+    .limit(1);
+
+  if (!txn) {
+    console.error("[webhook/marketplace] Transaction not found:", transactionId);
+    return NextResponse.json({ received: true });
+  }
+
+  // Idempotency guard
+  if (txn.status === "escrow" || txn.status === "released") {
+    return NextResponse.json({ received: true });
+  }
+
+  // Amount verification
+  if (txn.amount !== amount) {
+    console.error(`[webhook/marketplace] Amount mismatch: expected ${txn.amount}, got ${amount}`);
+    return NextResponse.json({ received: true });
+  }
+
+  // Update transaction to escrow
+  await db.update(marketplaceTransaction)
+    .set({ status: "escrow", paystackRef: reference, paidAt: new Date(), updatedAt: new Date() })
+    .where(eq(marketplaceTransaction.id, transactionId));
+
+  // Mark listing as reserved
+  await db.update(marketplaceListing)
+    .set({ status: "reserved", updatedAt: new Date() })
+    .where(eq(marketplaceListing.id, listingId));
+
+  // Mark availability request (best effort)
+  if (availabilityRequestId) {
+    await db.update(marketplaceAvailabilityRequest)
+      .set({ status: "confirmed" })
+      .where(eq(marketplaceAvailabilityRequest.id, availabilityRequestId))
+      .catch(() => {});
+  }
+
+  // Fetch both phone numbers for admin email
+  const [buyerUser, sellerUser] = await Promise.all([
+    db.select({ name: user.name, phone: user.phoneNumber }).from(user).where(eq(user.id, txn.buyerId)).limit(1).then((r) => r[0]),
+    db.select({ name: user.name, phone: user.phoneNumber }).from(user).where(eq(user.id, txn.sellerId)).limit(1).then((r) => r[0]),
+  ]);
+
+  const priceStr      = `₦${((agreedPrice ?? txn.amount) / 100).toLocaleString("en-NG")}`;
+  const commissionStr = `₦${((commission ?? txn.commission) / 100).toLocaleString("en-NG")}`;
+  const payoutStr     = `₦${((sellerPayout ?? txn.sellerPayout) / 100).toLocaleString("en-NG")}`;
+  const itemTitle     = listingTitle ?? "Marketplace item";
+
+  // Push: notify buyer
+  await createNotification({
+    userId:  txn.buyerId,
+    type:    "marketplace-payment-confirmed",
+    title:   "Payment confirmed ✅",
+    message: `Your payment of ${priceStr} for "${itemTitle}" is held in escrow. Go to Purchases to track your order and confirm receipt when you collect the item.`,
+    link:    "/marketplace/purchases",
+  });
+
+  // Push: notify seller
+  await createNotification({
+    userId:  txn.sellerId,
+    type:    "marketplace-item-sold",
+    title:   "Your item has been paid for! 🎉",
+    message: `${buyerUser?.name ?? buyerName ?? "A buyer"} paid ${priceStr} for "${itemTitle}". Prepare the item. You receive ${payoutStr} after they confirm receipt.`,
+    link:    "/marketplace/my-listings",
+  });
+
+  // Email: admin only — with both phone numbers
+  sendAdminEmail(
+    `🛍️ Marketplace escrow confirmed — ${itemTitle}`,
+    `
+      <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+        <h2 style="color:#15803D;margin:0 0 4px">Escrow Payment Confirmed</h2>
+        <p style="color:#6B7280;margin:0 0 20px;font-size:13px">
+          Marketplace transaction in escrow. Release payout manually after buyer confirms receipt.
+        </p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px">
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E5E7EB;color:#6B7280;width:140px">Item</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E5E7EB;font-weight:600">${itemTitle}</td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Amount</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E5E7EB;font-weight:700;color:#15803D">${priceStr}</td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Seller payout</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E5E7EB">${payoutStr} (after ${commissionStr} fee)</td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Paystack ref</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E5E7EB;font-family:monospace;font-size:12px">${reference}</td></tr>
+          <tr><td style="padding:10px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Buyer</td>
+              <td style="padding:10px 0;border-bottom:1px solid #E5E7EB">${buyerUser?.name ?? buyerName ?? "—"} — <strong>${buyerUser?.phone ? `<a href="tel:${buyerUser.phone}">${buyerUser.phone}</a>` : "no phone"}</strong></td></tr>
+          <tr><td style="padding:10px 0;color:#6B7280">Seller</td>
+              <td style="padding:10px 0">${sellerUser?.name ?? "—"} — <strong>${sellerUser?.phone ? `<a href="tel:${sellerUser.phone}">${sellerUser.phone}</a>` : "no phone"}</strong></td></tr>
+        </table>
+        <p style="font-size:12px;color:#9CA3AF">
+          Release payout via Paystack dashboard once buyer confirms receipt.
+        </p>
+      </div>
+    `
+  ).catch((err) => console.error("[webhook/marketplace] Admin email failed:", err));
+
+  console.log(`[webhook/marketplace] Escrow confirmed: txn=${transactionId}, listing=${listingId}`);
+  return NextResponse.json({ received: true });
 }
 
 // ─── COMMISSION PAYMENT HANDLER ───────────────────────────────────────────
@@ -105,13 +256,11 @@ async function handleCommissionPayment(bookingId: string, agentId: string, refer
     return NextResponse.json({ received: true });
   }
 
-  // Mark commission as paid
   await db
     .update(booking)
     .set({ commissionStatus: "paid", commissionPaidAt: new Date(), updatedAt: new Date() })
     .where(eq(booking.id, bookingId));
 
-  // Notify agent — confirmation their payment went through
   await createNotification({
     userId:  agentId,
     type:    "commission-paid",
@@ -120,7 +269,6 @@ async function handleCommissionPayment(bookingId: string, agentId: string, refer
     link:    "/agent",
   });
 
-  // Email admin so they know payment came in — awaited before return
   try {
     await sendAdminEmail(
       `💰 Commission Paid — ₦1,000 received`,

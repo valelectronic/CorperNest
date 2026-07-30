@@ -1,0 +1,1 @@
+ALTER TABLE "marketplace_listing" ADD COLUMN "delivery" text DEFAULT 'pickup' NOT NULL;

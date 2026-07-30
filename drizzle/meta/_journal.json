@@ -29,6 +29,41 @@
       "when": 1781290735886,
       "tag": "0003_public_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784821422826,
+      "tag": "0004_marvelous_random",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784927013258,
+      "tag": "0005_careful_the_call",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784933223305,
+      "tag": "0006_motionless_juggernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784966941833,
+      "tag": "0007_striped_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784988754850,
+      "tag": "0008_melted_luminals",
+      "breakpoints": true
     }
   ]
 }

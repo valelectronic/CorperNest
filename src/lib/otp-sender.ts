@@ -21,8 +21,7 @@ interface SendOTPResult {
 }
 
 export async function sendOTP({ to, phone, code, type }: SendOTPParams): Promise<SendOTPResult> {
-  console.log(`[OTP] sendOTP called — type=${type}, hasPhone=${!!phone}, OTP_PROVIDER=${process.env.OTP_PROVIDER}`);
-
+  // ── "viewing-verification" is the one exception — always SMS, no fallback logic ──
   // ── "change-email" is the one exception — always email, no fallback logic ──
   // The whole point of this type is proving ownership of a NEW email address.
   // Sending it by SMS would prove nothing about that email, so it always
@@ -42,7 +41,7 @@ export async function sendOTP({ to, phone, code, type }: SendOTPParams): Promise
       // SMS failed for any reason — wrong number, Termii downtime, low
       // balance, sender ID issue. Fall back to email automatically instead
       // of leaving the user stuck with no code at all.
-      console.error(`[OTP] SMS failed for type=${type}, falling back to email:`, err);
+      
     }
   }
 
@@ -66,7 +65,6 @@ async function sendViaEmail(to: string, code: string, type: OTPType) {
     "change-email": "Use this code to confirm your new email address.",
     "viewing-verification": "Share this code with your agent to verify your viewing session.",
   };
-console.log(`[EMAIL] Sending ${type} OTP to ${to} from noreply@contact.corpernest.com.ng`);
   await resend.emails.send({
     from: "CorperNest <noreply@contact.corpernest.com.ng>",
     to,
@@ -103,7 +101,7 @@ function toTermiiFormat(localPhone: string): string {
 
 async function sendViaSMS(to: string, code: string, type: OTPType): Promise<void> {
   const formattedNumber = toTermiiFormat(to);
-  console.log(`[SMS] Attempting Termii send — type=${type}, to=${formattedNumber}`);
+  
 
   // ── Most types share the exact Termii-approved sample wording. ───────────
   // viewing-verification is the one exception — it's genuinely valid for

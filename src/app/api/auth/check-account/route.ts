@@ -16,15 +16,13 @@ export async function POST(req: NextRequest) {
   // given or didn't match.
   if (phone) {
     const normalisedPhone = phone.trim();
-    console.log("[check-account] checking phone:", normalisedPhone);
+   
 
     const byPhone = await db
       .select({ id: user.id, email: user.email, phoneNumber: user.phoneNumber, phoneNumberVerified: user.phoneNumberVerified })
       .from(user)
       .where(eq(user.phoneNumber, normalisedPhone))
-      .limit(1);
-
-    console.log("[check-account] phone result:", byPhone.length);
+      .limit(1)
 
     if (byPhone.length > 0) {
       return NextResponse.json({
@@ -39,15 +37,12 @@ export async function POST(req: NextRequest) {
 
   if (email) {
     const normalisedEmail = email.toLowerCase().trim();
-    console.log("[check-account] checking email:", normalisedEmail);
-
+  
     const byEmail = await db
       .select({ id: user.id, email: user.email, phoneNumber: user.phoneNumber, phoneNumberVerified: user.phoneNumberVerified })
       .from(user)
       .where(eq(user.email, normalisedEmail))
       .limit(1);
-
-    console.log("[check-account] email result:", byEmail.length);
 
     if (byEmail.length > 0) {
       return NextResponse.json({

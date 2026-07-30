@@ -21,9 +21,6 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 type Props = {
-  // Folder kept as [id] for minimal disruption — but the value can be
-  // either a slug ("self-contained-uyo-akwa-ibom-8fb0") or a raw legacy ID.
-  // We look up by BOTH so old shared links never break.
   params:       Promise<{ id: string }>;
   searchParams: Promise<{ action?: string }>;
 };
@@ -38,7 +35,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       slug:           listing.slug,
       title:          listing.title,
       description:    listing.description,
-      address:        listing.address,
       lga:            listing.lga,
       state:          listing.state,
       price:          listing.price,
@@ -48,112 +44,95 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       status:         listing.status,
     })
     .from(listing)
-    .where(
-      and(
-        or(eq(listing.slug, slugOrId), eq(listing.id, slugOrId)),
-        eq(listing.isActive, true)
-      )
-    )
+    .where(and(
+      or(eq(listing.slug, slugOrId), eq(listing.id, slugOrId)),
+      eq(listing.isActive, true),
+    ))
     .limit(1);
 
   if (!found) return { title: "Property Not Found" };
 
-  const typeLabel   = TYPE_LABELS[found.type] ?? found.type;
-  const price       = `₦${found.price.toLocaleString("en-NG")}`;
-  const purpose     = found.listingPurpose === "sale" ? "for sale" : "for rent";
-  const location    = `${found.lga}, ${found.state}`;
-  const coverImage  = found.images?.[0] ?? "/og-image.png";
-
-  const title       = `${typeLabel} in ${found.lga} — ${price}${found.listingPurpose === "rent" ? "/yr" : ""}`;
+  const typeLabel  = TYPE_LABELS[found.type] ?? found.type;
+  const price      = `₦${found.price.toLocaleString("en-NG")}`;
+  const purpose    = found.listingPurpose === "sale" ? "for sale" : "for rent";
+  const location   = `${found.lga}, ${found.state}`;
+  const coverImage = found.images?.[0] ?? "/og-image.png";
+  const title      = `${typeLabel} in ${found.lga} — ${price}${found.listingPurpose === "rent" ? "/yr" : ""}`;
   const description = `Verified ${typeLabel.toLowerCase()} ${purpose} in ${location}. ${price}${found.listingPurpose === "rent" ? " per year" : ""}. ${found.description.slice(0, 120)}. Book an inspection on CorperNest — no scams.`;
-
-  // Always use the clean slug for canonical/sharing URLs, even if accessed via old ID
   const canonicalSlug = found.slug ?? found.id;
-  const url           = `${BASE_URL}/properties/${canonicalSlug}`;
+  const url = `${BASE_URL}/properties/${canonicalSlug}`;
 
   return {
     title,
     description,
     alternates: { canonical: url },
     openGraph: {
-      type:        "website",
-      url,
-      siteName:    "CorperNest",
-      title:       `${title} | CorperNest`,
-      description,
-      locale:      "en_NG",
-      images: [
-        {
-          url:    coverImage,
-          width:  1200,
-          height: 630,
-          alt:    title,
-        },
-      ],
+      type: "website", url, siteName: "CorperNest",
+      title: `${title} | CorperNest`, description, locale: "en_NG",
+      images: [{ url: coverImage, width: 1200, height: 630, alt: title }],
     },
     twitter: {
-      card:        "summary_large_image",
-      title:       `${title} | CorperNest`,
-      description,
-      images:      [coverImage],
+      card: "summary_large_image",
+      title: `${title} | CorperNest`, description, images: [coverImage],
     },
   };
 }
 
 // ─── PAGE ────────────────────────────────────────────────────────────────────
-
 export default async function PropertyDetailPage({ params, searchParams }: Props) {
   const { id: slugOrId } = await params;
   const { action }       = await searchParams;
 
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await auth.api.getSession({ headers: await headers() }).catch(() => null);
 
-  // Look up by slug OR raw id — supports both new clean links and old legacy links
   const [found] = await db
     .select()
     .from(listing)
-    .where(
-      and(
-        or(eq(listing.slug, slugOrId), eq(listing.id, slugOrId)),
-        eq(listing.isActive, true)
-      )
-    )
+    .where(and(
+      or(eq(listing.slug, slugOrId), eq(listing.id, slugOrId)),
+      eq(listing.isActive, true),
+    ))
     .limit(1);
 
   if (!found) notFound();
 
-  const [agent] = await db
-    .select({ id: user.id, name: user.name })
-    .from(user)
-    .where(eq(user.id, found.agentId))
-    .limit(1);
+  // Fetch agent + watchlist in parallel — saves one round trip vs sequential
+  const [agentResult, watchlistResult] = await Promise.all([
+    db.select({ id: user.id, name: user.name })
+      .from(user)
+      .where(eq(user.id, found.agentId))
+      .limit(1),
 
-  let isWatchlisted = false;
-  if (session) {
-    const [wl] = await db
-      .select({ id: watchlist.id })
-      .from(watchlist)
-      .where(and(eq(watchlist.renterId, session.user.id), eq(watchlist.listingId, found.id)))
-      .limit(1);
-    isWatchlisted = !!wl;
-  }
+    session?.user?.id
+      ? db.select({ id: watchlist.id })
+          .from(watchlist)
+          .where(and(
+            eq(watchlist.renterId, session.user.id),
+            eq(watchlist.listingId, found.id),
+          ))
+          .limit(1)
+      : Promise.resolve([]),
+  ]);
 
-  // ── JSON-LD Structured Data ──────────────────────────────────────────────
-  const typeLabel      = TYPE_LABELS[found.type] ?? found.type;
-  const canonicalSlug  = found.slug ?? found.id;
+  const agent       = agentResult[0];
+  const isWatchlisted = watchlistResult.length > 0;
+
+  // ── JSON-LD ──────────────────────────────────────────────────────────────
+  const typeLabel     = TYPE_LABELS[found.type] ?? found.type;
+  const canonicalSlug = found.slug ?? found.id;
   const jsonLd = {
-    "@context":         "https://schema.org",
-    "@type":            "RealEstateListing",
-    "name":             found.title,
-    "description":      found.description,
-    "url":              `${BASE_URL}/properties/${canonicalSlug}`,
-    "image":            found.images ?? [],
-    "datePosted":       new Date(found.createdAt).toISOString(),
+    "@context":        "https://schema.org",
+    "@type":           "RealEstateListing",
+    "name":            found.title,
+    "description":     found.description,
+    "url":             `${BASE_URL}/properties/${canonicalSlug}`,
+    "image":           found.images ?? [],
+    "datePosted":      new Date(found.createdAt).toISOString(),
     "offers": {
-      "@type":          "Offer",
-      "price":          found.price,
-      "priceCurrency":  "NGN",
-      "availability":   found.status === "available"
+      "@type":         "Offer",
+      "price":         found.price,
+      "priceCurrency": "NGN",
+      "availability":  found.status === "available"
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
     },

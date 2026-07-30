@@ -1,40 +1,32 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import type { Metadata } from "next";
 import LandingPageClient from "./landing-client";
 
-
-// ADD THIS export to src/app/page.tsx — paste above the default export
-
-import type { Metadata } from "next";
-
 export const metadata: Metadata = {
-  title: "CorperNest — Verified Housing in Akwa Ibom and Beyond | No Scams",
+  title: "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
   description:
-    "Find verified houses for rent and buy in Eket, uyo and the whole nigeria states. Pay ₦5,000 once, tour with a verified agent, and move in with confidence. NYSC corper accommodation made safe.",
+    "CorperNest helps Nigerians relocating to new cities find verified scam-free housing and buy or sell items safely via escrow. Verified agents, no fraud, secure payments. Starting in Eket, Akwa Ibom — expanding across Nigeria.",
   alternates: {
     canonical: "https://www.corpernest.com.ng",
   },
   openGraph: {
-    title:       "CorperNest — Verified Housing in Akwa Ibom",
-    description: "Find verified houses for rent and buy in Eket. Pay ₦5,000 to tour with a verified agent. No scams. Built for NYSC corpers and young professionals.",
+    title:       "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
+    description: "Find verified scam-free housing and buy or sell items safely via escrow. Verified agents, secure payments, no fraud. Starting in Eket, Akwa Ibom.",
     url:         "https://www.corpernest.com.ng",
     images: [{
       url:    "/og-image.png",
       width:  1200,
       height: 630,
-      alt:    "CorperNest — Verified Housing in Akwa Ibom",
+      alt:    "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
     }],
   },
 };
 
 export default async function LandingPage() {
-  // If user already has a valid session, send them straight to /home
-  // No reason for a logged-in corper to see the marketing page
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
+  // Logged-in users go straight to /home — no reason to see the marketing page
+  const session = await auth.api.getSession({ headers: await headers() });
   if (session) redirect("/home");
 
   return <LandingPageClient />;

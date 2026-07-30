@@ -1,3 +1,4 @@
+// src/app/(main)/properties/[slug]/property-detail-client.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -47,7 +48,7 @@ const statusStyle: Record<string, { bg: string; color: string; dot: string }> = 
 
 type Listing = {
   id:              string;
-  slug?:           string | null;   // ← ADDED
+  slug?:           string | null;
   title:           string;
   description:     string;
   address:         string;
@@ -80,9 +81,9 @@ function ZoomViewer({
 }: {
   images: string[]; startIndex: number; onClose: () => void;
 }) {
-  const [index, setIndex]   = useState(startIndex);
-  const [scale, setScale]   = useState(1);
-  const lastTapRef          = useRef(0);
+  const [index, setIndex] = useState(startIndex);
+  const [scale, setScale] = useState(1);
+  const lastTapRef        = useRef(0);
 
   function next(e?: React.MouseEvent) {
     e?.stopPropagation();
@@ -132,7 +133,6 @@ function ZoomViewer({
             cursor: scale === 1 ? "zoom-in" : "zoom-out",
           }}
         />
-
         {images.length > 1 && (
           <>
             <button onClick={prev}
@@ -158,11 +158,8 @@ function ZoomViewer({
         {images.length > 1 && (
           <div style={{ display: "flex", gap: 6, overflowX: "auto", justifyContent: "center" }}>
             {images.map((img, i) => (
-              <button
-                key={i}
-                onClick={(e) => { e.stopPropagation(); setScale(1); setIndex(i); }}
-                style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: i === index ? "2px solid #fff" : "2px solid rgba(255,255,255,0.25)", cursor: "pointer", padding: 0 }}
-              >
+              <button key={i} onClick={(e) => { e.stopPropagation(); setScale(1); setIndex(i); }}
+                style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: i === index ? "2px solid #fff" : "2px solid rgba(255,255,255,0.25)", cursor: "pointer", padding: 0 }}>
                 <img src={img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </button>
             ))}
@@ -173,7 +170,6 @@ function ZoomViewer({
   );
 }
 
-
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function PropertyDetailClient({
@@ -181,21 +177,16 @@ export default function PropertyDetailClient({
 }: Props) {
   const router = useRouter();
 
-  // Use slug for all URLs when available, fall back to raw id for older listings ← ADDED
   const linkPath = listing.slug ?? listing.id;
 
-  const [activeImage,       setActiveImage]       = useState(0);
-  const [watching,          setWatching]          = useState(isWatchlisted);
-  const [toggling,          setToggling]          = useState(false);
-  const [isPaused,          setIsPaused]          = useState(false);
-  const [zoomOpen,          setZoomOpen]          = useState(false);
-  const [showPhoneVerify,   setShowPhoneVerify]   = useState(false);
+  const [activeImage,     setActiveImage]     = useState(0);
+  const [watching,        setWatching]        = useState(isWatchlisted);
+  const [toggling,        setToggling]        = useState(false);
+  const [isPaused,        setIsPaused]        = useState(false);
+  const [zoomOpen,        setZoomOpen]        = useState(false);
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Check by phoneNumber field existence — in this app, phoneNumber is
-  // only written to the DB after successful OTP verification. So if it
-  // exists in session, the number is verified. No need to check the
-  // phoneNumberVerified flag which Better Auth may not include in session.
   const { data: session } = authClient.useSession();
   const sessionUser = session?.user as {
     phoneNumber?: string | null;
@@ -204,7 +195,7 @@ export default function PropertyDetailClient({
   const hasVerifiedPhone = !!(sessionUser?.phoneNumber || sessionUser?.phoneNumberVerified);
 
   const images          = listing.images ?? [];
-  const hasMultiple      = images.length > 1;
+  const hasMultiple     = images.length > 1;
   const badge           = statusStyle[listing.status] ?? statusStyle.available;
   const isAvailable     = listing.status === "available";
   const isForSale       = listing.listingPurpose === "sale";
@@ -216,14 +207,13 @@ export default function PropertyDetailClient({
     ? Math.round(listing.price * (listing.agencyFeePercent / 100))
     : null;
 
+  // Auto-slide gallery
   useEffect(() => {
     if (!hasMultiple || isPaused || zoomOpen) return;
     intervalRef.current = setInterval(() => {
       setActiveImage((prev) => (prev + 1) % images.length);
     }, 3500);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [hasMultiple, isPaused, zoomOpen, images.length]);
 
   function pauseThenResume() {
@@ -231,22 +221,18 @@ export default function PropertyDetailClient({
     setTimeout(() => setIsPaused(false), 6000);
   }
 
-  // ── Phase 4: Free booking — navigate to T&Cs page ─────────────────────────
-  // Checks phone verification first. If not verified, shows the modal
-  // inline — user stays on this page, verifies, then continues to T&Cs.
-  // No redirect bouncing.
+  // ── Booking ───────────────────────────────────────────────────────────────
   function handleBookInspection() {
-    if (!isLoggedIn) {
-      router.push(`/signin?redirect=/properties/${linkPath}`);
-      return;
-    }
-    if (!hasVerifiedPhone) {
-      setShowPhoneVerify(true);
-      return;
-    }
+    if (!isLoggedIn) { router.push(`/signin?redirect=/properties/${linkPath}`); return; }
+    if (!hasVerifiedPhone) { setShowPhoneVerify(true); return; }
     router.push(`/inspection-terms/${listing.id}`);
   }
 
+  // Auto-open booking if ?action=book was in the URL
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (autoOpenBooking) handleBookInspection(); }, []);
+
+  // ── Watchlist ─────────────────────────────────────────────────────────────
   async function handleWatchlistToggle() {
     if (!isLoggedIn) { router.push(`/signin?callbackUrl=/properties/${linkPath}`); return; }
     if (toggling) return;
@@ -260,16 +246,41 @@ export default function PropertyDetailClient({
       });
       if (!res.ok) { setWatching(!newWatching); return; }
       toast(newWatching ? "Added to watchlist" : "Removed from watchlist", { duration: 2000 });
-    } catch { setWatching(!newWatching); toast.error("Could not update watchlist. Try again."); }
-    finally { setToggling(false); }
+    } catch {
+      setWatching(!newWatching);
+      toast.error("Could not update watchlist. Try again.");
+    } finally { setToggling(false); }
   }
 
+  // ── Share ─────────────────────────────────────────────────────────────────
+  async function handleShare() {
+    const url      = `https://www.corpernest.com.ng/properties/${linkPath}`;
+    const purpose  = isForSale ? "for sale" : "for rent";
+    const location = listing.landmark
+      ? `${listing.landmark}, ${listing.lga}, ${listing.state}`
+      : `${listing.lga}, ${listing.state}`;
+    const text =
+      `🏠 ${listing.title}\n` +
+      `${typeLabel} · 📍 ${location}\n` +
+      `💰 ₦${listing.price.toLocaleString("en-NG")}${isForSale ? "" : "/yr"} — ${purpose}\n\n` +
+      `Verified listing on CorperNest — inspect before you pay rent. No scams, agent KYC-checked.\n\n` +
+      `🔗 View listing: ${url}\n\n` +
+      `📲 Join our community: https://chat.whatsapp.com/GqaBzJjdPdlDMwjvaGQQeJ\n` +
+      `🐦 Follow us: https://x.com/_Corpernest`;
+    if (navigator.share) {
+      try { await navigator.share({ title: listing.title, text, url }); } catch {}
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+    }
+  }
+
+  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100dvh", paddingBottom: 120, backgroundColor: "var(--color-bg)" }}>
 
       {/* ── HEADER ── */}
       <div style={{ position: "sticky", top: 0, zIndex: 30, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}>
-        <button onClick={() => router.push("/home")}
+        <button onClick={() => router.back()}
           style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -279,21 +290,7 @@ export default function PropertyDetailClient({
           {listing.title}
         </p>
         <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={async () => {
-              const url       = `https://www.corpernest.com.ng/properties/${linkPath}`;
-              const purpose   = isForSale ? "for sale" : "for rent";
-              const location  = listing.landmark
-                ? `${listing.landmark}, ${listing.lga}, ${listing.state}`
-                : `${listing.lga}, ${listing.state}`;
-              const text      =
-                `🏠 ${listing.title}\n` +
-                `${typeLabel} · 📍 ${location}\n` +
-                `💰 ₦${listing.price.toLocaleString()}${isForSale ? "" : "/yr"} — ${purpose}\n\n` +
-                `Verified listing on CorperNest — inspect before you pay rent. No scams, agent KYC-checked.`;
-              if (navigator.share) { try { await navigator.share({ title: listing.title, text, url }); } catch {} }
-              else { window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n\n${url}`)}`, "_blank"); }
-            }}
+          <button onClick={handleShare}
             style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <circle cx="18" cy="5"  r="3" stroke="var(--color-text)" strokeWidth="1.8" />
@@ -312,7 +309,7 @@ export default function PropertyDetailClient({
         </div>
       </div>
 
-      {/* ── IMAGE GALLERY — auto-swap + tap to zoom ── */}
+      {/* ── IMAGE GALLERY ── */}
       <div
         style={{ position: "relative", height: 280, cursor: "zoom-in" }}
         onMouseEnter={() => setIsPaused(true)}
@@ -326,29 +323,24 @@ export default function PropertyDetailClient({
               onClick={() => setZoomOpen(true)}
               style={{ width: "100%", height: "100%", objectFit: "cover", transition: "opacity 0.3s" }}
             />
-
             <div style={{ position: "absolute", top: 12, left: 12, width: 30, height: 30, borderRadius: "50%", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <circle cx="11" cy="11" r="7" stroke="white" strokeWidth="1.8" />
                 <path d="M21 21l-4.3-4.3M11 8v6M8 11h6" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             </div>
-
             <span style={{ position: "absolute", bottom: 12, right: 12, fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 8, backgroundColor: "rgba(0,0,0,0.55)", color: "#fff", backdropFilter: "blur(4px)" }}>
               {activeImage + 1} / {images.length}
             </span>
-
             {hasMultiple && (
               <>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setActiveImage((p) => (p - 1 + images.length) % images.length); pauseThenResume(); }}
+                <button onClick={(e) => { e.stopPropagation(); setActiveImage((p) => (p - 1 + images.length) % images.length); pauseThenResume(); }}
                   style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.4)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                     <path d="M15 18l-6-6 6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setActiveImage((p) => (p + 1) % images.length); pauseThenResume(); }}
+                <button onClick={(e) => { e.stopPropagation(); setActiveImage((p) => (p + 1) % images.length); pauseThenResume(); }}
                   style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.4)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                     <path d="M9 18l6-6-6-6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -356,12 +348,10 @@ export default function PropertyDetailClient({
                 </button>
               </>
             )}
-
             {images.length > 1 && (
               <div style={{ position: "absolute", bottom: 12, left: 12, display: "flex", gap: 6 }}>
                 {images.map((_, i) => (
-                  <button key={i}
-                    onClick={(e) => { e.stopPropagation(); setActiveImage(i); pauseThenResume(); }}
+                  <button key={i} onClick={(e) => { e.stopPropagation(); setActiveImage(i); pauseThenResume(); }}
                     style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden", flexShrink: 0, border: i === activeImage ? "2px solid #fff" : "2px solid rgba(255,255,255,0.3)", cursor: "pointer", padding: 0 }}>
                     <img src={images[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
                   </button>
@@ -412,16 +402,15 @@ export default function PropertyDetailClient({
                 {isForSale ? "Selling price" : "Annual rent"}
               </p>
               <p style={{ fontFamily: "var(--font-heading)", fontSize: 26, fontWeight: 900, color: "var(--color-primary)", margin: 0, lineHeight: 1 }}>
-                ₦{listing.price.toLocaleString()}
+                ₦{listing.price.toLocaleString("en-NG")}
                 <span style={{ fontSize: 13, fontWeight: 400, opacity: 0.7, marginLeft: 4 }}>
                   {isForSale ? "one-time" : "/yr"}
                 </span>
               </p>
               {agencyFeeNaira !== null && (
                 <div style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, background: "#FFF8E1", border: "1px solid #FAC775" }}>
-                  <span style={{ fontSize: 12, color: "#B45309", fontWeight: 800 }}>₦</span>
                   <p style={{ fontSize: 12, color: "#B45309", margin: 0, fontWeight: 700 }}>
-                    Agency fee: {listing.agencyFeePercent}% — ₦{agencyFeeNaira.toLocaleString()}
+                    Agency fee: {listing.agencyFeePercent}% — ₦{agencyFeeNaira.toLocaleString("en-NG")}
                   </p>
                 </div>
               )}
@@ -441,7 +430,6 @@ export default function PropertyDetailClient({
           <p style={{ fontFamily: "var(--font-heading)", fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 12px" }}>
             Location
           </p>
-
           {listing.landmark && (
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 12, background: "var(--color-light)", border: "1px solid var(--color-border)", marginBottom: 10 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -458,7 +446,6 @@ export default function PropertyDetailClient({
               </div>
             </div>
           )}
-
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="var(--color-text-muted)" strokeWidth="1.8" />
@@ -468,7 +455,6 @@ export default function PropertyDetailClient({
               {listing.lga}, {listing.state}
             </p>
           </div>
-
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
               <rect x="3" y="11" width="18" height="11" rx="2" stroke="var(--color-text-muted)" strokeWidth="1.8" />
@@ -562,8 +548,6 @@ export default function PropertyDetailClient({
       </div>
 
       {/* ── PHONE VERIFICATION MODAL ── */}
-      {/* Shown inline when client tries to book without a verified number.
-          On success, continues straight to the T&Cs page — no redirect. */}
       {showPhoneVerify && (
         <PhoneVerificationModal
           onClose={() => setShowPhoneVerify(false)}

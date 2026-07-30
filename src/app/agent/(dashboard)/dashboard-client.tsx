@@ -1,6 +1,6 @@
+// src/app/agent/dashboard-client.tsx
 "use client";
 
-import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -10,28 +10,28 @@ import PhoneVerificationModal from "@/components/phone-verification-modal";
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 type Listing = {
-  id: string;
-  title: string;
-  description: string;
-  address: string;
-  lga: string;
-  state: string;
-  price: number;
-  type: string;
-  status: string;
-  lastStatusUpdate: Date;
+  id:                  string;
+  title:               string;
+  description:         string;
+  address:             string;
+  lga:                 string;
+  state:               string;
+  price:               number;
+  type:                string;
+  status:              string;
+  lastStatusUpdate:    Date;
   landlordOtpVerified: boolean | null;
-  images: string[] | null;
+  images:              string[] | null;
 };
 
 type IncomingBooking = {
-  id:          string;
-  bookingCode: string;
-  status:      string;
-  agreedDate:  Date | null;
-  agreedTime:  string | null;
-  listingId:   string;
-  renterId:    string;
+  id:                        string;
+  bookingCode:               string;
+  status:                    string;
+  agreedDate:                Date | null;
+  agreedTime:                string | null;
+  listingId:                 string;
+  renterId:                  string;
   renterName:                string;
   renterPhone:               string | null;
   renterPhoneLegacy:         string | null;
@@ -67,19 +67,19 @@ type Props = {
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS = [
-  { value: "available",        label: "Available" },
-  { value: "occupied",         label: "Occupied" },
+  { value: "available",        label: "Available"        },
+  { value: "occupied",         label: "Occupied"         },
   { value: "temp-unavailable", label: "Temp unavailable" },
 ];
 
 const statusStyle: Record<string, { bg: string; color: string; dot: string; label: string }> = {
-  available:           { bg: "#EAF3DE", color: "#27500A", dot: "#43A047",  label: "Available"        },
-  occupied:            { bg: "#FCEBEB", color: "#791F1F", dot: "#E53935",  label: "Occupied"         },
-  "temp-unavailable":  { bg: "#F3F4F6", color: "#4B5563", dot: "#9CA3AF",  label: "Temp Unavailable" },
-  reserved:            { bg: "#EEF2FF", color: "#3730A3", dot: "#6366F1",  label: "Reserved"         },
-  "under-review":      { bg: "#FFF8E1", color: "#92400E", dot: "#F59E0B",  label: "Under Review"     },
-  "needs-correction":  { bg: "#FEF2F2", color: "#C62828", dot: "#E53935",  label: "Needs Correction" },
-  flagged:             { bg: "#FEF2F2", color: "#C62828", dot: "#E53935",  label: "Not Approved"     },
+  available:          { bg: "#EAF3DE", color: "#27500A", dot: "#43A047",  label: "Available"        },
+  occupied:           { bg: "#FCEBEB", color: "#791F1F", dot: "#E53935",  label: "Occupied"         },
+  "temp-unavailable": { bg: "#F3F4F6", color: "#4B5563", dot: "#9CA3AF",  label: "Temp Unavailable" },
+  reserved:           { bg: "#EEF2FF", color: "#3730A3", dot: "#6366F1",  label: "Reserved"         },
+  "under-review":     { bg: "#FFF8E1", color: "#92400E", dot: "#F59E0B",  label: "Under Review"     },
+  "needs-correction": { bg: "#FEF2F2", color: "#C62828", dot: "#E53935",  label: "Needs Correction" },
+  flagged:            { bg: "#FEF2F2", color: "#C62828", dot: "#E53935",  label: "Not Approved"     },
 };
 
 const REQUEST_TYPE_LABELS: Record<string, string> = {
@@ -89,6 +89,13 @@ const REQUEST_TYPE_LABELS: Record<string, string> = {
   "2-bed":     "2 Bedroom",
   "3-bed":     "3 Bedroom",
   "room":      "Single Room",
+};
+
+// Commission bank account — agents transfer here directly
+const COMMISSION_BANK = {
+  name:    "DIBIAH AMETORTOBARI TOBIN",
+  account: "1468155402",
+  bank:    "Access Bank",
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -103,58 +110,35 @@ function daysUntilExpiry(date: Date) {
   return Math.max(0, Math.ceil((expiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
 }
 
-function formatDate(date: Date) {
-  return new Date(date).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
-}
-
-// ─── VERIFY STATE ─────────────────────────────────────────────────────────────
-
 type VerifyStep = "idle" | "sending" | "code-shown" | "confirming" | "done";
-type VerifyState = {
-  step:         VerifyStep;
-  code?:        string;
-  maskedEmail?: string;
-  error?:       string;
-};
+type VerifyState = { step: VerifyStep; code?: string; maskedEmail?: string; error?: string };
 
-// ─── BOOKING STATUS PILL ──────────────────────────────────────────────────────
+// ─── SMALL COMPONENTS ─────────────────────────────────────────────────────────
 
 function BookingStatusPill({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string }> = {
-    verified:  { label: "Visited ✓",     bg: "#E8F5E9", color: "#2E7D32" },
+    verified:  { label: "Visited ✓",      bg: "#E8F5E9", color: "#2E7D32" },
     scheduled: { label: "Awaiting Visit", bg: "#EEF2FF", color: "#4338CA" },
     pending:   { label: "Awaiting Visit", bg: "#EEF2FF", color: "#4338CA" },
-    completed: { label: "Completed",     bg: "#F3F4F6", color: "#374151" },
-    cancelled: { label: "Cancelled",     bg: "#FEF2F2", color: "#C62828" },
+    completed: { label: "Completed",      bg: "#F3F4F6", color: "#374151" },
+    cancelled: { label: "Cancelled",      bg: "#FEF2F2", color: "#C62828" },
   };
   const s = map[status] ?? map.pending;
   return (
-    <span style={{
-      fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
-      background: s.bg, color: s.color, whiteSpace: "nowrap",
-    }}>
+    <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: s.bg, color: s.color, whiteSpace: "nowrap" }}>
       {s.label}
     </span>
   );
 }
 
-// ─── SECTION HEADER ───────────────────────────────────────────────────────────
-
 function SectionHeader({ label, count }: { label: string; count?: number }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-      <p style={{
-        margin: 0, fontSize: 11, fontWeight: 700,
-        color: "var(--color-text-muted)", textTransform: "uppercase",
-        letterSpacing: "0.06em", fontFamily: "var(--font-heading)",
-      }}>
+      <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-heading)" }}>
         {label}
       </p>
       {count !== undefined && (
-        <span style={{
-          fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
-          background: "var(--color-light)", color: "var(--color-primary)",
-        }}>
+        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "var(--color-light)", color: "var(--color-primary)" }}>
           {count}
         </span>
       )}
@@ -162,18 +146,67 @@ function SectionHeader({ label, count }: { label: string; count?: number }) {
   );
 }
 
-// ─── EMPTY STATE ──────────────────────────────────────────────────────────────
-
 function EmptyState({ message, sub }: { message: string; sub: string }) {
   return (
-    <div style={{
-      background: "var(--color-card)", border: "1px solid var(--color-border)",
-      borderRadius: 18, padding: "36px 24px", textAlign: "center",
-    }}>
-      <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>
-        {message}
-      </p>
+    <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 18, padding: "36px 24px", textAlign: "center" }}>
+      <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "var(--color-text)", fontFamily: "var(--font-heading)" }}>{message}</p>
       <p style={{ margin: 0, fontSize: 12, color: "var(--color-text-muted)", lineHeight: 1.5 }}>{sub}</p>
+    </div>
+  );
+}
+
+// ─── COMMISSION BANK CARD ─────────────────────────────────────────────────────
+// Replaces the old Paystack button. Agent sees bank details and transfers
+// directly. Admin marks as paid manually in the admin panel.
+
+function CommissionBankCard({ bookingCode }: { bookingCode: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyAccount() {
+    navigator.clipboard.writeText(COMMISSION_BANK.account).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div style={{ background: "#FFF8E1", border: "1.5px solid #FAC775", borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
+      <p style={{ margin: "0 0 10px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "#92400E" }}>
+        💰 Platform commission due
+      </p>
+      <p style={{ margin: "0 0 12px", fontSize: 12, color: "#B45309", lineHeight: 1.6 }}>
+        A client confirmed their visit. Transfer your platform commission directly to our account. Use your booking code as the transfer reference.
+      </p>
+
+      {/* Bank details */}
+      <div style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", border: "1px solid #FAC775", marginBottom: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#B45309", textTransform: "uppercase", letterSpacing: "0.04em" }}>Bank</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#633806" }}>{COMMISSION_BANK.bank}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#B45309", textTransform: "uppercase", letterSpacing: "0.04em" }}>Account name</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#633806" }}>{COMMISSION_BANK.name}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#B45309", textTransform: "uppercase", letterSpacing: "0.04em" }}>Account number</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 16, fontWeight: 900, color: "#633806", letterSpacing: 2 }}>
+              {COMMISSION_BANK.account}
+            </span>
+            <button onClick={copyAccount} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #FAC775", background: copied ? "#E8F5E9" : "#FEF3C7", color: copied ? "#2E7D32" : "#92400E", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+              {copied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Reference */}
+      <div style={{ background: "#FEF3C7", borderRadius: 10, padding: "8px 12px", border: "1px solid #FAC775" }}>
+        <p style={{ margin: 0, fontSize: 12, color: "#92400E", lineHeight: 1.5 }}>
+          <strong>Reference:</strong> Use booking code <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{bookingCode}</span> as your transfer narration so we can match your payment.
+        </p>
+      </div>
     </div>
   );
 }
@@ -194,11 +227,7 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
         body: JSON.stringify({ bookingId: booking.id }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setVs({ step: "idle", error: data.error ?? "Failed to send code." });
-        toast.error(data.error ?? "Failed to send code.");
-        return;
-      }
+      if (!res.ok) { setVs({ step: "idle", error: data.error ?? "Failed to send code." }); toast.error(data.error ?? "Failed to send code."); return; }
       setVs({ step: "code-shown", code: data.code, maskedEmail: data.maskedRenterEmail });
     } catch {
       setVs({ step: "idle", error: "Network error." });
@@ -214,11 +243,7 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
         body: JSON.stringify({ bookingId: booking.id, code: vs.code }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setVs((prev) => ({ ...prev, step: "code-shown", error: data.error ?? "Confirmation failed." }));
-        toast.error(data.error ?? "Confirmation failed.");
-        return;
-      }
+      if (!res.ok) { setVs((prev) => ({ ...prev, step: "code-shown", error: data.error ?? "Confirmation failed." })); toast.error(data.error ?? "Confirmation failed."); return; }
       setVs({ step: "done" });
       toast.success("Visit verified!");
       onVerified();
@@ -229,64 +254,48 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
   }
 
   return (
-    <div style={{
-      background: "var(--color-card)", border: "1px solid var(--color-border)",
-      borderRadius: 18, overflow: "hidden",
-    }}>
+    <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 18, overflow: "hidden" }}>
       <div style={{ height: 3, background: isVerified ? "#43A047" : isScheduled ? "#6366F1" : "#F59E0B" }} />
       <div style={{ padding: 16 }}>
 
+        {/* Header row */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 12, background: "var(--color-light)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16,
-            color: "var(--color-primary)", flexShrink: 0,
-          }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16, color: "var(--color-primary)", flexShrink: 0 }}>
             {initial}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)" }}>
-              {booking.renterName}
-            </p>
-            <p style={{ margin: "2px 0 0", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>
-              {booking.bookingCode}
-            </p>
+            <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)" }}>{booking.renterName}</p>
+            <p style={{ margin: "2px 0 0", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--color-text-muted)" }}>{booking.bookingCode}</p>
           </div>
           <BookingStatusPill status={booking.status} />
         </div>
 
-        {/* Visit confirmed banner */}
-        {booking.status === "verified" && (
+        {/* Visit confirmed */}
+        {isVerified && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "#E8F5E9", border: "1px solid #A5D6A7", marginBottom: 10 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M20 6L9 17l-5-5" stroke="#2E7D32" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#2E7D32" }}>Client confirmed their visit ✓</p>
-              <p style={{ margin: "2px 0 0", fontSize: 11, color: "#388E3C" }}>CorperNest will send your commission details shortly</p>
-            </div>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "#2E7D32" }}>Client confirmed their visit ✓</p>
           </div>
         )}
 
-        {/* Commission payment card — shown when admin sends request */}
+        {/* Commission — bank details when requested, paid confirmation when done */}
         {booking.commissionStatus === "requested" && (
-          <CommissionCard bookingId={booking.id} />
+          <CommissionBankCard bookingCode={booking.bookingCode} />
         )}
         {booking.commissionStatus === "paid" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12, background: "#F0FDF4", border: "1px solid #86EFAC", marginBottom: 10 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path d="M20 6L9 17l-5-5" stroke="#15803D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "#15803D" }}>Commission paid ✓ — Thank you!</p>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "#15803D" }}>Commission confirmed — Thank you!</p>
           </div>
         )}
 
-        {/* Client contact — phone and email, no date setting needed */}
+        {/* Client contact */}
         <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 14 }}>
-          <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Client Contact
-          </p>
+          <p style={{ margin: "0 0 6px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Client Contact</p>
           {booking.renterPhone ? (
             <a href={`tel:${booking.renterPhone}`} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 700, color: "var(--color-primary)", textDecoration: "none", marginBottom: 4 }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
@@ -295,22 +304,16 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
               {booking.renterPhone}
             </a>
           ) : (
-            <p style={{ margin: "0 0 4px", fontSize: 12, color: "#B45309", fontWeight: 600 }}>
-              ⚠ Client phone not verified yet
-            </p>
+            <p style={{ margin: "0 0 4px", fontSize: 12, color: "#B45309", fontWeight: 600 }}>⚠ Client phone not verified yet</p>
           )}
           <a href={`mailto:${booking.renterEmail}`} style={{ fontSize: 12, color: "var(--color-text-muted)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
             {booking.renterEmail}
           </a>
         </div>
 
+        {/* Verify visit flow */}
         {isScheduled && vs.step === "idle" && (
-          <button onClick={handleSendCode} style={{
-            width: "100%", padding: "13px", borderRadius: 14,
-            background: "var(--color-primary)", color: "#fff", border: "none",
-            fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-          }}>
+          <button onClick={handleSendCode} style={{ width: "100%", padding: "13px", borderRadius: 14, background: "var(--color-primary)", color: "#fff", border: "none", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
               <path d="M12 2L4 6v6c0 4.418 3.582 8 8 8s8-3.582 8-8V6L12 2Z" stroke="white" strokeWidth="1.8" fill="none" strokeLinejoin="round" />
               <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -328,176 +331,29 @@ function IncomingBookingCard({ booking, onVerified }: { booking: IncomingBooking
 
         {isScheduled && vs.step === "code-shown" && (
           <div style={{ background: "var(--color-bg)", borderRadius: 14, padding: 16, border: "1px solid var(--color-border)" }}>
-            <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Verification Code
-            </p>
+            <p style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Verification Code</p>
             <div style={{ background: "var(--color-light)", borderRadius: 12, padding: "16px 12px", textAlign: "center", marginBottom: 12, border: "1px solid var(--color-border)" }}>
-              <p style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 28, fontWeight: 900, letterSpacing: 6, color: "var(--color-primary)" }}>
-                {vs.code}
-              </p>
-              <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--color-text-muted)" }}>
-                Sent to {vs.maskedEmail}
-              </p>
+              <p style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 28, fontWeight: 900, letterSpacing: 6, color: "var(--color-primary)" }}>{vs.code}</p>
+              <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--color-text-muted)" }}>Sent to {vs.maskedEmail}</p>
             </div>
             <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--color-text-secondary)", textAlign: "center", lineHeight: 1.5 }}>
               Ask the client to read the code aloud. Confirm if it matches.
             </p>
-            {vs.error && (
-              <p style={{ margin: "0 0 8px", fontSize: 12, color: "#E53935", textAlign: "center" }}>{vs.error}</p>
-            )}
+            {vs.error && <p style={{ margin: "0 0 8px", fontSize: 12, color: "#E53935", textAlign: "center" }}>{vs.error}</p>}
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-              <button onClick={() => setVs({ step: "idle" })} style={{
-                flex: 1, padding: "12px", borderRadius: 12, fontSize: 13, fontWeight: 600,
-                background: "var(--color-card)", border: "1px solid var(--color-border)",
-                color: "var(--color-text-muted)", cursor: "pointer",
-              }}>
+              <button onClick={() => setVs({ step: "idle" })} style={{ flex: 1, padding: "12px", borderRadius: 12, fontSize: 13, fontWeight: 600, background: "var(--color-card)", border: "1px solid var(--color-border)", color: "var(--color-text-muted)", cursor: "pointer" }}>
                 Cancel
               </button>
-              <button onClick={handleConfirm} style={{
-                flex: 1, padding: "12px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                background: "var(--color-primary)", border: "none", color: "#fff",
-                cursor: "pointer", fontFamily: "var(--font-heading)",
-              }}>
+              <button onClick={handleConfirm} style={{ flex: 1, padding: "12px", borderRadius: 12, fontSize: 13, fontWeight: 700, background: "var(--color-primary)", border: "none", color: "#fff", cursor: "pointer", fontFamily: "var(--font-heading)" }}>
                 Confirm Visit ✓
               </button>
             </div>
-            <button onClick={handleSendCode} style={{
-              width: "100%", fontSize: 12, color: "var(--color-text-muted)",
-              background: "none", border: "none", cursor: "pointer", textDecoration: "underline",
-            }}>
+            <button onClick={handleSendCode} style={{ width: "100%", fontSize: 12, color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
               Resend code
             </button>
           </div>
         )}
-
-        {isScheduled && vs.step === "confirming" && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "13px 0" }}>
-            <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Confirming visit…</span>
-          </div>
-        )}
-
-        {(isVerified || vs.step === "done") && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 14px", borderRadius: 12, background: "#E8F5E9", border: "1px solid var(--color-border)" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M20 6L9 17l-5-5" stroke="#2E7D32" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#2E7D32" }}>Visit verified</span>
-          </div>
-        )}
       </div>
-    </div>
-  );
-}
-
-// ─── PROPERTY REQUEST ROW — chat-list style, collapses/expands ──────────────
-
-function PropertyRequestRow(props: {
-  request:      PropertyRequestItem;
-  isOpen:       boolean;
-  onToggle:     () => void;
-  onMatchClick: () => void;
-}) {
-  const { request, isOpen, onToggle, onMatchClick } = props;
-  const initial = request.renterName?.charAt(0).toUpperCase() ?? "?";
-  const isFull  = request.matchCount >= 3;
-  const urgent  = request.daysLeft <= 1;
-
-  return (
-    <div style={{
-      background: "var(--color-card)", border: "1px solid var(--color-border)",
-      borderRadius: 18, overflow: "hidden",
-    }}>
-      <div style={{ height: 3, background: isFull ? "#9CA3AF" : urgent ? "#E53935" : "#6366F1" }} />
-
-      <button
-        onClick={onToggle}
-        style={{
-          width: "100%", display: "flex", alignItems: "flex-start", gap: 12,
-          padding: "14px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left",
-        }}
-      >
-        <div style={{
-          width: 40, height: 40, borderRadius: 12, background: "var(--color-light)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16,
-          color: "var(--color-primary)", flexShrink: 0, marginTop: 2,
-        }}>
-          {initial}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)" }}>
-            {request.renterName}
-          </p>
-          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.lga}
-          </p>
-          {/* Budget + landmark surfaced here, no click needed — this is the
-              info an agent actually needs to judge fit at a glance */}
-          {((request.minBudget != null && request.minBudget > 0) || (request.maxBudget != null && request.maxBudget > 0)) || request.landmark ? (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-              {(request.minBudget != null && request.minBudget > 0) || (request.maxBudget != null && request.maxBudget > 0) ? (
-                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "var(--color-light)", color: "var(--color-primary)" }}>
-                  {request.minBudget != null && request.minBudget > 0 && request.maxBudget != null && request.maxBudget > 0
-                    ? `₦${(request.minBudget / 1000).toFixed(0)}k – ₦${(request.maxBudget / 1000).toFixed(0)}k/yr`
-                    : request.maxBudget != null && request.maxBudget > 0
-                    ? `Up to ₦${(request.maxBudget / 1000).toFixed(0)}k/yr`
-                    : `From ₦${(request.minBudget! / 1000).toFixed(0)}k/yr`
-                  }
-                </span>
-              ) : null}
-              {request.landmark && (
-                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
-                  📍 {request.landmark}
-                </span>
-              )}
-            </div>
-          ) : null}
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, marginTop: 2 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: urgent ? "#E53935" : "var(--color-text-muted)" }}>
-            {request.daysLeft === 0 ? "Today" : `${request.daysLeft}d`}
-          </span>
-          <span style={{
-            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-            background: isFull ? "#F3F4F6" : "var(--color-light)",
-            color: isFull ? "var(--color-text-muted)" : "var(--color-primary)",
-          }}>
-            {request.matchCount}/3
-          </span>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 4, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-          <path d="M6 9l6 6 6-6" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div style={{ padding: "0 16px 16px" }}>
-          <div style={{ height: 1, background: "var(--color-border)", marginBottom: 14 }} />
-
-          {request.notes && (
-            <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 14 }}>
-              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Notes
-              </p>
-              <p style={{ margin: 0, fontSize: 12, color: "var(--color-text)", lineHeight: 1.5 }}>{request.notes}</p>
-            </div>
-          )}
-
-          <button
-            onClick={onMatchClick}
-            disabled={isFull}
-            style={{
-              width: "100%", padding: "13px", borderRadius: 14, fontSize: 14, fontWeight: 700,
-              background: isFull ? "var(--color-border)" : "var(--color-primary)",
-              color: "#fff", border: "none", cursor: isFull ? "not-allowed" : "pointer",
-              fontFamily: "var(--font-heading)",
-            }}
-          >
-            {isFull ? "Match limit reached" : "I have this — Find Match"}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -518,11 +374,7 @@ function ListingCard(props: {
   const isDeleting = deletingId === listing.id;
 
   return (
-    <div style={{
-      background: "var(--color-card)", border: "1px solid var(--color-border)",
-      borderRadius: 18, overflow: "hidden",
-      opacity: isDeleting ? 0.5 : 1, transition: "opacity 0.2s",
-    }}>
+    <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 18, overflow: "hidden", opacity: isDeleting ? 0.5 : 1, transition: "opacity 0.2s" }}>
       <div style={{ position: "relative", height: 172 }}>
         {coverImage ? (
           <img src={coverImage} alt={listing.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -536,101 +388,51 @@ function ListingCard(props: {
           </div>
         )}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 100%)" }} />
-
-        <span style={{
-          position: "absolute", top: 12, left: 12,
-          fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20,
-          background: badge.bg, color: badge.color,
-          display: "flex", alignItems: "center", gap: 5,
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: badge.dot, display: "inline-block" }} />
+        <span style={{ position: "absolute", top: 12, left: 12, fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20, background: badge.bg, color: badge.color, display: "flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: badge.dot }} />
           {currentStatus.replace(/-/g, " ")}
         </span>
-
-        <button
-          onClick={() => onMenuOpen(listing.id)}
-          disabled={isDeleting}
-          style={{
-            position: "absolute", top: 12, right: 12,
-            width: 32, height: 32, borderRadius: "50%",
-            background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)",
-            border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          {isDeleting ? (
-            <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <circle cx="5" cy="12" r="1.5" fill="white" />
-              <circle cx="12" cy="12" r="1.5" fill="white" />
-              <circle cx="19" cy="12" r="1.5" fill="white" />
-            </svg>
-          )}
+        <button onClick={() => onMenuOpen(listing.id)} disabled={isDeleting} style={{ position: "absolute", top: 12, right: 12, width: 32, height: 32, borderRadius: "50%", background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {isDeleting
+            ? <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+            : <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="5" cy="12" r="1.5" fill="white" />
+                <circle cx="12" cy="12" r="1.5" fill="white" />
+                <circle cx="19" cy="12" r="1.5" fill="white" />
+              </svg>
+          }
         </button>
-
-        <p style={{
-          position: "absolute", bottom: 12, left: 12, margin: 0,
-          fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 16, color: "#fff",
-          textShadow: "0 1px 4px rgba(0,0,0,0.4)",
-        }}>
-          ₦{listing.price.toLocaleString()}<span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>/yr</span>
+        <p style={{ position: "absolute", bottom: 12, left: 12, margin: 0, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 16, color: "#fff", textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>
+          ₦{listing.price.toLocaleString("en-NG")}<span style={{ fontSize: 11, fontWeight: 400, opacity: 0.8 }}>/yr</span>
         </p>
       </div>
-
       <div style={{ padding: "14px 16px" }}>
-        <p style={{ margin: "0 0 2px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)" }}>
-          {listing.title}
-        </p>
-        <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--color-text-muted)" }}>
-          {listing.lga}, {listing.state}
-        </p>
-        {/* Review status messages — agent always knows where their listing stands */}
+        <p style={{ margin: "0 0 2px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)" }}>{listing.title}</p>
+        <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--color-text-muted)" }}>{listing.lga}, {listing.state}</p>
+
         {currentStatus === "under-review" && (
           <div style={{ margin: "0 0 10px", padding: "10px 12px", borderRadius: 10, background: "#FFF8E1", border: "1px solid #FAC775" }}>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#92400E" }}>
-              ⏳ Under Review
-            </p>
-            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#B45309", lineHeight: 1.5 }}>
-              Our team is reviewing your listing. You'll be notified once it's approved — usually within 24 hours.
-            </p>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#92400E" }}>⏳ Under Review</p>
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#B45309", lineHeight: 1.5 }}>Our team is reviewing your listing. You'll be notified once approved — usually within 24 hours.</p>
           </div>
         )}
         {currentStatus === "needs-correction" && (
           <div style={{ margin: "0 0 10px", padding: "10px 12px", borderRadius: 10, background: "#FEF2F2", border: "1px solid #FECACA" }}>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#C62828" }}>
-              📞 Our team will call you
-            </p>
-            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#E57373", lineHeight: 1.5 }}>
-              We found some corrections needed on this listing. Please wait for our call before resubmitting.
-            </p>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#C62828" }}>📞 Our team will call you</p>
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#E57373", lineHeight: 1.5 }}>We found corrections needed. Please wait for our call before resubmitting.</p>
           </div>
         )}
         {currentStatus === "flagged" && (
           <div style={{ margin: "0 0 10px", padding: "10px 12px", borderRadius: 10, background: "#FEF2F2", border: "1px solid #FECACA" }}>
-            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#C62828" }}>
-              ✕ Not Approved
-            </p>
-            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#E57373", lineHeight: 1.5 }}>
-              This listing was not approved. Check your notifications for the reason, then submit a new listing with the corrections.
-            </p>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: "#C62828" }}>✕ Not Approved</p>
+            <p style={{ margin: "3px 0 0", fontSize: 11, color: "#E57373", lineHeight: 1.5 }}>This listing was not approved. Check your notifications for the reason, then submit a corrected listing.</p>
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <label style={{ fontSize: 12, color: "var(--color-text-muted)", flexShrink: 0 }}>Status:</label>
+
         {["available", "occupied", "temp-unavailable", "reserved"].includes(currentStatus) && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <label style={{ fontSize: 12, color: "var(--color-text-muted)", flexShrink: 0 }}>Status:</label>
-            <select
-              value={currentStatus}
-              onChange={(e) => onStatusChange(listing.id, e.target.value)}
-              style={{
-                flex: 1, padding: "8px 12px", borderRadius: 10, fontSize: 12,
-                border: "1.5px solid var(--color-border)", background: "var(--color-bg)",
-                color: "var(--color-text)", maxWidth: 180,
-                opacity: updatingId === listing.id ? 0.5 : 1,
-              }}
-            >
+            <select value={currentStatus} onChange={(e) => onStatusChange(listing.id, e.target.value)} style={{ flex: 1, padding: "8px 12px", borderRadius: 10, fontSize: 12, border: "1.5px solid var(--color-border)", background: "var(--color-bg)", color: "var(--color-text)", maxWidth: 180, opacity: updatingId === listing.id ? 0.5 : 1 }}>
               {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
             {updatingId === listing.id && (
@@ -638,90 +440,82 @@ function ListingCard(props: {
             )}
           </div>
         )}
-        </div>
       </div>
     </div>
   );
 }
 
-// ─── COMMISSION CARD ──────────────────────────────────────────────────────────
-// Shown when admin sends a commission request to an agent.
-// The agent pays ₦1,000 via Paystack button. Clean, no mention of
-// tracking — just "a commission is due, here's how to pay."
+// ─── PROPERTY REQUEST ROW ─────────────────────────────────────────────────────
 
-function CommissionCard({ bookingId }: { bookingId: string }) {
-  const [loading, setLoading] = useState(false);
-
-  async function handlePay() {
-    setLoading(true);
-    try {
-      const res  = await fetch("/api/payments/commission/initiate", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ bookingId }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error ?? "Could not start payment. Try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Guard against missing URL — if undefined, spinner would run forever
-      if (!data.authorizationUrl) {
-        toast.error("Payment link not received. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      // Small safety timeout — if redirect doesn't fire in 5s, reset loading
-      // so the agent can try again rather than seeing a stuck spinner
-      const redirectTimeout = setTimeout(() => setLoading(false), 5000);
-
-      window.location.href = data.authorizationUrl;
-
-      // Clear timeout if redirect fired successfully
-      clearTimeout(redirectTimeout);
-
-    } catch {
-      toast.error("Network error. Try again.");
-      setLoading(false);
-    }
-  }
+function PropertyRequestRow(props: {
+  request:      PropertyRequestItem;
+  isOpen:       boolean;
+  onToggle:     () => void;
+  onMatchClick: () => void;
+}) {
+  const { request, isOpen, onToggle, onMatchClick } = props;
+  const initial = request.renterName?.charAt(0).toUpperCase() ?? "?";
+  const isFull  = request.matchCount >= 3;
+  const urgent  = request.daysLeft <= 1;
 
   return (
-    <div style={{ background: "#FFF8E1", border: "1.5px solid #FAC775", borderRadius: 14, padding: "14px 16px", marginBottom: 10 }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: "#FEF3C7", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="#92400E" strokeWidth="1.8" />
-            <path d="M12 8v4M12 16h.01" stroke="#92400E" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
+    <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 18, overflow: "hidden" }}>
+      <div style={{ height: 3, background: isFull ? "#9CA3AF" : urgent ? "#E53935" : "#6366F1" }} />
+      <button onClick={onToggle} style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: "var(--color-light)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 16, color: "var(--color-primary)", flexShrink: 0, marginTop: 2 }}>
+          {initial}
         </div>
-        <div>
-          <p style={{ margin: "0 0 4px", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "#92400E" }}>
-            Commission payment due
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)" }}>{request.renterName}</p>
+          <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {REQUEST_TYPE_LABELS[request.type] ?? request.type} · {request.lga}
           </p>
-          <p style={{ margin: 0, fontSize: 12, color: "#B45309", lineHeight: 1.6 }}>
-            A client confirmed their visit through CorperNest. Your platform commission of <strong>₦1,000</strong> is now due. Pay securely via Paystack below.
-          </p>
+          {((request.minBudget ?? 0) > 0 || (request.maxBudget ?? 0) > 0 || request.landmark) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              {((request.minBudget ?? 0) > 0 || (request.maxBudget ?? 0) > 0) && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "var(--color-light)", color: "var(--color-primary)" }}>
+                  {request.minBudget && request.maxBudget
+                    ? `₦${(request.minBudget / 1000).toFixed(0)}k – ₦${(request.maxBudget / 1000).toFixed(0)}k/yr`
+                    : request.maxBudget ? `Up to ₦${(request.maxBudget / 1000).toFixed(0)}k/yr`
+                    : `From ₦${((request.minBudget ?? 0) / 1000).toFixed(0)}k/yr`
+                  }
+                </span>
+              )}
+              {request.landmark && (
+                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: "var(--color-bg)", border: "1px solid var(--color-border)", color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>
+                  📍 {request.landmark}
+                </span>
+              )}
+            </div>
+          )}
         </div>
-      </div>
-      <button onClick={handlePay} disabled={loading}
-        style={{ width: "100%", padding: "13px", borderRadius: 12, background: loading ? "var(--color-border)" : "#92400E", border: "none", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-        {loading ? (
-          <span style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
-        ) : (
-          <>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-              <rect x="1" y="4" width="22" height="16" rx="2" stroke="white" strokeWidth="1.8" />
-              <path d="M1 10h22" stroke="white" strokeWidth="1.8" />
-            </svg>
-            Pay ₦1,000 Commission
-          </>
-        )}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, marginTop: 2 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: urgent ? "#E53935" : "var(--color-text-muted)" }}>
+            {request.daysLeft === 0 ? "Today" : `${request.daysLeft}d`}
+          </span>
+          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10, background: isFull ? "#F3F4F6" : "var(--color-light)", color: isFull ? "var(--color-text-muted)" : "var(--color-primary)" }}>
+            {request.matchCount}/3
+          </span>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 4, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+          <path d="M6 9l6 6 6-6" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </button>
+
+      {isOpen && (
+        <div style={{ padding: "0 16px 16px" }}>
+          <div style={{ height: 1, background: "var(--color-border)", marginBottom: 14 }} />
+          {request.notes && (
+            <div style={{ background: "var(--color-bg)", borderRadius: 12, padding: "10px 12px", border: "1px solid var(--color-border)", marginBottom: 14 }}>
+              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Notes</p>
+              <p style={{ margin: 0, fontSize: 12, color: "var(--color-text)", lineHeight: 1.5 }}>{request.notes}</p>
+            </div>
+          )}
+          <button onClick={onMatchClick} disabled={isFull} style={{ width: "100%", padding: "13px", borderRadius: 14, fontSize: 14, fontWeight: 700, background: isFull ? "var(--color-border)" : "var(--color-primary)", color: "#fff", border: "none", cursor: isFull ? "not-allowed" : "pointer", fontFamily: "var(--font-heading)" }}>
+            {isFull ? "Match limit reached" : "I have this — Find Match"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -731,54 +525,40 @@ function CommissionCard({ bookingId }: { bookingId: string }) {
 export default function AgentDashboardClient(mainProps: Props) {
   const { agentName, listings, incomingBookings, expiringListings, staleListings, completedCount, hasVerifiedPhone } = mainProps;
   const router = useRouter();
-  const [showPhoneVerify, setShowPhoneVerify] = useState(false);
 
-  const [statusMap, setStatusMap]           = useState<Record<string, string>>(
-    Object.fromEntries(listings.map((l) => [l.id, l.status]))
-  );
-  const [deletedIds, setDeletedIds]         = useState<Set<string>>(new Set());
-  const [updatingId, setUpdatingId]         = useState<string | null>(null);
-  const [sheetListingId, setSheetListingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId]         = useState<string | null>(null);
-  const [bookings, setBookings]             = useState(incomingBookings);
-  const [activeTab, setActiveTab]           = useState<"bookings" | "listings" | "requests">("bookings");
-
+  const [showPhoneVerify,  setShowPhoneVerify]  = useState(false);
+  const [activeTab,        setActiveTab]        = useState<"bookings" | "listings" | "requests">("bookings");
+  const [statusMap,        setStatusMap]        = useState<Record<string, string>>({});
+  const [updatingId,       setUpdatingId]       = useState<string | null>(null);
+  const [deletingId,       setDeletingId]       = useState<string | null>(null);
+  const [deletedIds,       setDeletedIds]       = useState<Set<string>>(new Set());
+  const [sheetListingId,   setSheetListingId]   = useState<string | null>(null);
+  const [bookings,         setBookings]         = useState(incomingBookings);
   const [propertyRequests, setPropertyRequests] = useState<PropertyRequestItem[]>([]);
-  const [requestsLoading, setRequestsLoading]   = useState(true);
-  const [openRequestId, setOpenRequestId]       = useState<string | null>(null);
-  const [matchSheetId, setMatchSheetId]         = useState<string | null>(null);
+  const [requestsLoading,  setRequestsLoading]  = useState(false);
+  const [openRequestId,    setOpenRequestId]    = useState<string | null>(null);
+  const [matchSheetId,     setMatchSheetId]     = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchRequests();
-    // Fire-and-forget housekeeping — never awaited, never blocks the UI,
-    // and only ever runs because someone happened to open this page, not
-    // on any schedule.
-    // Stale listing cleanup is handled server-side on a schedule,
-    // not on every dashboard mount — removed to save Neon compute hours.
-  }, []);
-
-  async function fetchRequests() {
-    setRequestsLoading(true);
-    try {
-      const res  = await fetch("/api/property-requests/list");
-      const data = await res.json();
-      if (res.ok) setPropertyRequests(data.requests ?? []);
-    } catch {
-      toast.error("Could not load requests.");
-    } finally {
-      setRequestsLoading(false);
-    }
-  }
-
-  const initial         = agentName ? agentName.charAt(0).toUpperCase() : "A";
+  // Computed
+  const initial         = agentName?.charAt(0).toUpperCase() ?? "A";
   const visibleListings = listings.filter((l) => !deletedIds.has(l.id));
-  const sheetListing    = sheetListingId ? listings.find((l) => l.id === sheetListingId) : null;
-  const activeBookings  = bookings.filter((b) => b.status !== "verified" && b.status !== "completed" && b.status !== "cancelled");
-  const doneBookings    = bookings.filter((b) => b.status === "verified" || b.status === "completed");
-  const visibleStale    = staleListings.filter((l) => !deletedIds.has(l.id));
   const visibleExpiring = expiringListings.filter((l) => !deletedIds.has(l.id));
-  const alertCount      = activeBookings.length + visibleExpiring.length + visibleStale.length;
-  const activeMatchSheetRequest = propertyRequests.find((r) => r.id === matchSheetId);
+  const visibleStale    = staleListings.filter((l) => !deletedIds.has(l.id));
+  const activeBookings  = bookings.filter((b) => b.status === "pending" || b.status === "scheduled");
+  const doneBookings    = bookings.filter((b) => b.status === "verified");
+  const alertCount      = activeBookings.length + visibleStale.length + visibleExpiring.length;
+  const sheetListing    = visibleListings.find((l) => l.id === sheetListingId);
+
+  // Load property requests when requests tab is active
+  useEffect(() => {
+    if (activeTab !== "requests" || propertyRequests.length > 0) return;
+    setRequestsLoading(true);
+    fetch("/api/property-requests/list")
+      .then((r) => r.json())
+      .then((d) => setPropertyRequests(d.requests ?? []))
+      .catch(() => {})
+      .finally(() => setRequestsLoading(false));
+  }, [activeTab]);
 
   async function handleDelete(listingId: string, mode: "temporary" | "permanent") {
     setSheetListingId(null);
@@ -789,7 +569,7 @@ export default function AgentDashboardClient(mainProps: Props) {
         body: JSON.stringify({ listingId, mode }),
       });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.error ?? "Failed. Try again."); setDeletingId(null); return; }
+      if (!res.ok) { toast.error(data.error ?? "Failed. Try again."); return; }
       if (mode === "permanent") {
         setDeletedIds((prev) => new Set([...prev, listingId]));
         toast.success("Listing deleted.");
@@ -797,11 +577,8 @@ export default function AgentDashboardClient(mainProps: Props) {
         setStatusMap((prev) => ({ ...prev, [listingId]: "temp-unavailable" }));
         toast.success("Listing hidden.");
       }
-    } catch {
-      toast.error("Network error. Try again.");
-    } finally {
-      setDeletingId(null);
-    }
+    } catch { toast.error("Network error. Try again."); }
+    finally  { setDeletingId(null); }
   }
 
   async function handleStatusUpdate(listingId: string, newStatus: string) {
@@ -812,9 +589,7 @@ export default function AgentDashboardClient(mainProps: Props) {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ listingId, status: newStatus }),
       });
-    } finally {
-      setUpdatingId(null);
-    }
+    } finally { setUpdatingId(null); }
   }
 
   function handleVerified(bookingId: string) {
@@ -824,128 +599,63 @@ export default function AgentDashboardClient(mainProps: Props) {
   return (
     <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }}>
 
+      {/* ── HEADER ── */}
       <header style={{ background: "#1B2E1B", padding: "14px 16px 0", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 640, margin: "0 auto" }}>
 
-          {/* ── Phone not verified warning — shown inside header so it's unmissable ── */}
           {!hasVerifiedPhone && (
-            <div style={{
-              background: "#E53935", borderRadius: 10, padding: "10px 14px",
-              marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
-            }}>
+            <div style={{ background: "#E53935", borderRadius: 10, padding: "10px 14px", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div style={{ minWidth: 0 }}>
-                <p style={{ margin: "0 0 2px", fontSize: 12, fontWeight: 700, color: "#fff" }}>
-                  ⚠ Clients cannot see your phone number
-                </p>
-                <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>
-                  Verify your number so clients can reach you after booking
-                </p>
+                <p style={{ margin: "0 0 2px", fontSize: 12, fontWeight: 700, color: "#fff" }}>⚠ Clients cannot see your phone number</p>
+                <p style={{ margin: 0, fontSize: 11, color: "rgba(255,255,255,0.8)", lineHeight: 1.4 }}>Verify your number so clients can reach you after booking</p>
               </div>
-              <button onClick={() => setShowPhoneVerify(true)}
-                style={{ padding: "8px 14px", borderRadius: 8, background: "#fff", color: "#C62828", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", flexShrink: 0 }}>
+              <button onClick={() => setShowPhoneVerify(true)} style={{ padding: "8px 14px", borderRadius: 8, background: "#fff", color: "#C62828", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer", flexShrink: 0 }}>
                 Verify Now
               </button>
             </div>
           )}
 
-          {/* ── Row 1: Identity + Home button ── */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <div style={{
-                width: 38, height: 38, borderRadius: 11, flexShrink: 0,
-                background: "var(--color-primary)", border: "2px solid #43A047",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "#E8F5E9",
-              }}>
+              <div style={{ width: 38, height: 38, borderRadius: 11, flexShrink: 0, background: "var(--color-primary)", border: "2px solid #43A047", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "#E8F5E9" }}>
                 {initial}
               </div>
               <div style={{ minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 10, color: "#7A9A7A", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  Agent Dashboard
-                </p>
-                <p style={{ margin: "1px 0 0", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "#E8F5E9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {agentName}
-                </p>
+                <p style={{ margin: 0, fontSize: 10, color: "#7A9A7A", letterSpacing: "0.06em", textTransform: "uppercase" }}>Agent Dashboard</p>
+                <p style={{ margin: "1px 0 0", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "#E8F5E9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{agentName}</p>
               </div>
             </div>
-
-            {/* Home — icon only on mobile to save space */}
-            <button
-              onClick={() => router.push("/home")}
-              style={{
-                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                cursor: "pointer",
-              }}
-              aria-label="Go to Home"
-            >
+            <button onClick={() => router.push("/home")} style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer" }} aria-label="Go to Home">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z"
-                  stroke="#A5D6A7" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M3 9.5L12 3l9 6.5V21a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5Z" stroke="#A5D6A7" strokeWidth="1.8" strokeLinejoin="round" />
               </svg>
             </button>
           </div>
 
-          {/* ── Row 2: Stats strip — full width, evenly spaced ── */}
-          <div style={{
-            display: "flex", justifyContent: "space-around",
-            background: "rgba(255,255,255,0.05)", borderRadius: 12,
-            padding: "10px 0", marginBottom: 12,
-          }}>
+          {/* Stats strip */}
+          <div style={{ display: "flex", justifyContent: "space-around", background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: "10px 0", marginBottom: 12 }}>
             {[
-              { num: activeBookings.filter(b => b.status === "pending" || b.status === "scheduled").length,  label: "Active",   color: "#FAC775" },
+              { num: activeBookings.length, label: "Active",   color: "#FAC775" },
               { num: visibleListings.length, label: "Listings", color: "#A5D6A7" },
               { num: completedCount,         label: "Done",     color: "#7A9A7A" },
             ].map((s, i, arr) => (
-              <div key={s.label} style={{
-                textAlign: "center", flex: 1,
-                borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
-              }}>
-                <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 22, color: s.color, lineHeight: 1 }}>
-                  {s.num}
-                </p>
-                <p style={{ margin: "3px 0 0", fontSize: 9, color: "#7A9A7A", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {s.label}
-                </p>
+              <div key={s.label} style={{ textAlign: "center", flex: 1, borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none" }}>
+                <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 22, color: s.color, lineHeight: 1 }}>{s.num}</p>
+                <p style={{ margin: "3px 0 0", fontSize: 9, color: "#7A9A7A", textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</p>
               </div>
             ))}
           </div>
 
+          {/* Tabs */}
           <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
             {(["bookings", "listings", "requests"] as const).map((tab) => {
               const isActive = activeTab === tab;
-              const badge    = tab === "bookings" ? activeBookings.length
-                             : tab === "listings" ? visibleListings.length
-                             : propertyRequests.length;
+              const badge    = tab === "bookings" ? activeBookings.length : tab === "listings" ? visibleListings.length : propertyRequests.length;
               return (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    flex: 1, padding: "10px 0 12px",
-                    background: "none", border: "none", cursor: "pointer",
-                    borderBottom: isActive ? "2px solid #43A047" : "2px solid transparent",
-                    marginBottom: -1,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  }}
-                >
-                  <span style={{
-                    fontFamily: "var(--font-heading)", fontWeight: isActive ? 700 : 500,
-                    fontSize: 13, color: isActive ? "#E8F5E9" : "#7A9A7A",
-                    textTransform: "capitalize",
-                  }}>
-                    {tab}
-                  </span>
+                <button key={tab} onClick={() => setActiveTab(tab)} style={{ flex: 1, padding: "10px 0 12px", background: "none", border: "none", cursor: "pointer", borderBottom: isActive ? "2px solid #43A047" : "2px solid transparent", marginBottom: -1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                  <span style={{ fontFamily: "var(--font-heading)", fontWeight: isActive ? 700 : 500, fontSize: 13, color: isActive ? "#E8F5E9" : "#7A9A7A", textTransform: "capitalize" }}>{tab}</span>
                   {badge > 0 && (
-                    <span style={{
-                      fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 20,
-                      background: isActive ? "#43A047" : "rgba(255,255,255,0.1)",
-                      color: isActive ? "#fff" : "#7A9A7A",
-                    }}>
-                      {badge}
-                    </span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 20, background: isActive ? "#43A047" : "rgba(255,255,255,0.1)", color: isActive ? "#fff" : "#7A9A7A" }}>{badge}</span>
                   )}
                 </button>
               );
@@ -954,14 +664,11 @@ export default function AgentDashboardClient(mainProps: Props) {
         </div>
       </header>
 
+      {/* ── CONTENT ── */}
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "20px 16px 100px" }}>
 
         {alertCount > 0 && (
-          <div style={{
-            background: "#FAEEDA", border: "1px solid #FAC775",
-            borderRadius: 14, padding: "12px 14px", marginBottom: 20,
-            display: "flex", alignItems: "flex-start", gap: 10,
-          }}>
+          <div style={{ background: "#FAEEDA", border: "1px solid #FAC775", borderRadius: 14, padding: "12px 14px", marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 10 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
               <circle cx="12" cy="12" r="10" stroke="#854F0B" strokeWidth="1.8" />
               <path d="M12 8v4M12 16h.01" stroke="#854F0B" strokeWidth="1.8" strokeLinecap="round" />
@@ -981,27 +688,43 @@ export default function AgentDashboardClient(mainProps: Props) {
           </div>
         )}
 
+        {/* ── BOOKINGS TAB ── */}
         {activeTab === "bookings" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
 
+            {/* Permanent bank details — always visible so agents always know where to pay */}
+            <div style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 16, padding: "14px 16px" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, color: "var(--color-header)", margin: "0 0 4px" }}>
+                💳 Platform Commission Account
+              </p>
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
+                After every confirmed client visit, transfer your commission here. Use your booking code as the transfer reference.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  { label: "Bank",           value: COMMISSION_BANK.bank    },
+                  { label: "Account name",   value: COMMISSION_BANK.name    },
+                  { label: "Account number", value: COMMISSION_BANK.account },
+                ].map((row) => (
+                  <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", borderRadius: 10, backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{row.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-header)", fontFamily: row.label === "Account number" ? "var(--font-mono)" : "var(--font-body)" }}>{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
             {visibleStale.length > 0 && (
               <div>
                 <SectionHeader label="Availability reminder" />
                 <div style={{ background: "#EAF3DE", border: "1px solid #C0DD97", borderRadius: 14, padding: 14 }}>
                   <p style={{ margin: "0 0 12px", fontSize: 13, color: "#3B6D11", lineHeight: 1.5 }}>
-                    {visibleStale.length} listing{visibleStale.length > 1 ? "s haven't" : " hasn't"} been updated in 5+ days. Keep availability current so clients don't book unavailable properties.
+                    {visibleStale.length} listing{visibleStale.length > 1 ? "s haven't" : " hasn't"} been updated in 5+ days. Keep availability current.
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {visibleStale.map((l) => (
                       <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", borderRadius: 10, padding: "10px 12px", border: "1px solid #C0DD97" }}>
-                        <span style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#27500A", fontWeight: 500 }}>
-                          {l.title}
-                        </span>
-                        <select
-                          value={statusMap[l.id] ?? l.status}
-                          onChange={(e) => handleStatusUpdate(l.id, e.target.value)}
-                          style={{ fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #97C459", background: "#fff", color: "#27500A", flexShrink: 0 }}
-                        >
+                        <span style={{ fontSize: 13, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#27500A", fontWeight: 500 }}>{l.title}</span>
+                        <select value={statusMap[l.id] ?? l.status} onChange={(e) => handleStatusUpdate(l.id, e.target.value)} style={{ fontSize: 12, padding: "6px 10px", borderRadius: 8, border: "1px solid #97C459", background: "#fff", color: "#27500A", flexShrink: 0 }}>
                           {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                         </select>
                       </div>
@@ -1013,36 +736,28 @@ export default function AgentDashboardClient(mainProps: Props) {
 
             <div>
               <SectionHeader label="Active Bookings" count={activeBookings.length} />
-              {activeBookings.length === 0 ? (
-                <EmptyState
-                  message="No active bookings"
-                  sub="Bookings from clients will appear here once they pay the inspection fee."
-                />
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {activeBookings.map((b) => (
-                    <IncomingBookingCard key={b.id} booking={b} onVerified={() => handleVerified(b.id)} />
-                  ))}
-                </div>
-              )}
+              {activeBookings.length === 0
+                ? <EmptyState message="No active bookings" sub="Bookings from clients will appear here once confirmed." />
+                : <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {activeBookings.map((b) => <IncomingBookingCard key={b.id} booking={b} onVerified={() => handleVerified(b.id)} />)}
+                  </div>
+              }
             </div>
 
             {doneBookings.length > 0 && (
               <div>
                 <SectionHeader label="Verified Visits" count={doneBookings.length} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {doneBookings.map((b) => (
-                    <IncomingBookingCard key={b.id} booking={b} onVerified={() => handleVerified(b.id)} />
-                  ))}
+                  {doneBookings.map((b) => <IncomingBookingCard key={b.id} booking={b} onVerified={() => handleVerified(b.id)} />)}
                 </div>
               </div>
             )}
           </div>
         )}
 
+        {/* ── LISTINGS TAB ── */}
         {activeTab === "listings" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-
             {visibleExpiring.length > 0 && (
               <div>
                 <SectionHeader label="Expiring Soon" count={visibleExpiring.length} />
@@ -1056,12 +771,8 @@ export default function AgentDashboardClient(mainProps: Props) {
                           <path d="M12 7v5l3 3" stroke="#854F0B" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#633806", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {l.title}
-                          </p>
-                          <p style={{ margin: "2px 0 0", fontSize: 11, color: "#854F0B" }}>
-                            Last updated {daysAgo(l.lastStatusUpdate)}d ago
-                          </p>
+                          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#633806", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.title}</p>
+                          <p style={{ margin: "2px 0 0", fontSize: 11, color: "#854F0B" }}>Last updated {daysAgo(l.lastStatusUpdate)}d ago</p>
                         </div>
                         <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 20, background: "#fff", color: "#854F0B", flexShrink: 0 }}>
                           {days === 0 ? "Today" : `${days}d left`}
@@ -1074,86 +785,46 @@ export default function AgentDashboardClient(mainProps: Props) {
             )}
 
             <div>
-              <SectionHeader label="My Listings" count={visibleListings.length} />
-              {visibleListings.length === 0 ? (
-                <EmptyState
-                  message="No listings yet"
-                  sub="Add your first property to start receiving bookings from clients."
-                />
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  {visibleListings.map((l) => (
-                    <ListingCard
-                      key={l.id}
-                      listing={l}
-                      currentStatus={statusMap[l.id] ?? l.status}
-                      updatingId={updatingId}
-                      deletingId={deletingId}
-                      onStatusChange={handleStatusUpdate}
-                      onMenuOpen={setSheetListingId}
-                    />
-                  ))}
-                </div>
-              )}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <SectionHeader label="My Listings" count={visibleListings.length} />
+                <button onClick={() => router.push("/marketplace/new")} style={{ padding: "8px 14px", borderRadius: 10, background: "var(--color-primary)", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  + New Listing
+                </button>
+              </div>
+              {visibleListings.length === 0
+                ? <EmptyState message="No listings yet" sub="Add your first property to start receiving bookings." />
+                : <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {visibleListings.map((l) => (
+                      <ListingCard key={l.id} listing={l} currentStatus={statusMap[l.id] ?? l.status} updatingId={updatingId} deletingId={deletingId} onStatusChange={handleStatusUpdate} onMenuOpen={setSheetListingId} />
+                    ))}
+                  </div>
+              }
             </div>
-
-            <Link href="/agent/listings/new" style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              padding: "15px", borderRadius: 16, background: "var(--color-primary)",
-              color: "#fff", textDecoration: "none",
-              fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15,
-            }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5v14M5 12h14" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-              </svg>
-              Add new listing
-            </Link>
           </div>
         )}
 
+        {/* ── REQUESTS TAB ── */}
         {activeTab === "requests" && (
-          <div>
-            <SectionHeader label="Open Requests" count={propertyRequests.length} />
-
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <SectionHeader label="Property Requests" count={propertyRequests.length} />
             {requestsLoading && (
-              <p style={{ fontSize: 13, color: "var(--color-text-muted)", textAlign: "center", padding: 24 }}>Loading…</p>
+              <div style={{ display: "flex", justifyContent: "center", padding: "32px 0" }}>
+                <span style={{ width: 24, height: 24, borderRadius: "50%", border: "2px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+              </div>
             )}
-
             {!requestsLoading && propertyRequests.length === 0 && (
-              <EmptyState
-                message="No open requests"
-                sub="When renters ask for something specific, it'll show up here for you to match."
-              />
+              <EmptyState message="No open requests" sub="When renters ask for something specific, it'll show up here for you to match." />
             )}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {propertyRequests.map((r) => (
-                <PropertyRequestRow
-                  key={r.id}
-                  request={r}
-                  isOpen={openRequestId === r.id}
-                  onToggle={() => setOpenRequestId(openRequestId === r.id ? null : r.id)}
-                  onMatchClick={() => setMatchSheetId(r.id)}
-                />
-              ))}
-            </div>
+            {propertyRequests.map((r) => (
+              <PropertyRequestRow key={r.id} request={r} isOpen={openRequestId === r.id} onToggle={() => setOpenRequestId(openRequestId === r.id ? null : r.id)} onMatchClick={() => setMatchSheetId(r.id)} />
+            ))}
           </div>
         )}
       </div>
 
-      {sheetListingId && (
-        <div onClick={() => setSheetListingId(null)}
-          style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(0,0,0,0.5)" }} />
-      )}
-
-      <div style={{
-        position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
-        borderRadius: "22px 22px 0 0", background: "var(--color-card)",
-        transform: sheetListingId ? "translateY(0)" : "translateY(100%)",
-        transition: "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)",
-        maxWidth: 640, margin: "0 auto",
-        paddingBottom: "env(safe-area-inset-bottom, 16px)",
-      }}>
+      {/* ── LISTING MENU SHEET ── */}
+      {sheetListingId && <div onClick={() => setSheetListingId(null)} style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(0,0,0,0.5)" }} />}
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50, borderRadius: "22px 22px 0 0", background: "var(--color-card)", transform: sheetListingId ? "translateY(0)" : "translateY(100%)", transition: "transform 0.3s cubic-bezier(0.32,0.72,0,1)", maxWidth: 640, margin: "0 auto", paddingBottom: "env(safe-area-inset-bottom, 16px)" }}>
         <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 8px" }}>
           <div style={{ width: 40, height: 4, borderRadius: 2, background: "var(--color-border)" }} />
         </div>
@@ -1161,70 +832,49 @@ export default function AgentDashboardClient(mainProps: Props) {
           <p style={{ margin: 0, fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "var(--color-header)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {sheetListing?.title ?? "Listing"}
           </p>
-          <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--color-text-muted)" }}>Choose an action</p>
         </div>
-        <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <button
-            onClick={() => sheetListingId && handleDelete(sheetListingId, "temporary")}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)", cursor: "pointer", textAlign: "left" }}
-          >
-            <div style={{ width: 38, height: 38, borderRadius: 12, background: "#F3F4F6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M1 1l22 22"
-                  stroke="#4B5563" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--color-text)" }}>Hide temporarily</p>
-              <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--color-text-muted)" }}>Hidden from clients. Restore anytime.</p>
-            </div>
+        <div style={{ padding: "8px 16px 0", display: "flex", flexDirection: "column", gap: 4 }}>
+          <button onClick={() => { if (sheetListingId) handleDelete(sheetListingId, "temporary"); }} style={{ width: "100%", padding: "14px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, background: "var(--color-bg)", border: "none", color: "var(--color-text)", cursor: "pointer", textAlign: "left" }}>
+            🙈 Hide listing temporarily
           </button>
-
-          <button
-            onClick={() => sheetListingId && handleDelete(sheetListingId, "permanent")}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 16, background: "#FEF2F2", border: "1px solid #FECACA", cursor: "pointer", textAlign: "left" }}
-          >
-            <div style={{ width: 38, height: 38, borderRadius: 12, background: "#FEE2E2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="#E53935" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#C62828" }}>Delete permanently</p>
-              <p style={{ margin: "2px 0 0", fontSize: 12, color: "#E57373" }}>Removes listing and all photos. Cannot be undone.</p>
-            </div>
+          <button onClick={() => { if (sheetListingId) handleDelete(sheetListingId, "permanent"); }} style={{ width: "100%", padding: "14px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, background: "var(--color-bg)", border: "none", color: "#C62828", cursor: "pointer", textAlign: "left" }}>
+            🗑 Delete listing permanently
           </button>
-
-          <button
-            onClick={() => setSheetListingId(null)}
-            style={{ width: "100%", padding: "14px", borderRadius: 16, background: "var(--color-bg)", border: "1px solid var(--color-border)", fontSize: 14, fontWeight: 600, color: "var(--color-text-muted)", cursor: "pointer" }}
-          >
+          <button onClick={() => setSheetListingId(null)} style={{ width: "100%", padding: "14px 16px", borderRadius: 12, fontSize: 14, fontWeight: 600, background: "var(--color-bg)", border: "none", color: "var(--color-text-muted)", cursor: "pointer", textAlign: "left" }}>
             Cancel
           </button>
         </div>
       </div>
 
-      {activeMatchSheetRequest && (
-        <MatchSelectionSheet
-          request={activeMatchSheetRequest}
-          onClose={() => setMatchSheetId(null)}
-          onMatched={() => {
-            setMatchSheetId(null);
-            setOpenRequestId(null);
-            fetchRequests();
-          }}
-        />
-      )}
+      {matchSheetId && (() => {
+        const req = propertyRequests.find((r) => r.id === matchSheetId);
+        if (!req) return null;
+        return (
+          <MatchSelectionSheet
+            request={{
+              id:        req.id,
+              type:      req.type,
+              lga:       req.lga,
+              state:     req.state,
+              minBudget: req.minBudget,
+              maxBudget: req.maxBudget,
+              landmark:  req.landmark,
+            }}
+            onClose={() => setMatchSheetId(null)}
+            onMatched={() => {
+              setPropertyRequests((prev) =>
+                prev.map((r) => r.id === matchSheetId ? { ...r, matchCount: r.matchCount + 1 } : r)
+              );
+              setMatchSheetId(null);
+            }}
+          />
+        );
+      })()}
 
       {showPhoneVerify && (
         <PhoneVerificationModal
           onClose={() => setShowPhoneVerify(false)}
-          onVerified={() => {
-            setShowPhoneVerify(false);
-            // Reload page so the warning banner disappears and
-            // clients can now see the agent's phone number
-            window.location.reload();
-          }}
+          onVerified={() => { setShowPhoneVerify(false); window.location.reload(); }}
         />
       )}
 

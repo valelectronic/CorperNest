@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import UserAvatar from "@/components/user-avatar";
 import CustomerCare from "@/components/customer-care";
 import PWAInstallBanner from "@/components/pwa-install-banner";
+import { useFCM } from "@/hooks/use-fcm";
 const ADMIN_EMAIL = "corpernestng@gmail.com";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -191,6 +192,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   } | undefined;
 
   const isLoggedIn = !!user;
+  useFCM(isLoggedIn);
   const isAdmin    = user?.email === ADMIN_EMAIL;
   const [isVerifiedAgent, setIsVerifiedAgent] = useState(false);
 
@@ -224,7 +226,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
     const startPolling = () => {
       if (intervalRef.current) return;
-      intervalRef.current = setInterval(fetchUnreadCount, 30_000);
+      intervalRef.current = setInterval(fetchUnreadCount, 120_000);
     };
     const stopPolling = () => {
       if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }

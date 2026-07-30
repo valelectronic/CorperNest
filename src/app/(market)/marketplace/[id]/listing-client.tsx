@@ -318,18 +318,24 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
   function handleShare() {
     const url       = window.location.href;
     const priceStr  = `₦${listing.price.toLocaleString("en-NG")}`;
-    const refLine   = listing.refPriceMin && listing.refPriceMax
-      ? `\n🏷️ New price: ₦${listing.refPriceMin.toLocaleString()} – ₦${listing.refPriceMax.toLocaleString()}`
-      : "";
-    const saving    = listing.refPriceMin && listing.price < listing.refPriceMin
-      ? `\n💸 Save ${Math.round(((listing.refPriceMin - listing.price) / listing.refPriceMin) * 100)}% vs buying new!`
-      : "";
     const condLabel = listing.condition === "new" ? "✨ New" : listing.condition === "fairly-used" ? "♻️ Fairly Used" : "🔀 Mixed";
     const receipt   = listing.hasReceipt ? "\n📄 Receipt available" : "";
 
+    // Only show reference price if listed price is genuinely below new price
+    const isBelowNew = listing.refPriceMin && listing.price < listing.refPriceMin;
+    const savePct    = isBelowNew && listing.refPriceMin
+      ? Math.round(((listing.refPriceMin - listing.price) / listing.refPriceMin) * 100)
+      : 0;
+    const refLine   = isBelowNew && listing.refPriceMin && listing.refPriceMax
+      ? `\n🏷️ New price: ₦${listing.refPriceMin.toLocaleString("en-NG")} – ₦${listing.refPriceMax.toLocaleString("en-NG")}`
+      : "";
+    const saveLine  = isBelowNew && savePct > 0
+      ? `\n💸 Save ${savePct}% vs buying new!`
+      : "";
+
     const text =
       `${listing.title}\n\n` +
-      `💰 Price: ${priceStr}${refLine}${saving}\n` +
+      `💰 Price: ${priceStr}${refLine}${saveLine}\n` +
       `📦 ${condLabel} · ${listing.category}\n` +
       `📍 ${listing.lga}, ${listing.state}${receipt}\n` +
       `🔒 Buy safely via Escrow on CorperNest\n\n` +

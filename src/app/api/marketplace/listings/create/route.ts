@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
         <p><strong>Seller:</strong> ${session.user.name} (${session.user.email})</p>
         <p><strong>Title:</strong> ${title}</p>
         <p><strong>Category:</strong> ${category} · <strong>Condition:</strong> ${condition}</p>
-        <p><strong>Price:</strong> ₦${price.toLocaleString()}</p>
+        <p><strong>Price:</strong> ₦${price.toLocaleString("en-NG")}</p>
         <p><strong>Location:</strong> ${lga}, ${state} — ${landmark}</p>
         ${bundleDetail}
         <p><strong>Description:</strong> ${description}</p>
@@ -146,13 +146,18 @@ export async function POST(req: NextRequest) {
         <p><strong>Bank:</strong> ${accountName} — ${accountNumber}</p>
         <p><strong>Photos:</strong> ${images.length} uploaded</p>
         <p><strong>Active listings after this:</strong> ${activeCount + 1} / ${MAX_ACTIVE_LISTINGS}</p>
-        <p>Review and approve in the admin dashboard.</p>
+        <div style="margin: 24px 0;">
+          <a href="https://www.corpernest.com.ng/admin/marketplace/listings"
+            style="display:inline-block;padding:12px 24px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">
+            Review &amp; Approve in Admin →
+          </a>
+        </div>
+        <p style="color:#888;font-size:13px;">Listing ID: ${newListing.id}</p>
       `
     );
 
     return NextResponse.json({ id: newListing.id, status: "pending" });
-  } catch (err) {
-    console.error("[marketplace/create]", err);
+  } catch {
     return NextResponse.json({ error: "Could not create listing. Try again." }, { status: 500 });
   }
 }

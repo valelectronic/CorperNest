@@ -18,28 +18,35 @@ const messaging = firebase.messaging();
 
 // Handle background messages — show notification when app is not in focus
 messaging.onBackgroundMessage((payload) => {
-  const { title, body, link } = payload.notification ?? payload.data ?? {};
+  // title and body come from payload.notification
+  // link ALWAYS comes from payload.data — never from payload.notification
+  const title = payload.notification?.title ?? payload.data?.title ?? "CorperNest";
+  const body  = payload.notification?.body  ?? payload.data?.body  ?? "";
+  const link  = payload.data?.link ?? "/";
 
-  self.registration.showNotification(title ?? "CorperNest", {
-    body:  body  ?? "",
+  self.registration.showNotification(title, {
+    body,
     icon:  "/icon-192.png",
     badge: "/badge-72.png",
-    data:  { link: link ?? "/" },
+    data:  { link },
   });
 });
 
-// Open the app when notification is clicked
+// Open the correct page when notification is tapped
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const link = event.notification.data?.link ?? "/";
+
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // If app is already open in a tab, navigate that tab to the link
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && "focus" in client) {
           client.navigate(link);
           return client.focus();
         }
       }
+      // Otherwise open a new window at the link
       if (clients.openWindow) return clients.openWindow(link);
     })
   );

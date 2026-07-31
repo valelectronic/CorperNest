@@ -121,9 +121,11 @@ export default async function ListingDetailPage({ params }: Props) {
     }
   }
 
-  // Only show active/reserving listings to non-sellers
+  // Only show active/reserving/reserved listings to non-sellers
+  // Admin can view any listing regardless of status
   const isOwnListing = session?.user?.id === row.sellerId;
-  if (!["active", "reserving", "reserved"].includes(row.status) && !isOwnListing) {
+  const isAdmin      = session?.user?.email === process.env.ADMIN_EMAIL || session?.user?.email === "corpernestng@gmail.com";
+  if (!["active", "reserving", "reserved", "pending"].includes(row.status) && !isOwnListing && !isAdmin) {
     notFound();
   }
 

@@ -787,7 +787,7 @@ export default function AgentDashboardClient(mainProps: Props) {
             <div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <SectionHeader label="My Listings" count={visibleListings.length} />
-                <button onClick={() => router.push("/marketplace/new")} style={{ padding: "8px 14px", borderRadius: 10, background: "var(--color-primary)", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                <button onClick={() => router.push("/agent/listings/new")} style={{ padding: "8px 14px", borderRadius: 10, background: "var(--color-primary)", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                   + New Listing
                 </button>
               </div>

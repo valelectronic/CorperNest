@@ -1,5 +1,4 @@
 // src/app/(market)/marketplace/purchases/purchases-client.tsx
-// Client component — handles Item Received confirmation and dispute.
 "use client";
 
 import { useState, useEffect } from "react";
@@ -24,19 +23,33 @@ type Purchase = {
   listingLga:      string;
   listingState:    string;
   listingLandmark: string;
+  // Waybill — from seller
+  waybillDetails:  string | null;
+  shippedAt:       Date | string | null;
+};
+
+type PendingRequest = {
+  id:                  string;
+  listingId:           string;
+  agreedPrice:         number;
+  status:              string;
+  expiresAtMs:         number;
+  checkoutExpiresAtMs: number | null;
+  listingTitle:        string;
+  listingImages:       string[];
 };
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
-  pending:  { label: "Awaiting payment",    bg: "#FFF8E1", color: "#92400E" },
-  escrow:   { label: "In escrow",           bg: "#EEF2FF", color: "#4338CA" },
-  released: { label: "Complete",            bg: "#E8F5E9", color: "#2E7D32" },
-  disputed: { label: "Dispute raised",      bg: "#FEF2F2", color: "#C62828" },
-  refunded: { label: "Refunded",            bg: "#F3F4F6", color: "#6B7280" },
+  pending:  { label: "Awaiting payment", bg: "#FFF8E1", color: "#92400E" },
+  escrow:   { label: "In escrow",        bg: "#EEF2FF", color: "#4338CA" },
+  released: { label: "Complete",         bg: "#E8F5E9", color: "#2E7D32" },
+  disputed: { label: "Dispute raised",   bg: "#FEF2F2", color: "#C62828" },
+  refunded: { label: "Refunded",         bg: "#F3F4F6", color: "#6B7280" },
 };
 
 function timeAgo(date: Date | string | null): string {
   if (!date) return "";
-  const diff = Date.now() - new Date(date).getTime();
+  const diff  = Date.now() - new Date(date).getTime();
   const hours = Math.floor(diff / 3600000);
   const days  = Math.floor(diff / 86400000);
   if (hours < 1)  return "Just now";
@@ -51,23 +64,116 @@ function Spinner() {
   );
 }
 
-type PendingRequest = {
-  id:                  string;
-  listingId:           string;
-  agreedPrice:         number;
-  status:              string;
-  expiresAtMs:         number;
-  checkoutExpiresAtMs: number | null;
-  listingTitle:        string;
-  listingImages:       string[];
-};
+// ── STAR RATING COMPONENT ─────────────────────────────────────────────────────
+function StarRating({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [hovered, setHovered] = useState(0);
+  return (
+    <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHovered(star)}
+          onMouseLeave={() => setHovered(0)}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            fontSize: 32, padding: 0, lineHeight: 1,
+            color: star <= (hovered || value) ? "#F59E0B" : "#E5E7EB",
+            transition: "color 0.1s",
+          }}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
 
-export default function PurchasesClient({ purchases, pendingRequests }: { purchases: Purchase[]; pendingRequests: PendingRequest[] }) {
+// ── RATING MODAL ──────────────────────────────────────────────────────────────
+function RatingModal({ transactionId, sellerName, onDone }: {
+  transactionId: string;
+  sellerName:    string;
+  onDone:        () => void;
+}) {
+  const [stars,      setStars]      = useState(0);
+  const [comment,    setComment]    = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit() {
+    if (stars === 0) { toast.error("Please select a star rating."); return; }
+    setSubmitting(true);
+    try {
+      await fetch("/api/marketplace/ratings", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionId, stars, comment: comment.trim() || null }),
+      });
+      toast.success("Thank you for your rating!");
+      onDone();
+    } catch { onDone(); } // silent — never block the user
+    finally   { setSubmitting(false); }
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onDone(); }}>
+      <div style={{ width: "100%", backgroundColor: "var(--color-bg)", borderRadius: "20px 20px 0 0", padding: "20px 16px 36px" }}>
+        <div style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: "var(--color-border)", margin: "0 auto 20px" }} />
+
+        <p style={{ fontFamily: "var(--font-heading)", fontSize: 17, fontWeight: 700, color: "var(--color-header)", textAlign: "center", margin: "0 0 4px" }}>
+          Rate this seller
+        </p>
+        <p style={{ fontSize: 13, color: "var(--color-text-muted)", textAlign: "center", margin: "0 0 20px" }}>
+          How was your experience?
+        </p>
+
+        <StarRating value={stars} onChange={setStars} />
+
+        {stars > 0 && (
+          <p style={{ textAlign: "center", fontSize: 13, color: "var(--color-text-muted)", margin: "8px 0 16px" }}>
+            {["", "Poor", "Fair", "Good", "Very good", "Excellent"][stars]}
+          </p>
+        )}
+
+        <div style={{ marginBottom: 16, marginTop: stars > 0 ? 0 : 20 }}>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value.slice(0, 200))}
+            placeholder="Leave a comment (optional)"
+            rows={3}
+            style={{ width: "100%", padding: "12px 14px", borderRadius: 12, fontSize: 14, border: "1.5px solid var(--color-border)", backgroundColor: "var(--color-card)", color: "var(--color-text)", resize: "none", fontFamily: "var(--font-body)", boxSizing: "border-box" }}
+          />
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>{comment.length}/200</span>
+          </div>
+        </div>
+
+        <button onClick={handleSubmit} disabled={submitting || stars === 0}
+          style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", backgroundColor: stars === 0 ? "var(--color-border)" : "var(--color-primary)", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: stars === 0 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
+          {submitting ? <Spinner /> : "Submit Rating"}
+        </button>
+        <button onClick={onDone}
+          style={{ width: "100%", padding: "12px", borderRadius: 14, border: "none", backgroundColor: "transparent", color: "var(--color-text-muted)", fontSize: 13, cursor: "pointer" }}>
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
+export default function PurchasesClient({
+  purchases, pendingRequests,
+}: {
+  purchases:       Purchase[];
+  pendingRequests: PendingRequest[];
+}) {
   const router = useRouter();
-  const [confirming,  setConfirming]  = useState<string | null>(null);
-  const [disputing,   setDisputing]   = useState<string | null>(null);
-  const [showConfirm, setShowConfirm] = useState<string | null>(null);
-  const [countdowns,  setCountdowns]  = useState<Record<string, string>>({});
+  const [confirming,      setConfirming]      = useState<string | null>(null);
+  const [disputing,       setDisputing]       = useState<string | null>(null);
+  const [showConfirm,     setShowConfirm]     = useState<string | null>(null);
+  const [showRating,      setShowRating]      = useState<string | null>(null); // transactionId
+  const [countdowns,      setCountdowns]      = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!pendingRequests.length) return;
@@ -83,7 +189,6 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
         if (remaining === 0) anyExpired = true;
       }
       setCountdowns(updated);
-      // When any countdown hits zero — trigger lazy expiry then refresh
       if (anyExpired) {
         clearInterval(tick);
         const expired = pendingRequests.find((r) => {
@@ -97,7 +202,7 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
       }
     }, 1000);
     return () => clearInterval(tick);
-  }, [pendingRequests]);
+  }, [pendingRequests, router]);
 
   async function handleItemReceived(txnId: string) {
     setConfirming(txnId);
@@ -108,8 +213,10 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Could not confirm. Try again."); return; }
-      toast.success("✅ Confirmed! Admin will release payment to the seller.");
+      toast.success("✅ Confirmed! Payment will be released to the seller.");
       setShowConfirm(null);
+      // Show rating prompt immediately after confirmation
+      setShowRating(txnId);
       router.refresh();
     } catch { toast.error("Network error. Try again."); }
     finally   { setConfirming(null); }
@@ -143,7 +250,7 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
 
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
 
-        {/* ── PENDING RESERVATIONS ── */}
+        {/* Pending reservations */}
         {pendingRequests.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 10px" }}>
@@ -183,7 +290,7 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
                   <div style={{ padding: "0 14px 12px" }}>
                     {r.status === "pending" && (
                       <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 8px", lineHeight: 1.5 }}>
-                        Seller has been notified. Nothing has left your account. We will notify you the moment they confirm.
+                        Seller has been notified. Nothing has left your account.
                       </p>
                     )}
                     {r.status === "confirmed" && (
@@ -206,7 +313,7 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
           </div>
         )}
 
-        {/* ── PURCHASES ── */}
+        {/* Purchases */}
         {purchases.length === 0 && pendingRequests.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🛍️</div>
@@ -220,85 +327,77 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {purchases.map((p) => {
-              const config = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.pending;
+              const config   = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.pending;
               const isEscrow = p.status === "escrow";
 
               return (
                 <div key={p.id} style={{ borderRadius: 14, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
+
                   {/* Listing info */}
                   <div style={{ display: "flex", gap: 12, padding: "14px", alignItems: "center", borderBottom: "1px solid var(--color-border)" }}>
                     <div style={{ width: 60, height: 60, borderRadius: 10, overflow: "hidden", backgroundColor: "var(--color-light)", flexShrink: 0 }}>
-                      {p.listingImages[0] ? (
-                        <img src={p.listingImages[0]} alt={p.listingTitle} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>📦</div>
-                      )}
+                      {p.listingImages[0]
+                        ? <img src={p.listingImages[0]} alt={p.listingTitle} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>📦</div>
+                      }
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text)", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {p.listingTitle}
                       </p>
                       <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 4px" }}>
-                        📍 {p.listingLandmark}, {p.listingLga}, {p.listingState}
+                        📍 {p.listingLandmark}, {p.listingLga}
                       </p>
                       <p style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)", margin: 0, fontFamily: "var(--font-heading)" }}>
                         ₦{p.amount.toLocaleString("en-NG")}
                       </p>
                     </div>
-                    <div>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, backgroundColor: config.bg, color: config.color }}>
-                        {config.label}
-                      </span>
-                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, backgroundColor: config.bg, color: config.color, flexShrink: 0 }}>
+                      {config.label}
+                    </span>
                   </div>
 
-                  {/* Transaction details */}
-                  <div style={{ padding: "10px 14px", borderBottom: isEscrow ? "1px solid var(--color-border)" : "none" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Paid</span>
-                      <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>{p.paidAt ? timeAgo(p.paidAt) : "—"}</span>
-                    </div>
-                    {p.confirmedAt && (
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Confirmed received</span>
-                        <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>{timeAgo(p.confirmedAt)}</span>
-                      </div>
-                    )}
-                    {p.releasedAt && (
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Seller paid</span>
-                        <span style={{ fontSize: 11, color: "#15803D", fontWeight: 600 }}>{timeAgo(p.releasedAt)}</span>
-                      </div>
-                    )}
-                    {p.paystackRef && (
-                      <p style={{ fontSize: 10, color: "var(--color-text-muted)", margin: "6px 0 0", fontFamily: "monospace" }}>
-                        Ref: {p.paystackRef}
+                  {/* Waybill / tracking info */}
+                  {isEscrow && p.waybillDetails && (
+                    <div style={{ padding: "10px 14px", backgroundColor: "#EEF2FF", borderBottom: "1px solid var(--color-border)" }}>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "#4338CA", margin: "0 0 2px" }}>
+                        📦 Item has been shipped
                       </p>
-                    )}
-                  </div>
+                      <p style={{ fontSize: 12, color: "#4338CA", margin: 0 }}>
+                        {p.waybillDetails}
+                      </p>
+                    </div>
+                  )}
 
-                  {/* Actions — only for escrow status */}
+                  {/* Escrow actions */}
                   {isEscrow && (
-                    <div style={{ padding: "12px 14px", display: "flex", gap: 8 }}>
-                      <button
-                        onClick={() => setShowConfirm(p.id)}
-                        style={{ flex: 2, padding: "12px", borderRadius: 12, border: "none", backgroundColor: "#15803D", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                    <div style={{ padding: "12px 14px" }}>
+                      {!p.waybillDetails && (
+                        <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 10px", lineHeight: 1.5 }}>
+                          Your payment is safely held in escrow. Once you collect the item, tap below to release payment to the seller.
+                        </p>
+                      )}
+                      {p.waybillDetails && (
+                        <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 10px", lineHeight: 1.5 }}>
+                          When you receive the item, confirm below to release payment to the seller.
+                        </p>
+                      )}
+                      <button onClick={() => setShowConfirm(p.id)}
+                        style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", backgroundColor: "#15803D", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 14, cursor: "pointer", marginBottom: 8 }}>
                         ✅ Item Received
                       </button>
-                      <button
-                        onClick={() => handleDispute(p.id)}
-                        disabled={disputing === p.id}
-                        style={{ flex: 1, padding: "12px", borderRadius: 12, border: "1px solid #FCA5A5", backgroundColor: "#FEF2F2", color: "#C62828", fontWeight: 600, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
-                        {disputing === p.id ? <Spinner /> : "🚨 Dispute"}
+                      <button onClick={() => handleDispute(p.id)} disabled={disputing === p.id}
+                        style={{ width: "100%", padding: "11px", borderRadius: 12, border: "1px solid #FCA5A5", backgroundColor: "#FEF2F2", color: "#C62828", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        {disputing === p.id ? "Raising dispute…" : "⚠️ Item not received / issue"}
                       </button>
                     </div>
                   )}
 
-                  {/* Released — complete message */}
+                  {/* Complete */}
                   {p.status === "released" && (
                     <div style={{ padding: "10px 14px", backgroundColor: "#F0FDF4" }}>
-                      <p style={{ fontSize: 12, color: "#15803D", fontWeight: 600, margin: 0 }}>
-                        ✓ Transaction complete — seller has been paid.
+                      <p style={{ fontSize: 11, color: "#15803D", margin: 0, fontWeight: 600 }}>
+                        ✓ Transaction complete · {timeAgo(p.releasedAt)}
                       </p>
                     </div>
                   )}
@@ -306,8 +405,8 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
                   {/* Disputed */}
                   {p.status === "disputed" && (
                     <div style={{ padding: "10px 14px", backgroundColor: "#FEF2F2" }}>
-                      <p style={{ fontSize: 12, color: "#C62828", fontWeight: 600, margin: 0 }}>
-                        🚨 Dispute under review — admin will contact you within 24 hours.
+                      <p style={{ fontSize: 11, color: "#C62828", margin: 0, fontWeight: 600 }}>
+                        🚨 Dispute raised — CorperNest will contact you within 24 hours
                       </p>
                     </div>
                   )}
@@ -327,17 +426,15 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
             <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 700, color: "var(--color-header)", margin: "0 0 8px" }}>
               Confirm you received the item
             </h2>
-            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px", lineHeight: 1.6 }}>
-              Only tap confirm if you have physically collected the item and it matches the listing description. Once confirmed, payment is released to the seller and cannot be reversed.
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 16px", lineHeight: 1.6 }}>
+              Only confirm if you have physically collected the item and it matches the listing. Once confirmed, payment is released to the seller and cannot be reversed.
             </p>
-            <div style={{ padding: "12px 14px", borderRadius: 12, backgroundColor: "#FFF8E1", border: "1px solid #FAC775", marginBottom: 20 }}>
+            <div style={{ padding: "12px 14px", borderRadius: 12, backgroundColor: "#FFF8E1", border: "1px solid #FAC775", marginBottom: 16 }}>
               <p style={{ fontSize: 12, color: "#92400E", margin: 0, fontWeight: 600 }}>
                 ⚠️ If the item is not as described, tap Dispute instead — do not confirm.
               </p>
             </div>
-            <button
-              onClick={() => handleItemReceived(showConfirm)}
-              disabled={confirming === showConfirm}
+            <button onClick={() => handleItemReceived(showConfirm)} disabled={confirming === showConfirm}
               style={{ width: "100%", padding: "16px", borderRadius: 14, border: "none", backgroundColor: "#15803D", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
               {confirming === showConfirm ? <Spinner /> : "✅ Yes, I received the item"}
             </button>
@@ -347,6 +444,15 @@ export default function PurchasesClient({ purchases, pendingRequests }: { purcha
             </button>
           </div>
         </div>
+      )}
+
+      {/* Rating modal — shown immediately after confirming receipt */}
+      {showRating && (
+        <RatingModal
+          transactionId={showRating}
+          sellerName="this seller"
+          onDone={() => { setShowRating(null); router.refresh(); }}
+        />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

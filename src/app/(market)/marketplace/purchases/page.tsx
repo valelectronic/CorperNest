@@ -1,8 +1,6 @@
 // src/app/(market)/marketplace/purchases/page.tsx
 // Buyer tracks their escrow transactions here.
-// Shows all purchases with status and the "Item Received" button.
-// Tapping "Item Received" marks the transaction complete and
-// triggers admin to release payment to seller.
+// Shows all purchases with status, waybill tracking, and the "Item Received" button.
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
@@ -21,16 +19,16 @@ export default async function PurchasesPage() {
   // Fetch pending availability requests — buyer tracking reservations
   const pendingRequests = await db
     .select({
-      id:                 marketplaceAvailabilityRequest.id,
-      listingId:          marketplaceAvailabilityRequest.listingId,
-      agreedPrice:        marketplaceAvailabilityRequest.agreedPrice,
-      status:             marketplaceAvailabilityRequest.status,
-      expiresAt:          marketplaceAvailabilityRequest.expiresAt,
-      checkoutExpiresAt:  marketplaceAvailabilityRequest.checkoutExpiresAt,
-      createdAt:          marketplaceAvailabilityRequest.createdAt,
-      listingTitle:       marketplaceListing.title,
-      listingImages:      marketplaceListing.images,
-      listingStatus:      marketplaceListing.status,
+      id:                marketplaceAvailabilityRequest.id,
+      listingId:         marketplaceAvailabilityRequest.listingId,
+      agreedPrice:       marketplaceAvailabilityRequest.agreedPrice,
+      status:            marketplaceAvailabilityRequest.status,
+      expiresAt:         marketplaceAvailabilityRequest.expiresAt,
+      checkoutExpiresAt: marketplaceAvailabilityRequest.checkoutExpiresAt,
+      createdAt:         marketplaceAvailabilityRequest.createdAt,
+      listingTitle:      marketplaceListing.title,
+      listingImages:     marketplaceListing.images,
+      listingStatus:     marketplaceListing.status,
     })
     .from(marketplaceAvailabilityRequest)
     .innerJoin(marketplaceListing, eq(marketplaceAvailabilityRequest.listingId, marketplaceListing.id))
@@ -41,25 +39,30 @@ export default async function PurchasesPage() {
     .orderBy(desc(marketplaceAvailabilityRequest.createdAt))
     .catch(() => []);
 
+  // Fetch all transactions for this buyer
+  // waybillDetails and shippedAt added so buyer can see tracking info
   const rows = await db
     .select({
-      id:           marketplaceTransaction.id,
-      listingId:    marketplaceTransaction.listingId,
-      amount:       marketplaceTransaction.amount,
-      commission:   marketplaceTransaction.commission,
-      sellerPayout: marketplaceTransaction.sellerPayout,
-      status:       marketplaceTransaction.status,
-      paystackRef:  marketplaceTransaction.paystackRef,
-      paidAt:       marketplaceTransaction.paidAt,
-      confirmedAt:  marketplaceTransaction.confirmedAt,
-      releasedAt:   marketplaceTransaction.releasedAt,
-      createdAt:    marketplaceTransaction.createdAt,
+      id:             marketplaceTransaction.id,
+      listingId:      marketplaceTransaction.listingId,
+      amount:         marketplaceTransaction.amount,
+      commission:     marketplaceTransaction.commission,
+      sellerPayout:   marketplaceTransaction.sellerPayout,
+      status:         marketplaceTransaction.status,
+      paystackRef:    marketplaceTransaction.paystackRef,
+      paidAt:         marketplaceTransaction.paidAt,
+      confirmedAt:    marketplaceTransaction.confirmedAt,
+      releasedAt:     marketplaceTransaction.releasedAt,
+      createdAt:      marketplaceTransaction.createdAt,
+      // Waybill — seller uploads after shipping
+      waybillDetails: marketplaceTransaction.waybillDetails,
+      shippedAt:      marketplaceTransaction.shippedAt,
       // Listing details
-      listingTitle:   marketplaceListing.title,
-      listingImages:  marketplaceListing.images,
-      listingStatus:  marketplaceListing.status,
-      listingLga:     marketplaceListing.lga,
-      listingState:   marketplaceListing.state,
+      listingTitle:    marketplaceListing.title,
+      listingImages:   marketplaceListing.images,
+      listingStatus:   marketplaceListing.status,
+      listingLga:      marketplaceListing.lga,
+      listingState:    marketplaceListing.state,
       listingLandmark: marketplaceListing.landmark,
     })
     .from(marketplaceTransaction)
@@ -70,17 +73,17 @@ export default async function PurchasesPage() {
 
   const purchases = rows.map((r) => ({
     ...r,
-    amount:       r.amount       / 100,
-    commission:   r.commission   / 100,
-    sellerPayout: r.sellerPayout / 100,
+    amount:        r.amount       / 100,
+    commission:    r.commission   / 100,
+    sellerPayout:  r.sellerPayout / 100,
     listingImages: r.listingImages ?? [],
   }));
 
   const requests = pendingRequests.map((r) => ({
     ...r,
-    agreedPrice:   r.agreedPrice / 100,
-    listingImages: r.listingImages ?? [],
-    expiresAtMs:       new Date(r.expiresAt).getTime(),
+    agreedPrice:         r.agreedPrice / 100,
+    listingImages:       r.listingImages ?? [],
+    expiresAtMs:         new Date(r.expiresAt).getTime(),
     checkoutExpiresAtMs: r.checkoutExpiresAt
       ? new Date(r.checkoutExpiresAt).getTime()
       : null,

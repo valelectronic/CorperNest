@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   pgTable, text, timestamp, boolean,
-  index, integer,
+  index, integer,uniqueIndex
 } from "drizzle-orm/pg-core";
 
 // ─── USER ────────────────────────────────────────────────────────────────────
@@ -401,8 +401,8 @@ export const marketplaceListing = pgTable("marketplace_listing", {
   refPriceMin:         integer("ref_price_min"),               // AI estimated new price min (kobo)
   refPriceMax:         integer("ref_price_max"),               // AI estimated new price max (kobo)
   refPriceSource:      text("ref_price_source"),               // e.g. "Jumia, Konga"
-  refPriceContext:     text("ref_price_context"),              // one sentence context
-  refPriceGoogleUrl:   text("ref_price_google_url"),           // google verify link
+  refPriceContext:     text("ref_price_context"), 
+  refPriceGoogleUrl:   text("ref_price_google_url"),  
   status:              text("status").default("pending").notNull(),
   agreementAcceptedAt: timestamp("agreement_accepted_at"),
   approvedAt:          timestamp("approved_at"),
@@ -418,6 +418,21 @@ export const marketplaceListing = pgTable("marketplace_listing", {
   index("market_listing_type_idx").on(t.listingType),
 ]);
 
+// ─── MARKETPLACE RATING ──────────────────────────────────────────────────────
+export const marketplaceRating = pgTable("marketplace_rating", {
+  id:            text("id").primaryKey(),
+  transactionId: text("transaction_id").notNull().references(() => marketplaceTransaction.id, { onDelete: "cascade" }),
+  listingId:     text("listing_id").notNull().references(() => marketplaceListing.id,     { onDelete: "cascade" }),
+  sellerId:      text("seller_id").notNull().references(() => user.id,                    { onDelete: "cascade" }),
+  buyerId:       text("buyer_id").notNull().references(() => user.id,                     { onDelete: "cascade" }),
+  stars:         integer("stars").notNull(),
+  comment:       text("comment"),
+  createdAt:     timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("rating_transaction_unique").on(t.transactionId),
+  index("rating_seller_idx").on(t.sellerId),
+]);
+ 
 // ─── MARKETPLACE TRANSACTION ──────────────────────────────────────────────────
 // status flow: pending → escrow → released | refunded | disputed
 
@@ -433,7 +448,9 @@ export const marketplaceTransaction = pgTable("marketplace_transaction", {
   status:       text("status").default("pending").notNull(),
   sellerRating: integer("seller_rating"),           // 1–5, set by buyer on completion
   paidAt:       timestamp("paid_at"),
-  confirmedAt:  timestamp("confirmed_at"),          // buyer tapped Item Received
+  confirmedAt:  timestamp("confirmed_at"),
+   waybillDetails: text("waybill_details"),
+  shippedAt:      timestamp("shipped_at"),         // buyer tapped Item Received
   releasedAt:   timestamp("released_at"),           // admin paid seller manually
   createdAt:    timestamp("created_at").defaultNow().notNull(),
   updatedAt:    timestamp("updated_at").defaultNow().$onUpdate(() => new Date()).notNull(),
@@ -571,6 +588,8 @@ export const userRelations = relations(user, ({ many }) => ({
   marketplaceSales:           many(marketplaceTransaction, { relationName: "sellerTransactions" }),
   vendorKyc:                  many(marketplaceVendorKyc),
   marketplaceOffers:             many(marketplaceOffer),
+  ratingsReceived: many(marketplaceRating, { relationName: "sellerRatings" }),
+ratingsGiven:    many(marketplaceRating, { relationName: "buyerRatings"  }),
 availabilityRequests:          many(marketplaceAvailabilityRequest),
 }));
 
@@ -672,10 +691,24 @@ export const marketplaceListingRelations = relations(marketplaceListing, ({ one,
   reports:      many(marketplaceReport),
 }));
 
-export const marketplaceTransactionRelations = relations(marketplaceTransaction, ({ one }) => ({
-  listing: one(marketplaceListing, { fields: [marketplaceTransaction.listingId], references: [marketplaceListing.id] }),
-  buyer:   one(user, { fields: [marketplaceTransaction.buyerId],  references: [user.id], relationName: "buyerTransactions"  }),
-  seller:  one(user, { fields: [marketplaceTransaction.sellerId], references: [user.id], relationName: "sellerTransactions" }),
+// ── marketplaceRating relations ───────────────────────────────────────────────
+export const marketplaceRatingRelations = relations(marketplaceRating, ({ one }) => ({
+  transaction: one(marketplaceTransaction, {
+    fields:     [marketplaceRating.transactionId],
+    references: [marketplaceTransaction.id],
+  }),
+  listing: one(marketplaceListing, {
+    fields:     [marketplaceRating.listingId],
+    references: [marketplaceListing.id],
+  }),
+  seller: one(user, {
+    fields:     [marketplaceRating.sellerId],
+    references: [user.id],
+  }),
+  buyer: one(user, {
+    fields:     [marketplaceRating.buyerId],
+    references: [user.id],
+  }),
 }));
 
 export const marketplaceReportRelations = relations(marketplaceReport, ({ one }) => ({

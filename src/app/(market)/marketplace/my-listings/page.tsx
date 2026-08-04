@@ -40,9 +40,9 @@ export default async function MyListingsPage() {
   // Fetch completed sales count and earnings for this seller
   const salesData = await db
     .select({
-      listingId:   marketplaceTransaction.listingId,
+      listingId:    marketplaceTransaction.listingId,
       sellerPayout: marketplaceTransaction.sellerPayout,
-      status:      marketplaceTransaction.status,
+      status:       marketplaceTransaction.status,
     })
     .from(marketplaceTransaction)
     .where(and(
@@ -61,13 +61,12 @@ export default async function MyListingsPage() {
 
   const items = listings.map((l) => ({
     ...l,
-    price:       l.price / 100,
-    images:      l.images ?? [],
-    earned:      (payoutByListing[l.id] ?? 0) / 100,
+    price:  l.price / 100,
+    images: l.images ?? [],
+    earned: (payoutByListing[l.id] ?? 0) / 100,
   }));
 
-  // Fetch active availability request IDs for reserving listings
-  // So seller can tap directly to the confirm-availability page
+  // Fetch availability request IDs for reserving listings
   const reservingIds = items.filter((l) => l.status === "reserving").map((l) => l.id);
   const availRequests = reservingIds.length > 0
     ? await db
@@ -82,9 +81,39 @@ export default async function MyListingsPage() {
 
   const availRequestMap = Object.fromEntries(availRequests.map((r) => [r.listingId, r.id]));
 
+  // ── Fetch waybill data for reserved listings (payment in escrow) ──────────
+  // Only reserved listings need waybill — seller ships after buyer pays
+  const reservedIds = items.filter((l) => l.status === "reserved").map((l) => l.id);
+  const escrowTxns = reservedIds.length > 0
+    ? await db
+        .select({
+          listingId:      marketplaceTransaction.listingId,
+          id:             marketplaceTransaction.id,
+          waybillDetails: marketplaceTransaction.waybillDetails,
+          shippedAt:      marketplaceTransaction.shippedAt,
+        })
+        .from(marketplaceTransaction)
+        .where(and(
+          eq(marketplaceTransaction.sellerId, session.user.id),
+          eq(marketplaceTransaction.status, "escrow"),
+          inArray(marketplaceTransaction.listingId, reservedIds),
+        ))
+        .catch(() => [])
+    : [];
+
+  // Map transaction data by listing ID
+  const txnByListing = Object.fromEntries(escrowTxns.map((t) => [t.listingId, t]));
+
   return (
     <MyListingsClient
-      listings={items.map((l) => ({ ...l, availRequestId: availRequestMap[l.id] ?? null }))}
+      listings={items.map((l) => ({
+        ...l,
+        availRequestId: availRequestMap[l.id] ?? null,
+        // Waybill data — only populated for reserved listings with active escrow
+        transactionId:  txnByListing[l.id]?.id             ?? null,
+        waybillDetails: txnByListing[l.id]?.waybillDetails ?? null,
+        shippedAt:      txnByListing[l.id]?.shippedAt      ?? null,
+      }))}
       totalEarned={totalEarned / 100}
       completedSales={salesData.length}
     />

@@ -6,40 +6,51 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 type MyListing = {
-  id:            string;
-  title:         string;
-  category:      string;
-  condition:     string;
-  price:         number;
-  images:        string[];
-  status:        string;
-  listingType:   string;
-  delivery:      string;
-  createdAt:     Date | string;
-  expiresAt:     Date | string | null;
-  approvedAt:    Date | string | null;
-  earned:        number;
-  availRequestId: string | null; // availability request ID for reserving listings
+  id:             string;
+  title:          string;
+  category:       string;
+  condition:      string;
+  price:          number;
+  images:         string[];
+  status:         string;
+  listingType:    string;
+  delivery:       string;
+  createdAt:      Date | string;
+  expiresAt:      Date | string | null;
+  approvedAt:     Date | string | null;
+  earned:         number;
+  availRequestId: string | null;
+  // Waybill — from joined transaction
+  transactionId:  string | null;
+  waybillDetails: string | null;
+  shippedAt:      Date | string | null;
 };
 
 type Props = {
-  listings:      MyListing[];
-  totalEarned:   number;
+  listings:       MyListing[];
+  totalEarned:    number;
   completedSales: number;
 };
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string; emoji: string }> = {
-  pending:   { label: "Awaiting approval", bg: "#FFF8E1", color: "#92400E", emoji: "⏳" },
-  active:    { label: "Active",            bg: "#E8F5E9", color: "#2E7D32", emoji: "✅" },
-  reserving: { label: "Being reserved",   bg: "#EEF2FF", color: "#4338CA", emoji: "🔒" },
-  reserved:  { label: "Payment in escrow",bg: "#EEF2FF", color: "#4338CA", emoji: "💳" },
-  sold:      { label: "Sold",             bg: "#F0FDF4", color: "#15803D", emoji: "✓"  },
-  flagged:   { label: "Flagged",          bg: "#FEF2F2", color: "#C62828", emoji: "⚠️" },
-  expired:   { label: "Expired",          bg: "#F3F4F6", color: "#6B7280", emoji: "⌛" },
+  pending:   { label: "Awaiting approval",  bg: "#FFF8E1", color: "#92400E", emoji: "⏳" },
+  active:    { label: "Active",             bg: "#E8F5E9", color: "#2E7D32", emoji: "✅" },
+  reserving: { label: "Being reserved",    bg: "#EEF2FF", color: "#4338CA", emoji: "🔒" },
+  reserved:  { label: "Payment in escrow", bg: "#EEF2FF", color: "#4338CA", emoji: "💳" },
+  sold:      { label: "Sold",              bg: "#F0FDF4", color: "#15803D", emoji: "✓"  },
+  flagged:   { label: "Flagged",           bg: "#FEF2F2", color: "#C62828", emoji: "⚠️" },
+  expired:   { label: "Expired",           bg: "#F3F4F6", color: "#6B7280", emoji: "⌛" },
 };
 
-function Spinner() {
-  return <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.15)", borderTopColor: "#C62828", animation: "spin 0.8s linear infinite", display: "inline-block" }} />;
+function Spinner({ dark }: { dark?: boolean }) {
+  return (
+    <span style={{
+      width: 14, height: 14, borderRadius: "50%",
+      border: `2px solid ${dark ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.3)"}`,
+      borderTopColor: dark ? "#C62828" : "#fff",
+      animation: "spin 0.8s linear infinite", display: "inline-block",
+    }} />
+  );
 }
 
 function timeAgo(date: Date | string): string {
@@ -52,13 +63,81 @@ function timeAgo(date: Date | string): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+// ── WAYBILL FORM ─────────────────────────────────────────────────────────────
+function WaybillSection({ listing, onShipped }: {
+  listing:    MyListing;
+  onShipped:  () => void;
+}) {
+  const [details,     setDetails]     = useState("");
+  const [submitting,  setSubmitting]  = useState(false);
+
+  // Already shipped — show tracking info
+  if (listing.waybillDetails) {
+    return (
+      <div style={{ padding: "10px 14px", backgroundColor: "#E8F5E9", borderTop: "1px solid var(--color-border)" }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#2E7D32", margin: "0 0 2px" }}>
+          📦 Item shipped — buyer has been notified
+        </p>
+        <p style={{ fontSize: 12, color: "#388E3C", margin: 0 }}>
+          {listing.waybillDetails}
+        </p>
+      </div>
+    );
+  }
+
+  async function handleSubmit() {
+    if (!details.trim()) { toast.error("Enter waybill details."); return; }
+    if (!listing.transactionId) { toast.error("No active transaction found."); return; }
+    setSubmitting(true);
+    try {
+      const res  = await fetch(`/api/marketplace/transactions/${listing.transactionId}/waybill`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ waybillDetails: details.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Could not save. Try again."); return; }
+      toast.success("Shipping details saved — buyer notified.");
+      onShipped();
+    } catch { toast.error("Network error. Try again."); }
+    finally   { setSubmitting(false); }
+  }
+
+  return (
+    <div style={{ padding: "12px 14px", backgroundColor: "#EEF2FF", borderTop: "1px solid var(--color-border)" }}>
+      <p style={{ fontSize: 12, fontWeight: 700, color: "#4338CA", margin: "0 0 8px" }}>
+        📦 Add shipping details so your buyer can track the item
+      </p>
+      <input
+        type="text"
+        value={details}
+        onChange={(e) => setDetails(e.target.value)}
+        placeholder="e.g. GIG Logistics — ABC123456 or I will deliver personally tomorrow"
+        style={{
+          width: "100%", padding: "10px 12px", borderRadius: 10, fontSize: 13,
+          border: "1.5px solid #C7D2FE", backgroundColor: "#fff",
+          color: "var(--color-text)", boxSizing: "border-box",
+          fontFamily: "var(--font-body)", marginBottom: 8,
+        }}
+      />
+      <button onClick={handleSubmit} disabled={submitting}
+        style={{ width: "100%", padding: "10px", borderRadius: 10, border: "none", backgroundColor: "#4338CA", color: "#fff", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        {submitting ? <Spinner /> : "✓ Save shipping details"}
+      </button>
+    </div>
+  );
+}
+
+// ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function MyListingsClient({ listings, totalEarned, completedSales }: Props) {
-  const router   = useRouter();
-  const [delisting,      setDelisting]      = useState<string | null>(null);
-  const [confirmDelist,  setConfirmDelist]  = useState<string | null>(null);
-  const [cancelling,     setCancelling]     = useState<string | null>(null);
-  const [markingSold,    setMarkingSold]    = useState<string | null>(null);
-  const [relisting,      setRelisting]      = useState<string | null>(null);
+  const router = useRouter();
+
+  const [delisting,     setDelisting]     = useState<string | null>(null);
+  const [confirmDelist, setConfirmDelist] = useState<string | null>(null);
+  const [cancelling,    setCancelling]    = useState<string | null>(null);
+  const [markingSold,   setMarkingSold]   = useState<string | null>(null);
+  const [relisting,     setRelisting]     = useState<string | null>(null);
+  // Track which listings have just been marked shipped (for instant UI update)
+  const [shippedIds, setShippedIds] = useState<Set<string>>(new Set());
 
   async function handleMarkSold(id: string) {
     setMarkingSold(id);
@@ -143,19 +222,15 @@ export default function MyListingsClient({ listings, totalEarned, completedSales
 
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "16px" }}>
 
-        {/* Stats row */}
+        {/* Stats */}
         {completedSales > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
             <div style={{ padding: "14px", borderRadius: 14, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", textAlign: "center" }}>
-              <p style={{ fontSize: 22, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 2px", fontFamily: "var(--font-heading)" }}>
-                {completedSales}
-              </p>
+              <p style={{ fontSize: 22, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 2px", fontFamily: "var(--font-heading)" }}>{completedSales}</p>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>Completed sales</p>
             </div>
             <div style={{ padding: "14px", borderRadius: 14, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", textAlign: "center" }}>
-              <p style={{ fontSize: 22, fontWeight: 800, color: "#15803D", margin: "0 0 2px", fontFamily: "var(--font-heading)" }}>
-                ₦{totalEarned.toLocaleString("en-NG")}
-              </p>
+              <p style={{ fontSize: 22, fontWeight: 800, color: "#15803D", margin: "0 0 2px", fontFamily: "var(--font-heading)" }}>₦{totalEarned.toLocaleString("en-NG")}</p>
               <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>Total earned</p>
             </div>
           </div>
@@ -177,9 +252,12 @@ export default function MyListingsClient({ listings, totalEarned, completedSales
         {/* Listing cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {listings.map((l) => {
-            const cfg = STATUS_CONFIG[l.status] ?? STATUS_CONFIG.pending;
+            const cfg        = STATUS_CONFIG[l.status] ?? STATUS_CONFIG.pending;
+            const hasShipped = shippedIds.has(l.id) || !!l.waybillDetails;
+
             return (
               <div key={l.id} style={{ borderRadius: 14, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
+
                 {/* Main info */}
                 <div style={{ display: "flex", gap: 12, padding: "14px", alignItems: "center" }}>
                   <div style={{ width: 64, height: 64, borderRadius: 10, overflow: "hidden", backgroundColor: "var(--color-light)", flexShrink: 0 }}>
@@ -193,7 +271,9 @@ export default function MyListingsClient({ listings, totalEarned, completedSales
                       {l.title}
                     </p>
                     <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 4px" }}>
-                      {l.category} · {l.condition === "new" ? "✨ New" : "♻️ Used"} · {timeAgo(l.createdAt)}
+                      {l.category}
+                      {l.condition && l.condition !== "null" ? ` · ${l.condition === "new" ? "✨ New" : "♻️ Used"}` : ""}
+                      {" · "}{timeAgo(l.createdAt)}
                     </p>
                     <p style={{ fontSize: 15, fontWeight: 800, color: "var(--color-primary)", margin: 0, fontFamily: "var(--font-heading)" }}>
                       ₦{l.price.toLocaleString("en-NG")}
@@ -212,10 +292,11 @@ export default function MyListingsClient({ listings, totalEarned, completedSales
                     </p>
                   </div>
                 )}
+
                 {l.status === "reserving" && (
                   <div style={{ padding: "8px 14px", backgroundColor: "#EEF2FF", borderTop: "1px solid var(--color-border)" }}>
                     <p style={{ fontSize: 11, color: "#4338CA", margin: "0 0 6px" }}>
-                      A buyer is trying to purchase this item. Confirm if it is still available.
+                      A buyer wants to purchase this item. Confirm if it is still available.
                     </p>
                     <div style={{ display: "flex", gap: 8 }}>
                       {l.availRequestId && (
@@ -226,18 +307,27 @@ export default function MyListingsClient({ listings, totalEarned, completedSales
                       )}
                       <button onClick={() => handleCancelReservation(l.id, l.availRequestId)} disabled={cancelling === l.id}
                         style={{ flex: 1, padding: "8px", borderRadius: 10, border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text-muted)", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                        {cancelling === l.id ? "Cancelling…" : "↩ Cancel reservation"}
+                        {cancelling === l.id ? "Cancelling…" : "↩ Cancel"}
                       </button>
                     </div>
                   </div>
                 )}
+
+                {/* Reserved — show waybill section */}
                 {l.status === "reserved" && (
-                  <div style={{ padding: "8px 14px", backgroundColor: "#EEF2FF", borderTop: "1px solid var(--color-border)" }}>
-                    <p style={{ fontSize: 11, color: "#4338CA", margin: 0 }}>
-                      Payment received — coordinate pickup with the buyer. You will be paid after they confirm receipt.
-                    </p>
-                  </div>
+                  <>
+                    <div style={{ padding: "8px 14px", backgroundColor: "#EEF2FF", borderTop: "1px solid var(--color-border)" }}>
+                      <p style={{ fontSize: 11, color: "#4338CA", margin: 0 }}>
+                        Payment received — coordinate with the buyer and ship the item. You will be paid after they confirm receipt.
+                      </p>
+                    </div>
+                    <WaybillSection
+                      listing={{ ...l, waybillDetails: hasShipped ? (l.waybillDetails ?? "Shipped") : null }}
+                      onShipped={() => setShippedIds((prev) => new Set([...prev, l.id]))}
+                    />
+                  </>
                 )}
+
                 {l.status === "sold" && l.earned > 0 && (
                   <div style={{ padding: "8px 14px", backgroundColor: "#F0FDF4", borderTop: "1px solid var(--color-border)" }}>
                     <p style={{ fontSize: 11, color: "#15803D", margin: 0, fontWeight: 600 }}>
@@ -291,7 +381,7 @@ export default function MyListingsClient({ listings, totalEarned, completedSales
             </p>
             <button onClick={() => handleDelist(confirmDelist)} disabled={delisting === confirmDelist}
               style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", backgroundColor: "#C62828", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}>
-              {delisting === confirmDelist ? <Spinner /> : "Yes, remove listing"}
+              {delisting === confirmDelist ? <Spinner dark /> : "Yes, remove listing"}
             </button>
             <button onClick={() => setConfirmDelist(null)}
               style={{ width: "100%", padding: "12px", borderRadius: 14, border: "none", backgroundColor: "transparent", color: "var(--color-text-muted)", fontSize: 13, cursor: "pointer" }}>

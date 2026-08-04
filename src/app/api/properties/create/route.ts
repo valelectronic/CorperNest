@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 import { headers } from "next/headers";
 import { sendAdminEmail } from "@/lib/send-admin-email";
 import { createNotification } from "@/lib/create-notification";
-import { generateListingSlug } from "@/lib/generate-slug"; // ← NEW
+import { generateListingSlug } from "@/lib/generate-slug";
 
 const TYPE_LABELS: Record<string, string> = {
   "self-con":  "Self Contained",
@@ -28,7 +28,6 @@ const VALID_AMENITIES = [
 ];
 const VALID_AGENCY_FEE = [5, 8, 10, 12, 15];
 
-// Generate a unique slug, retrying with a new random suffix if collision occurs
 async function generateUniqueSlug(type: string, lga: string, state: string): Promise<string> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const slug = generateListingSlug(type, lga, state);
@@ -39,18 +38,17 @@ async function generateUniqueSlug(type: string, lga: string, state: string): Pro
       .limit(1);
     if (existing.length === 0) return slug;
   }
-  // Extremely unlikely fallback — append timestamp
   return `${generateListingSlug(type, lga, state)}-${Date.now()}`;
 }
 
 export async function POST(req: NextRequest) {
-  // 1. Auth
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (session.user.role !== "agent")
     return NextResponse.json({ error: "Only agents can create listings" }, { status: 403 });
 
-  // 2. Parse body
+  // ── Parse body ────────────────────────────────────────────────────────────
   let body: {
     description?:      string;
     address?:          string;
@@ -79,7 +77,7 @@ export async function POST(req: NextRequest) {
     agencyFeePercent = null,
   } = body;
 
-  // 3. Validate required fields
+  // ── Validation ────────────────────────────────────────────────────────────
   if (!description || !address || !lga || !state || !type)
     return NextResponse.json({ error: "description, address, lga, state and type are required" }, { status: 400 });
 
@@ -103,13 +101,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `agencyFeePercent must be one of: ${VALID_AGENCY_FEE.join(", ")}` }, { status: 400 });
   }
 
-  // 4. Auto-generate title
+  // ── Prepare ───────────────────────────────────────────────────────────────
   const title = `${TYPE_LABELS[type]} in ${lga.trim()}`;
+  const slug  = await generateUniqueSlug(type, lga.trim(), state.trim());
 
-  // 5. Generate unique slug ← NEW
-  const slug = await generateUniqueSlug(type, lga.trim(), state.trim());
-
-  // 6. Sanitise amenities
   const sanitisedAmenities = amenities.filter(
     (a) => typeof a === "string" && VALID_AMENITIES.includes(a)
   );
@@ -118,7 +113,7 @@ export async function POST(req: NextRequest) {
     .map((a) => a.trim())
     .slice(0, 10);
 
-  // 7. Check for possible duplicates (soft — never blocks submission)
+  // ── Duplicate check (soft — never blocks submission) ──────────────────────
   let possibleDuplicate = false;
   try {
     const dupes = await db
@@ -126,8 +121,8 @@ export async function POST(req: NextRequest) {
       .from(listing)
       .where(
         and(
-          eq(listing.lga,    lga.trim()),
-          eq(listing.type,   type),
+          eq(listing.lga,      lga.trim()),
+          eq(listing.type,     type),
           eq(listing.isActive, true),
           notInArray(listing.status, ["flagged"]),
           ilike(listing.landmark, `%${landmark.trim().slice(0, 20)}%`),
@@ -139,7 +134,7 @@ export async function POST(req: NextRequest) {
     // Silent — never block submission due to duplicate check failure
   }
 
-  // 8. Insert
+  // ── Insert + notify + email — all inside one try block ───────────────────
   try {
     const listingId = nanoid();
     const now       = new Date();
@@ -148,7 +143,7 @@ export async function POST(req: NextRequest) {
       id:                  listingId,
       agentId:             session.user.id,
       title,
-      slug,                                // ← NEW
+      slug,
       description:         description.trim(),
       address:             address.trim(),
       landmark:            landmark.trim(),
@@ -171,7 +166,7 @@ export async function POST(req: NextRequest) {
       updatedAt:           now,
     });
 
-    // 9. Notify agent in-app
+    // Notify agent in-app
     await createNotification({
       userId:  session.user.id,
       type:    "listing-under-review",
@@ -180,17 +175,17 @@ export async function POST(req: NextRequest) {
       link:    "/agent",
     });
 
-    // 10. Fetch agent for admin email
+    // Fetch agent details for admin email
     const agentRows = await db
       .select({ name: user.name, email: user.email, phone: user.phone, phoneNumber: user.phoneNumber })
       .from(user)
       .where(eq(user.id, session.user.id))
       .limit(1);
-    const agent = agentRows[0];
+    const agent      = agentRows[0];
     const agentPhone = agent?.phoneNumber ?? agent?.phone ?? "—";
 
-    // 11. Email admin — full details + inline photos so you can review without opening the dashboard
-    sendAdminEmail(
+    // Email admin — awaited so Vercel does not kill the function before it sends
+    await sendAdminEmail(
       `New Listing for Review${possibleDuplicate ? " ⚠️ Possible Duplicate" : ""} — ${title}`,
       `
         <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
@@ -244,24 +239,20 @@ export async function POST(req: NextRequest) {
           </div>
           ` : "<p style='color:#E53935;font-size:13px'>⚠ No photos uploaded</p>"}
 
-          <div style="display:flex;gap:12px;flex-wrap:wrap">
-            <a href="https://www.corpernest.com.ng/admin/listings"
-               style="display:inline-block;padding:12px 24px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">
-              Review &amp; Approve →
-            </a>
-            <a href="https://www.corpernest.com.ng/admin/listings"
-               style="display:inline-block;padding:12px 24px;background:#E53935;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">
-              Reject
-            </a>
-          </div>
+          <a href="https://www.corpernest.com.ng/admin/listings"
+             style="display:inline-block;padding:12px 24px;background:#2E7D32;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">
+            Review &amp; Approve in Admin →
+          </a>
           <p style="margin-top:16px;font-size:12px;color:#7A9A7A">
             Submitted ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })} WAT
           </p>
         </div>
       `
-    ).catch((err) => console.error("[create listing] admin email failed:", err));
+    ).catch(() => {});
+    // .catch(() => {}) means email failure never breaks the listing submission
 
     return NextResponse.json({ success: true, listingId, slug, possibleDuplicate }, { status: 201 });
+
   } catch (error) {
     console.error("[properties/create] DB error:", error);
     return NextResponse.json({ error: "Failed to create listing. Please try again." }, { status: 500 });

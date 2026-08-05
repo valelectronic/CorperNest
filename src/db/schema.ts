@@ -395,6 +395,8 @@ export const marketplaceListing = pgTable("marketplace_listing", {
   landmark:            text("landmark").notNull(),
   images:              text("images").array().default([]), // max 5 (3 for single, 5 for bundle)
   hasReceipt:          boolean("has_receipt").default(false),
+  bulkMinQty: integer("bulk_min_qty"),           // minimum qty to get bulk price
+  bulkPrice:  integer("bulk_price"),             // price per item in kobo at bulk qty
   delivery:            text("delivery").default("pickup").notNull(), // pickup | delivery | both
   // Price intelligence — stored at listing creation from seller's AI price check
   sellerPriceNote:     text("seller_price_note"),              // seller's explanation of their pricing

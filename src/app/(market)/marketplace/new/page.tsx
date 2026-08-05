@@ -129,6 +129,11 @@ export default function NewListingPage() {
   const [searching,           setSearching]           = useState(false);
   const [sellerPriceNote,     setSellerPriceNote]     = useState("");
 
+  // Bulk pricing — optional, available for all categories
+  const [bulkEnabled,  setBulkEnabled]  = useState(false);
+  const [bulkMinQty,   setBulkMinQty]   = useState(5);
+  const [bulkPrice,    setBulkPrice]    = useState("");
+
   // UI state
   const [agreed,               setAgreed]               = useState(false);
   const [submitting,           setSubmitting]           = useState(false);
@@ -160,6 +165,9 @@ export default function NewListingPage() {
       if (d.itemAge)                  setItemAge(d.itemAge);
       if (d.quantity)                 setQuantity(d.quantity);
       if (d.sellerPriceNote)          setSellerPriceNote(d.sellerPriceNote);
+      if (d.bulkEnabled !== undefined) setBulkEnabled(d.bulkEnabled);
+      if (d.bulkMinQty)               setBulkMinQty(d.bulkMinQty);
+      if (d.bulkPrice)                setBulkPrice(d.bulkPrice);
       if (saved !== "{}") toast("Draft restored — continue where you left off.", { duration: 3000 });
     } catch { /* silent */ }
   }, []);
@@ -172,6 +180,7 @@ export default function NewListingPage() {
           listingType, category, condition, title, description,
           price, state, lga, landmark, bundleItems, images,
           hasReceipt, delivery, brand, itemAge, quantity, sellerPriceNote,
+          bulkEnabled, bulkMinQty, bulkPrice,
         }));
       } catch { /* silent */ }
     }, 600);
@@ -227,6 +236,9 @@ export default function NewListingPage() {
     setBrand("");
     setItemAge("");
     setQuantity("");
+    setBulkEnabled(false);
+    setBulkPrice("");
+    setBulkMinQty(5);
     setPriceResult(null);
     setPriceError(null);
     setPriceCheckAttempted(false);
@@ -363,6 +375,14 @@ export default function NewListingPage() {
 
     const numPrice = Number(price.replace(/,/g, ""));
     if (!numPrice || numPrice <= 0) { toast.error("Enter a valid price.");        return; }
+
+    // Bulk pricing validation
+    const numBulkPrice = bulkEnabled ? Number(bulkPrice.replace(/,/g, "")) : 0;
+    if (bulkEnabled) {
+      if (!numBulkPrice || numBulkPrice <= 0) { toast.error("Enter a valid bulk price."); return; }
+      if (numBulkPrice >= numPrice) { toast.error("Bulk price must be lower than your single item price."); return; }
+      if (bulkMinQty < 2) { toast.error("Minimum quantity for bulk must be at least 2."); return; }
+    }
     if (!lga)                       { toast.error("Select your LGA.");             return; }
     if (!landmark.trim())           { toast.error("Enter the nearest landmark."); return; }
     if (!images.length)             { toast.error("Upload at least 1 photo.");    return; }
@@ -387,6 +407,8 @@ export default function NewListingPage() {
         body: JSON.stringify({
           listingType,
           title:       title.trim(),
+          bulkMinQty:  bulkEnabled ? bulkMinQty  : null,
+          bulkPrice:   bulkEnabled ? Math.round(Number(bulkPrice.replace(/,/g, "")) * 100) : null,
           category,
           condition:   isFood(category) ? null : condition,
           description: description.trim(),
@@ -699,6 +721,61 @@ export default function NewListingPage() {
                 placeholder={isFood(category) ? "e.g. 2,000" : "e.g. 8,000"}
                 style={inputStyle}
               />
+
+              {/* ── BULK PRICING — optional, all categories ── */}
+              <div style={{ marginTop: 12 }}>
+                <button type="button" onClick={() => { setBulkEnabled(v => !v); if (bulkEnabled) { setBulkPrice(""); setBulkMinQty(5); } }}
+                  style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  <div style={{ width: 36, height: 20, borderRadius: 10, backgroundColor: bulkEnabled ? "var(--color-primary)" : "var(--color-border)", position: "relative", transition: "background 0.2s", flexShrink: 0 }}>
+                    <div style={{ position: "absolute", top: 2, left: bulkEnabled ? 18 : 2, width: 16, height: 16, borderRadius: "50%", backgroundColor: "#fff", transition: "left 0.2s" }} />
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)" }}>
+                    Sell cheaper in larger quantities
+                  </span>
+                </button>
+
+                {bulkEnabled && (
+                  <div style={{ marginTop: 12, padding: "14px", borderRadius: 12, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
+                    <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
+                      Set a lower price per item when a buyer orders a certain quantity or more.
+                    </p>
+
+                    {/* Minimum quantity */}
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ ...labelStyle, marginBottom: 8 }}>Minimum quantity for bulk price</label>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <button type="button" onClick={() => setBulkMinQty(v => Math.max(2, v - 1))}
+                          style={{ width: 36, height: 36, borderRadius: 10, border: "1.5px solid var(--color-border)", backgroundColor: "var(--color-bg)", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text)", flexShrink: 0 }}>
+                          −
+                        </button>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)", minWidth: 32, textAlign: "center" }}>
+                          {bulkMinQty}
+                        </span>
+                        <button type="button" onClick={() => setBulkMinQty(v => v + 1)}
+                          style={{ width: 36, height: 36, borderRadius: 10, border: "1.5px solid var(--color-border)", backgroundColor: "var(--color-bg)", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text)", flexShrink: 0 }}>
+                          +
+                        </button>
+                        <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>items minimum</span>
+                      </div>
+                    </div>
+
+                    {/* Bulk price */}
+                    <div>
+                      <label style={labelStyle}>Bulk price per item (₦)</label>
+                      <input type="text" inputMode="numeric" value={bulkPrice}
+                        onChange={(e) => { const d = e.target.value.replace(/[^\d]/g, ""); setBulkPrice(d ? Number(d).toLocaleString("en-NG") : ""); }}
+                        placeholder="e.g. 4,500"
+                        style={inputStyle}
+                      />
+                      {bulkPrice && price && (
+                        <p style={{ fontSize: 11, color: "var(--color-primary)", margin: "6px 0 0", fontWeight: 600 }}>
+                          Single: ₦{price} · Bulk ({bulkMinQty}+): ₦{bulkPrice} per item
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* AI price check — non-food only */}
               {!isFood(category) && (

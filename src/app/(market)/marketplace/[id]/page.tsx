@@ -84,6 +84,8 @@ export default async function ListingDetailPage({ params }: Props) {
       refPriceSource:   marketplaceListing.refPriceSource,
       refPriceContext:  marketplaceListing.refPriceContext,
       refPriceGoogleUrl: marketplaceListing.refPriceGoogleUrl,
+      bulkMinQty:        marketplaceListing.bulkMinQty,
+      bulkPrice:         marketplaceListing.bulkPrice,
       status:           marketplaceListing.status,
       createdAt:        marketplaceListing.createdAt,
       sellerId:         marketplaceListing.sellerId,
@@ -198,6 +200,8 @@ export default async function ListingDetailPage({ params }: Props) {
         price:         row.price / 100,
         refPriceMin:   row.refPriceMin  ? row.refPriceMin  / 100 : null,
         refPriceMax:   row.refPriceMax  ? row.refPriceMax  / 100 : null,
+        bulkMinQty:    row.bulkMinQty   ?? null,
+        bulkPrice:     row.bulkPrice    ? row.bulkPrice    / 100 : null,
         images:        row.images        ?? [],
         bundleItems:   row.bundleItems   ?? [],
       }}

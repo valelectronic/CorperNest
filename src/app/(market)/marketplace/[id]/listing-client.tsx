@@ -31,6 +31,8 @@ type Listing = {
   refPriceSource:   string | null;
   refPriceContext:  string | null;
   refPriceGoogleUrl: string | null;
+  bulkMinQty:        number | null;
+  bulkPrice:         number | null;
   status:           string;
   createdAt:        Date | string;
   sellerId:         string;
@@ -362,6 +364,16 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
     finally { setSavingItem(false); }
   }
 
+  // Quantity selector — used when seller has set bulk pricing
+  const [qty, setQty] = useState(1);
+
+  // If buyer selected qty >= bulkMinQty, use bulk price per item
+  const unitPrice  = listing.bulkMinQty && listing.bulkPrice && qty >= listing.bulkMinQty
+    ? listing.bulkPrice
+    : listing.price;
+  const totalPrice = unitPrice * qty;
+  const hasBulk    = !!(listing.bulkMinQty && listing.bulkPrice);
+
   // ── Buy ───────────────────────────────────────────────────────────────────
   function handleBuy() {
     if (!isLoggedIn) { router.push("/signin?redirect=" + encodeURIComponent(window.location.pathname)); return; }
@@ -387,7 +399,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
   async function handleConfirmAvailability() {
     setSubmittingAvailability(true);
     try {
-      const res  = await fetch("/api/marketplace/availability", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ listingId: listing.id }) });
+      const res  = await fetch("/api/marketplace/availability", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ listingId: listing.id, quantity: qty, agreedPrice: Math.round(totalPrice * 100) }) });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Could not send request. Try again."); return; }
       setAvailRequest(data.request);
@@ -559,6 +571,46 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
         <p style={{ fontFamily: "var(--font-heading)", fontSize: 28, fontWeight: 800, color: "var(--color-primary)", margin: "0 0 16px" }}>
           ₦{listing.price.toLocaleString("en-NG")}
         </p>
+
+        {/* Bulk pricing info */}
+        {hasBulk && (
+          <div style={{ marginTop: 6 }}>
+            <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0 }}>
+              ₦{listing.bulkPrice!.toLocaleString("en-NG")} each · buy {listing.bulkMinQty}+ items
+            </p>
+          </div>
+        )}
+
+        {/* Quantity selector — only shown when bulk pricing exists */}
+        {hasBulk && listing.status === "active" && !isOwnListing && (
+          <div style={{ marginTop: 14, padding: "14px", borderRadius: 12, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", margin: "0 0 10px" }}>Quantity</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+              <button type="button" onClick={() => setQty(v => Math.max(1, v - 1))}
+                style={{ width: 36, height: 36, borderRadius: 10, border: "1.5px solid var(--color-border)", backgroundColor: "var(--color-bg)", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text)" }}>
+                −
+              </button>
+              <span style={{ fontSize: 18, fontWeight: 700, color: "var(--color-text)", minWidth: 28, textAlign: "center" }}>{qty}</span>
+              <button type="button" onClick={() => setQty(v => v + 1)}
+                style={{ width: 36, height: 36, borderRadius: 10, border: "1.5px solid var(--color-border)", backgroundColor: "var(--color-bg)", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text)" }}>
+                +
+              </button>
+              {qty >= (listing.bulkMinQty ?? 0) && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 20, backgroundColor: "#E8F5E9", color: "#15803D" }}>
+                  Bulk price applied ✓
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                {qty > 1 ? `₦${unitPrice.toLocaleString("en-NG")} × ${qty}` : "Single item price"}
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: "var(--color-primary)", fontFamily: "var(--font-heading)" }}>
+                ₦{totalPrice.toLocaleString("en-NG")}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Action buttons */}
         {!isOwnListing && (

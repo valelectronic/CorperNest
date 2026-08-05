@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
     refPriceSource  = null,
     refPriceContext = null,
     refPriceGoogleUrl = null,
+    bulkMinQty        = null,
+    bulkPrice         = null,
   } = body;
 
   // ── Enforce 5-listing limit ────────────────────────────────────────────────
@@ -122,6 +124,8 @@ export async function POST(req: NextRequest) {
       refPriceSource:      refPriceSource  ?? null,
       refPriceContext:     refPriceContext  ?? null,
       refPriceGoogleUrl:   refPriceGoogleUrl ?? null,
+      bulkMinQty:          bulkMinQty   ? Math.round(bulkMinQty)              : null,
+      bulkPrice:           bulkPrice    ? Math.round(bulkPrice)               : null,
       status:              "pending",
       agreementAcceptedAt: new Date(),
       expiresAt,

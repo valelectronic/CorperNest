@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
       ? `<p><strong>Bundle items:</strong> ${cleanBundleItems.join(", ")}</p>`
       : "";
 
-    void sendAdminEmail(
+    await sendAdminEmail(
       `New marketplace listing — ${listingType === "bundle" ? "Bundle: " : ""}${title}`,
       `
         <p><strong>Type:</strong> ${listingType === "bundle" ? "Bundle / Set" : "Single item"}</p>

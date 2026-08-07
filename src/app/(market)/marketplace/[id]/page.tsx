@@ -27,8 +27,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (!row) return { title: "Listing not found | CorperNest" };
 
     const priceStr   = `₦${(row.price / 100).toLocaleString("en-NG")}`;
-    const ogImageUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.corpernest.com.ng"}/api/marketplace/og/${id}`;
     const listingUrl  = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.corpernest.com.ng"}/marketplace/${id}`;
+
+    // Use Cloudinary image directly for WhatsApp preview — CDN is instant, no cold start
+    // Dynamic OG route is too slow for WhatsApp's crawler timeout
+    const firstImage  = (row.images ?? [])[0] ?? null;
+    const ogImageUrl  = firstImage
+      ? (firstImage as string).replace("/upload/", "/upload/c_fill,w_1200,h_630,q_auto,f_jpg/")
+      : `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.corpernest.com.ng"}/og-image.png`;
 
     return {
       title: `${row.title} — ${priceStr} | CorperNest Marketplace`,

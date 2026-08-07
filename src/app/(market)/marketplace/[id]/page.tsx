@@ -27,16 +27,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     if (!row) return { title: "Listing not found | CorperNest" };
 
     const priceStr   = `₦${(row.price / 100).toLocaleString("en-NG")}`;
-    const ogImageUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://corpernest.com.ng"}/api/marketplace/og/${id}`;
+    const ogImageUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.corpernest.com.ng"}/api/marketplace/og/${id}`;
+    const listingUrl  = `${process.env.NEXT_PUBLIC_APP_URL ?? "https://www.corpernest.com.ng"}/marketplace/${id}`;
 
     return {
       title: `${row.title} — ${priceStr} | CorperNest Marketplace`,
       description: `${priceStr} · ${row.condition} · ${row.lga}, ${row.state}. ${row.description.slice(0, 100)}`,
+      alternates: {
+        canonical: listingUrl,
+      },
       openGraph: {
         title: `${row.title} — ${priceStr}`,
         description: `${row.condition} · ${row.lga}, ${row.state} · Buy via Escrow on CorperNest`,
+        url:    listingUrl,
+        type:   "website",
         images: [{ url: ogImageUrl, width: 1200, height: 630 }],
-        type: "website",
       },
       twitter: {
         card: "summary_large_image",

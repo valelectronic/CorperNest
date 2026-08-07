@@ -323,7 +323,6 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
     const condLabel = listing.condition === "new" ? "✨ New" : listing.condition === "fairly-used" ? "♻️ Fairly Used" : "🔀 Mixed";
     const receipt   = listing.hasReceipt ? "\n📄 Receipt available" : "";
 
-    // Only show reference price if listed price is genuinely below new price
     const isBelowNew = listing.refPriceMin && listing.price < listing.refPriceMin;
     const savePct    = isBelowNew && listing.refPriceMin
       ? Math.round(((listing.refPriceMin - listing.price) / listing.refPriceMin) * 100)
@@ -335,20 +334,23 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
       ? `\n💸 Save ${savePct}% vs buying new!`
       : "";
 
+    // URL goes in navigator.share({ url }) only — not in text
+    // Having the URL in both causes WhatsApp to show it twice
+    // and breaks the OG image preview
     const text =
       `${listing.title}\n\n` +
       `💰 Price: ${priceStr}${refLine}${saveLine}\n` +
       `📦 ${condLabel} · ${listing.category}\n` +
       `📍 ${listing.lga}, ${listing.state}${receipt}\n` +
       `🔒 Buy safely via Escrow on CorperNest\n\n` +
-      `👉 ${url}\n\n` +
       `📲 Community: chat.whatsapp.com/GqaBzJjdPdlDMwjvaGQQeJ\n` +
       `Follow us on X: @_Corpernest`;
 
     if (navigator.share) {
       navigator.share({ title: listing.title, text, url }).catch(() => {});
     } else {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+      // Fallback — include URL in text for WhatsApp web
+      window.open(`https://wa.me/?text=${encodeURIComponent(text + `\n\n👉 ${url}`)}`, "_blank");
     }
   }
 

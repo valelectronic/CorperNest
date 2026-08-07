@@ -1,13 +1,14 @@
 // src/app/api/marketplace/og/[id]/route.tsx
 // Generates share image for WhatsApp, Twitter etc.
 // Reference price only shown when listing is genuinely below new price.
-// Image is pre-fetched as base64 for reliable rendering in next/og.
 
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { marketplaceListing, user } from "@/db/schema";
 import { eq } from "drizzle-orm";
+
+export const runtime = "edge";
 
 export async function GET(
   req: NextRequest,
@@ -46,39 +47,18 @@ export async function GET(
   const isBelowNew = refMin !== null && price < refMin;
   const saving     = isBelowNew && refMin ? Math.round(((refMin - price) / refMin) * 100) : 0;
 
-  // Safely parse images array
+  // Safely parse images — handle both array and string formats
   const imagesArr  = Array.isArray(row.images)
     ? row.images
     : typeof row.images === "string"
-      ? JSON.parse(row.images)
+      ? (() => { try { return JSON.parse(row.images as string); } catch { return []; } })()
       : [];
 
-  // Use Cloudinary to serve a small 630×630 version — much faster to fetch
-  const rawPhoto = imagesArr[0] ?? null;
-  const photoUrl = rawPhoto
-    ? rawPhoto.replace("/upload/", "/upload/c_fill,w_630,h_630,q_auto,f_jpg/")
+  // Use small Cloudinary transformation — faster to load in edge runtime
+  const rawPhoto  = imagesArr[0] ?? null;
+  const photoUrl  = rawPhoto
+    ? (rawPhoto as string).replace("/upload/", "/upload/c_fill,w_630,h_630,q_auto,f_auto/")
     : null;
-
-  // Pre-fetch image as base64 — this is the key fix.
-  // next/og is unreliable when fetching external URLs directly in <img>.
-  // Pre-fetching and converting to data URL makes it work every time.
-  let imageDataUrl: string | null = null;
-  if (photoUrl) {
-    try {
-      const imgRes = await fetch(photoUrl, {
-        signal: AbortSignal.timeout(6000), // 6 second timeout
-      });
-      if (imgRes.ok) {
-        const buffer      = await imgRes.arrayBuffer();
-        const base64      = Buffer.from(buffer).toString("base64");
-        const contentType = imgRes.headers.get("content-type") ?? "image/jpeg";
-        imageDataUrl      = `data:${contentType};base64,${base64}`;
-      }
-    } catch {
-      // Image fetch failed — show emoji placeholder instead
-      imageDataUrl = null;
-    }
-  }
 
   const condLabel = row.condition === "new"
     ? "✨ New"
@@ -91,9 +71,9 @@ export async function GET(
       <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "row", backgroundColor: "#ffffff", fontFamily: "sans-serif" }}>
         {/* Left — photo */}
         <div style={{ width: 630, height: 630, position: "relative", flexShrink: 0, backgroundColor: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          {imageDataUrl ? (
+          {photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageDataUrl} alt={row.title} width={630} height={630} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+            <img src={photoUrl} alt={row.title} width={630} height={630} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
           ) : (
             <div style={{ fontSize: 120, display: "flex" }}>📦</div>
           )}
@@ -107,7 +87,6 @@ export async function GET(
         {/* Right — details */}
         <div style={{ flex: 1, padding: "48px 48px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: "#ffffff" }}>
 
-          {/* Brand */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <div style={{ color: "white", fontSize: 18, fontWeight: 800, display: "flex" }}>C</div>
@@ -115,7 +94,6 @@ export async function GET(
             <div style={{ fontSize: 18, fontWeight: 700, color: "#16a34a", display: "flex" }}>CorperNest Marketplace</div>
           </div>
 
-          {/* Title + price */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 16 }}>
             <div style={{ fontSize: row.title.length > 40 ? 32 : 38, fontWeight: 800, color: "#111827", lineHeight: 1.2, display: "flex", flexWrap: "wrap" }}>
               {row.title}
@@ -151,7 +129,6 @@ export async function GET(
             </div>
           </div>
 
-          {/* Bottom — location */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 20, borderTop: "1px solid #e5e7eb" }}>
             <div style={{ fontSize: 18, color: "#6b7280", display: "flex" }}>
               📍 {row.lga}, {row.state}

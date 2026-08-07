@@ -333,10 +333,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
     const saveLine  = isBelowNew && savePct > 0
       ? `\n💸 Save ${savePct}% vs buying new!`
       : "";
-
-    // URL goes in navigator.share({ url }) only — not in text
-    // Having the URL in both causes WhatsApp to show it twice
-    // and breaks the OG image preview
+      
     const text =
       `${listing.title}\n\n` +
       `💰 Price: ${priceStr}${refLine}${saveLine}\n` +
@@ -347,7 +344,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
       `Follow us on X: @_Corpernest`;
 
     if (navigator.share) {
-      navigator.share({ title: listing.title, text, url }).catch(() => {});
+      navigator.share({ title: listing.title, text: text + `\n\n👉 ${url}` }).catch(() => {});
     } else {
       // Fallback — include URL in text for WhatsApp web
       window.open(`https://wa.me/?text=${encodeURIComponent(text + `\n\n👉 ${url}`)}`, "_blank");

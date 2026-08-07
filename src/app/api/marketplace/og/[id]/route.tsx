@@ -8,8 +8,6 @@ import { db } from "@/lib/db";
 import { marketplaceListing, user } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-export const runtime = "edge";
-
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -48,11 +46,18 @@ export async function GET(
   const isBelowNew = refMin !== null && price < refMin;
   const saving     = isBelowNew && refMin ? Math.round(((refMin - price) / refMin) * 100) : 0;
 
-  const rawPhoto  = (row.images ?? [])[0] ?? null;
-const photoUrl  = rawPhoto
-  ? rawPhoto.replace("/upload/", "/upload/c_fill,w_630,h_630,q_auto,f_jpg/")
-  : null;
-  
+  // Transform Cloudinary URL to serve small optimised version
+  // Edge runtime times out fetching large images — this fixes the 2-photo issue
+  // Safely parse images — edge runtime can return arrays as strings
+  const imagesArr  = Array.isArray(row.images)
+    ? row.images
+    : typeof row.images === "string"
+      ? JSON.parse(row.images)
+      : [];
+  const rawPhoto   = imagesArr[0] ?? null;
+  const photoUrl  = rawPhoto
+    ? rawPhoto.replace("/upload/", "/upload/c_fill,w_630,h_630,q_auto,f_jpg/")
+    : null;
   const condLabel = row.condition === "new" ? "✨ New" : row.condition === "fairly-used" ? "♻️ Fairly Used" : "🔀 Mixed";
 
   const imageResponse = new ImageResponse(

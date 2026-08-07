@@ -8,7 +8,8 @@ import { db } from "@/lib/db";
 import { marketplaceListing, user } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
-export const runtime = "edge";
+export const runtime   = "edge";
+export const revalidate = 3600; // Cache for 1 hour
 
 export async function GET(
   req: NextRequest,
@@ -143,6 +144,8 @@ export async function GET(
     { width: 1200, height: 630 }
   );
 
-  imageResponse.headers.set("Cache-Control", "no-store, max-age=0");
+  // Cache for 1 hour — WhatsApp crawler needs fast response
+  // no-store was causing WhatsApp to timeout on cold starts
+  imageResponse.headers.set("Cache-Control", "public, max-age=3600, s-maxage=3600");
   return imageResponse;
 }

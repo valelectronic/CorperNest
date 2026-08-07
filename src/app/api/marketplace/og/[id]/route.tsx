@@ -48,7 +48,11 @@ export async function GET(
   const isBelowNew = refMin !== null && price < refMin;
   const saving     = isBelowNew && refMin ? Math.round(((refMin - price) / refMin) * 100) : 0;
 
-  const photoUrl  = (row.images ?? [])[0] ?? null;
+  const rawPhoto  = (row.images ?? [])[0] ?? null;
+const photoUrl  = rawPhoto
+  ? rawPhoto.replace("/upload/", "/upload/c_fill,w_630,h_630,q_auto,f_jpg/")
+  : null;
+  
   const condLabel = row.condition === "new" ? "✨ New" : row.condition === "fairly-used" ? "♻️ Fairly Used" : "🔀 Mixed";
 
   const imageResponse = new ImageResponse(

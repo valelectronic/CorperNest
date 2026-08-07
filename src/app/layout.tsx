@@ -66,9 +66,6 @@ export const metadata: Metadata = {
     "CorperNest marketplace",
     "CorperNest housing",
   ],
-  alternates: {
-    canonical: "https://www.corpernest.com.ng",
-  },
   openGraph: {
     type:        "website",
     url:         "https://www.corpernest.com.ng",

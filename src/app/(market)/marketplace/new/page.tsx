@@ -483,7 +483,7 @@ export default function NewListingPage() {
         </button>
         <div style={{ flex: 1 }}>
           <p style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 700, color: "var(--color-header)", margin: 0 }}>List an item</p>
-          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>Sold via escrow — you get paid after buyer confirms receipt</p>
+          <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: 0 }}>List your item — payment processed securely through our verified checkout</p>
         </div>
       </div>
 

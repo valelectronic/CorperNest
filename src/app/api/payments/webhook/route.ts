@@ -185,7 +185,7 @@ async function handleMarketplacePurchase(
     userId:  txn.buyerId,
     type:    "marketplace-payment-confirmed",
     title:   "Payment confirmed ✅",
-    message: `Your payment of ${priceStr} for "${itemTitle}" is held in escrow. Go to Purchases to track your order and confirm receipt when you collect the item.`,
+    message: `Your payment of ${priceStr} for "${itemTitle}" is confirmed. Go to Purchases to track your order and confirm delivery when you collect the item.`,
     link:    "/marketplace/purchases",
   });
 
@@ -194,18 +194,18 @@ async function handleMarketplacePurchase(
     userId:  txn.sellerId,
     type:    "marketplace-item-sold",
     title:   "Your item has been paid for! 🎉",
-    message: `${buyerUser?.name ?? buyerName ?? "A buyer"} paid ${priceStr} for "${itemTitle}". Prepare the item. You receive ${payoutStr} after they confirm receipt.`,
+    message: `${buyerUser?.name ?? buyerName ?? "A buyer"} paid ${priceStr} for "${itemTitle}". Prepare the item. You receive ${payoutStr} after they confirm delivery.`,
     link:    "/marketplace/my-listings",
   });
 
   // Email: admin only — with both phone numbers
   sendAdminEmail(
-    `🛍️ Marketplace escrow confirmed — ${itemTitle}`,
+    `🛍️ Order Payment Confirmed — ${itemTitle}`,
     `
       <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-        <h2 style="color:#15803D;margin:0 0 4px">Escrow Payment Confirmed</h2>
+        <h2 style="color:#15803D;margin:0 0 4px">Order Payment Confirmed</h2>
         <p style="color:#6B7280;margin:0 0 20px;font-size:13px">
-          Marketplace transaction in escrow. Release payout manually after buyer confirms receipt.
+          Marketplace transaction completed. Release payout manually after buyer confirms delivery.
         </p>
         <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px">
           <tr><td style="padding:10px 0;border-bottom:1px solid #E5E7EB;color:#6B7280;width:140px">Item</td>
@@ -227,8 +227,6 @@ async function handleMarketplacePurchase(
       </div>
     `
   ).catch((err) => console.error("[webhook/marketplace] Admin email failed:", err));
-
-  console.log(`[webhook/marketplace] Escrow confirmed: txn=${transactionId}, listing=${listingId}`);
   return NextResponse.json({ received: true });
 }
 

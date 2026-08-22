@@ -36,7 +36,7 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string; 
   pending:   { label: "Awaiting approval",  bg: "#FFF8E1", color: "#92400E", emoji: "⏳" },
   active:    { label: "Active",             bg: "#E8F5E9", color: "#2E7D32", emoji: "✅" },
   reserving: { label: "Being reserved",    bg: "#EEF2FF", color: "#4338CA", emoji: "🔒" },
-  reserved:  { label: "Payment in escrow", bg: "#EEF2FF", color: "#4338CA", emoji: "💳" },
+  reserved:  { label: "Order Confirmed", bg: "#EEF2FF", color: "#4338CA", emoji: "💳" },
   sold:      { label: "Sold",              bg: "#F0FDF4", color: "#15803D", emoji: "✓"  },
   flagged:   { label: "Flagged",           bg: "#FEF2F2", color: "#C62828", emoji: "⚠️" },
   expired:   { label: "Expired",           bg: "#F3F4F6", color: "#6B7280", emoji: "⌛" },
@@ -241,7 +241,7 @@ export default function MyListingsClient({ listings, totalEarned, completedSales
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>📦</div>
             <p style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: "0 0 6px" }}>No listings yet</p>
-            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px" }}>List an item to start selling via escrow</p>
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px" }}>List an item to start selling securely</p>
             <button onClick={() => router.push("/marketplace/new")}
               style={{ padding: "12px 24px", borderRadius: 12, border: "none", backgroundColor: "var(--color-primary)", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
               List your first item
@@ -318,7 +318,7 @@ export default function MyListingsClient({ listings, totalEarned, completedSales
                   <>
                     <div style={{ padding: "8px 14px", backgroundColor: "#EEF2FF", borderTop: "1px solid var(--color-border)" }}>
                       <p style={{ fontSize: 11, color: "#4338CA", margin: 0 }}>
-                        Payment received — coordinate with the buyer and ship the item. You will be paid after they confirm receipt.
+                        Order confirmed — coordinate with the buyer and ship the item. Payment processed on delivery confirmation.
                       </p>
                     </div>
                     <WaybillSection

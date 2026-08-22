@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: "%s | CorperNest",
   },
   description:
-    "CorperNest helps Nigerians relocating to new cities find verified scam-free housing and buy or sell items safely via escrow. Verified agents, secure payments, no fraud. Currently serving Eket, Akwa Ibom — expanding across Nigeria.",
+    "CorperNest helps Nigerians relocating to new cities find verified scam-free housing and buy or sell items safely with buyer protection. Verified agents, secure payments, no fraud. Currently serving Eket, Akwa Ibom — expanding across Nigeria.",
   metadataBase: new URL("https://www.corpernest.com.ng"),
   keywords: [
     // Housing — broad
@@ -51,9 +51,9 @@ export const metadata: Metadata = {
     "NYSC corper housing",
     // Marketplace — broad
     "safe marketplace Nigeria",
-    "buy and sell Nigeria escrow",
+    "buy and sell Nigeria secure",
     "verified seller Nigeria",
-    "escrow payment marketplace Nigeria",
+    "secure payment marketplace Nigeria",
     "no scam buy sell Nigeria",
     "second hand items Nigeria",
     // Marketplace — specific
@@ -71,7 +71,7 @@ export const metadata: Metadata = {
     url:         "https://www.corpernest.com.ng",
     siteName:    "CorperNest",
     title:       "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
-    description: "Find verified scam-free housing and buy or sell items safely via escrow. Verified agents, secure payments. Currently in Eket, Akwa Ibom — expanding across Nigeria.",
+    description: "Find verified scam-free housing and buy or sell items safely with buyer protection. Verified agents, secure payments. Currently in Eket, Akwa Ibom — expanding across Nigeria.",
     locale:      "en_NG",
     images: [
       {
@@ -85,12 +85,12 @@ export const metadata: Metadata = {
   twitter: {
     card:        "summary_large_image",
     title:       "CorperNest — Verified Housing & Marketplace for Nigerians Relocating",
-    description: "Find verified housing and buy or sell items safely via escrow. No scams. Currently in Eket, Akwa Ibom.",
+    description: "Find verified housing and buy or sell items safely with secure checkout. No scams. Currently in Eket, Akwa Ibom.",
     images:      ["/og-image.png"],
   },
   robots: {
-    index:     true,
-    follow:    true,
+    index:   true,
+    follow:  true,
     googleBot: {
       index:               true,
       follow:              true,

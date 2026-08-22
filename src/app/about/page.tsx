@@ -40,7 +40,7 @@ export default function AboutPage() {
             We believe housing and commerce should be something you can trust.
           </h1>
           <p style={{ fontSize: 15, color: "rgba(255,255,255,0.7)", lineHeight: 1.8, margin: 0 }}>
-            CorperNest is a verified housing and marketplace platform operating in Eket, Akwa Ibom. We connect renters with real identity-checked agents, and buyers with verified sellers — staying involved in every transaction from start to finish.
+            CorperNest is a verified housing and marketplace platform operating in Eket, Akwa Ibom. We connect renters with real identity-checked agents, and buyers with verified sellers, staying involved in every transaction from start to finish.
           </p>
         </div>
       </div>
@@ -52,16 +52,16 @@ export default function AboutPage() {
             Our mission
           </p>
           <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(22px, 5vw, 30px)", fontWeight: 800, color: "var(--color-header)", margin: "0 0 20px", lineHeight: 1.3 }}>
-            End the scam cycle in Nigerian local markets — housing and commerce alike.
+            End the scam cycle in Nigerian local markets, housing and commerce alike.
           </h2>
           <p style={{ fontSize: 15, color: "var(--color-text-secondary)", lineHeight: 1.8, margin: "0 0 16px" }}>
-            In most Nigerian cities, finding accommodation means scrolling through WhatsApp groups, trusting strangers online, and paying money upfront for properties you've never seen. Buying or selling items carries the same risk — fake buyers, sellers who disappear after payment, and no one to turn to when things go wrong.
+            In most Nigerian cities, finding accommodation means scrolling through WhatsApp groups, trusting strangers online, and paying money upfront for properties you've never seen. Buying or selling items carries the same risk, fake buyers, sellers who disappear after payment, and no one to turn to when things go wrong.
           </p>
           <p style={{ fontSize: 15, color: "var(--color-text-secondary)", lineHeight: 1.8, margin: "0 0 16px" }}>
-            CorperNest was built to fix both problems — starting with Eket. By verifying every agent's identity and reviewing every listing before it goes live, we give renters a foundation of trust they can't get anywhere else. By holding marketplace payments in escrow until buyers confirm receipt, we protect both sides of every sale.
-          </p>
+  CorperNest was built to fix both problems, starting with Eket. By verifying every agent's identity and reviewing every listing before it goes live, we give renters a foundation of trust they can't get anywhere else. By processing marketplace orders through our verified checkout system, we protect both sides of every sale.
+</p>
           <p style={{ fontSize: 15, fontWeight: 600, color: "var(--color-header)", lineHeight: 1.8, margin: 0, padding: "16px", background: "var(--color-light)", borderRadius: 12, borderLeft: "3px solid var(--color-primary)" }}>
-            We're not competing with Facebook or WhatsApp. We're solving the problem they created — because posting a listing or selling an item on social media is free, which means anyone can do it, including people with no intention of delivering.
+            We're not competing with Facebook or WhatsApp. We're solving the problem they created, because posting a listing or selling an item on social media is free, which means anyone can do it, including people with no intention of delivering.
           </p>
         </div>
       </section>
@@ -86,9 +86,9 @@ export default function AboutPage() {
                 body: "When you request a property inspection, we call you personally to confirm the details, explain how the process works, and connect you to the agent. You are never sent to a stranger without us speaking to you first.",
               },
               {
-                heading: "Escrow protects every marketplace sale",
-                body: "When buying or selling an item on CorperNest, payment is held securely in escrow until the buyer confirms they have received the item. The seller only gets paid after confirmation. Both sides are protected.",
-              },
+              heading: "Secure payment & order protection",
+              body: "When buying or selling an item on CorperNest, payments are processed securely with verified order tracking and buyer protection. Both sides are protected throughout the purchase.",
+            },
               {
                 heading: "Inspections are free to book",
                 body: "Booking a property inspection through CorperNest costs nothing. You pay the agent their inspection fee directly when you meet them in person. CorperNest charges agents a small platform commission after a confirmed visit.",

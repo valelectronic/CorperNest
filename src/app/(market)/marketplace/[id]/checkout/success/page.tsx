@@ -47,7 +47,7 @@ export default function CheckoutSuccessPage() {
 
       <p style={{ fontSize: 14, color: "var(--color-text-muted)", margin: 0, textAlign: "center", lineHeight: 1.7 }}>
         {verified
-          ? "Your payment is held safely in escrow. The seller's contact has been sent to you. Coordinate pickup and tap \"Item Received\" when you collect the item."
+          ? "Your order is confirmed and covered by our buyer protection guarantee. The seller's contact has been sent to you. Coordinate pickup and tap \"Item Received\" when you collect the item."
           : "We couldn't confirm your payment status right now. If money left your account, it's safe — check your Purchases page or contact support."}
       </p>
 

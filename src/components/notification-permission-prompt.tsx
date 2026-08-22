@@ -19,7 +19,7 @@ const CONTEXT_COPY = {
     title:   "Know when your item sells",
     bullets: [
       "Get notified the moment a buyer wants your item",
-      "Know when payment is confirmed in escrow",
+      "Know when payment is confirmed for your order",
       "Get alerted when your payout is ready",
     ],
     cta: "Enable — notify me when it sells",

@@ -41,7 +41,7 @@ type PendingRequest = {
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   pending:  { label: "Awaiting payment", bg: "#FFF8E1", color: "#92400E" },
-  escrow:   { label: "In escrow",        bg: "#EEF2FF", color: "#4338CA" },
+  escrow:   { label: "Order Processing",        bg: "#EEF2FF", color: "#4338CA" },
   released: { label: "Complete",         bg: "#E8F5E9", color: "#2E7D32" },
   disputed: { label: "Dispute raised",   bg: "#FEF2F2", color: "#C62828" },
   refunded: { label: "Refunded",         bg: "#F3F4F6", color: "#6B7280" },
@@ -213,7 +213,7 @@ export default function PurchasesClient({
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? "Could not confirm. Try again."); return; }
-      toast.success("✅ Confirmed! Payment will be released to the seller.");
+      toast.success("✅ Delivery confirmed! Order complete.");
       setShowConfirm(null);
       // Show rating prompt immediately after confirmation
       setShowRating(txnId);
@@ -244,7 +244,7 @@ export default function PurchasesClient({
       <div style={{ position: "sticky", top: 56, zIndex: 30, padding: "12px 16px", backgroundColor: "var(--color-bg)", borderBottom: "1px solid var(--color-border)" }}>
         <p style={{ fontFamily: "var(--font-heading)", fontSize: 18, fontWeight: 700, color: "var(--color-header)", margin: 0 }}>My Purchases</p>
         <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "2px 0 0" }}>
-          Tap "Item Received" when you collect your item to release payment to the seller
+          Tap "Item Received" when you collect your item to complete your order
         </p>
       </div>
 
@@ -318,7 +318,7 @@ export default function PurchasesClient({
           <div style={{ textAlign: "center", padding: "60px 20px" }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🛍️</div>
             <p style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text)", margin: "0 0 6px" }}>No purchases yet</p>
-            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px" }}>Items you buy via escrow appear here</p>
+            <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 20px" }}>Items you buy securely appear here</p>
             <button onClick={() => router.push("/marketplace")}
               style={{ padding: "12px 24px", borderRadius: 12, border: "none", backgroundColor: "var(--color-primary)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
               Browse Marketplace
@@ -369,17 +369,17 @@ export default function PurchasesClient({
                     </div>
                   )}
 
-                  {/* Escrow actions */}
+                  {/* Order actions */}
                   {isEscrow && (
                     <div style={{ padding: "12px 14px" }}>
                       {!p.waybillDetails && (
                         <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 10px", lineHeight: 1.5 }}>
-                          Your payment is safely held in escrow. Once you collect the item, tap below to release payment to the seller.
+                          Your order is protected. Once you collect the item, tap below to confirm delivery.
                         </p>
                       )}
                       {p.waybillDetails && (
                         <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 10px", lineHeight: 1.5 }}>
-                          When you receive the item, confirm below to release payment to the seller.
+                          When you receive the item, confirm below to complete your order.
                         </p>
                       )}
                       <button onClick={() => setShowConfirm(p.id)}
@@ -427,7 +427,7 @@ export default function PurchasesClient({
               Confirm you received the item
             </h2>
             <p style={{ fontSize: 13, color: "var(--color-text-muted)", margin: "0 0 16px", lineHeight: 1.6 }}>
-              Only confirm if you have physically collected the item and it matches the listing. Once confirmed, payment is released to the seller and cannot be reversed.
+              Only confirm if you have physically collected the item and it matches the listing. Once confirmed, your order is marked complete and cannot be reversed.
             </p>
             <div style={{ padding: "12px 14px", borderRadius: 12, backgroundColor: "#FFF8E1", border: "1px solid #FAC775", marginBottom: 16 }}>
               <p style={{ fontSize: 12, color: "#92400E", margin: 0, fontWeight: 600 }}>

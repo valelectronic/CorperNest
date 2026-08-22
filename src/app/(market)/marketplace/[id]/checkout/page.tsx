@@ -165,11 +165,11 @@ export default function MarketplaceCheckoutPage() {
 
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "24px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
 
-        {/* Escrow explanation */}
+        {/* Order explanation */}
         <div style={{ padding: "14px", borderRadius: 14, backgroundColor: "#F0FDF4", border: "1px solid #86EFAC" }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: "#15803D", margin: "0 0 6px" }}>🔒 Your money is protected</p>
           <p style={{ fontSize: 12, color: "#15803D", margin: 0, lineHeight: 1.6 }}>
-            Your payment is held by CorperNest until you confirm you have received the item in good condition. The seller only gets paid after you approve.
+           Your order is covered by our buyer protection guarantee. If the item is not as described, raise a dispute within 48 hours and we will investigate.
           </p>
         </div>
 
@@ -187,7 +187,7 @@ export default function MarketplaceCheckoutPage() {
             <span style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text)" }}>₦{details.agreedPrice.toLocaleString("en-NG")}</span>
           </div>
           <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--color-border)", display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>CorperNest escrow fee (5%)</span>
+            <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>CorperNest service fee (5%)</span>
             <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>₦{details.commission.toLocaleString("en-NG")}</span>
           </div>
           <div style={{ padding: "12px 14px", display: "flex", justifyContent: "space-between", backgroundColor: "var(--color-light)" }}>
@@ -203,7 +203,7 @@ export default function MarketplaceCheckoutPage() {
             { icon: "💳", text: "You pay via Paystack — card, bank transfer, or USSD" },
             { icon: "📦", text: "Seller's contact details are revealed — coordinate pickup" },
             { icon: "✅", text: "Tap \"Item Received\" in Purchases when you collect the item" },
-            { icon: "💰", text: "Seller receives payment within 24 hours of your confirmation" },
+            { icon: "💰", text: "Order complete — seller fulfils within 24 hours of delivery confirmation" },
           ].map(({ icon, text }, i) => (
             <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: i < 3 ? 10 : 0 }}>
               <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
@@ -219,7 +219,7 @@ export default function MarketplaceCheckoutPage() {
         </button>
 
         <p style={{ fontSize: 11, color: "var(--color-text-muted)", textAlign: "center", margin: 0, lineHeight: 1.6 }}>
-          Payments are processed securely by Paystack. CorperNest holds your money in escrow until you confirm receipt. Disputes must be raised within 48 hours.
+          Payments are processed securely by Paystack. All orders are covered by our buyer protection policy. Disputes must be raised within 48 hours.
         </p>
       </div>
 

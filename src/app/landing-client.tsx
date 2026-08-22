@@ -60,8 +60,9 @@ export default function LandingClient() {
           <span style={{ color: "#43A047", fontStyle: "italic" }}>No scams.</span>
         </h1>
 
+        {/* Changed: "escrow payments" → "secure checkout" */}
         <p style={{ fontSize: 15, color: "#444", lineHeight: 1.75, margin: "0 0 28px", maxWidth: 420 }}>
-          CorperNest helps Nigerians relocating to new cities find verified housing and buy or sell items safely — with escrow payments and verified agents protecting every transaction.
+          CorperNest helps Nigerians relocating to new cities find verified housing and buy or sell items safely, with secure checkout and verified agents protecting every transaction.
         </p>
 
         {/* Stats */}
@@ -113,7 +114,7 @@ export default function LandingClient() {
                 Find Verified Housing
               </p>
               <p style={{ fontSize: 13, color: "#555", margin: 0, lineHeight: 1.65 }}>
-                Every listing is reviewed before going live. Book a free inspection, meet a verified agent, and see all their available properties in one visit. Pay the agent directly — nothing to us before you see the property.
+                Every listing is reviewed before going live. Book a free inspection, meet a verified agent, and see all their available properties in one visit. Pay the agent directly, nothing to us before you see the property.
               </p>
             </div>
           </div>
@@ -129,7 +130,7 @@ export default function LandingClient() {
           </Link>
         </div>
 
-        {/* Marketplace card */}
+        {/* Marketplace card — Changed: "Buy & Sell via Escrow" → "Buy & Sell Securely" */}
         <div style={{
           border: "1.5px solid #E8F0E8", borderRadius: 20,
           padding: "20px", background: "#fff",
@@ -143,10 +144,11 @@ export default function LandingClient() {
             </div>
             <div>
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 16, color: "#0D1F0D", margin: "0 0 4px" }}>
-                Buy & Sell via Escrow
+                Buy &amp; Sell Securely
               </p>
+              {/* Changed: "held in escrow" → "buyer protection guarantee" */}
               <p style={{ fontSize: 13, color: "#555", margin: 0, lineHeight: 1.65 }}>
-                Selling items before relocating? Buying something locally? Your payment is held securely in escrow until you confirm you've received the item. Safe transactions, zero scams, total peace of mind.
+                Selling items before relocating? Buying something locally? Every order is backed by our buyer protection guarantee and verified merchant fulfilment. Safe transactions, zero scams, total peace of mind.
               </p>
             </div>
           </div>
@@ -172,8 +174,10 @@ export default function LandingClient() {
           {[
             {
               icon: "🔒",
-              title: "Escrow payments",
-              body:  "For marketplace purchases, your money is held safely until you confirm you received the item. Sellers only get paid after you approve.",
+              // Changed: "Escrow payments" → "Secure Checkout"
+              title: "Secure Checkout",
+              // Changed: "held safely" → "buyer protection and transparent return coverage"
+              body:  "For marketplace purchases, all orders are backed by full buyer protection and transparent return coverage for a risk-free experience.",
             },
             {
               icon: "✅",

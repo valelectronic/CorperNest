@@ -1,5 +1,5 @@
 // src/app/api/marketplace/checkout/init/route.ts
-// Initializes a Paystack payment for a marketplace escrow transaction.
+// Initializes a Paystack payment for a marketplace order transaction.
 // Called when buyer taps "Pay Now" on the checkout page.
 //
 // Guards:

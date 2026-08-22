@@ -172,7 +172,7 @@ export default function ConfirmAvailabilityPage() {
             🛍️ A buyer wants to purchase this item
           </p>
           <p style={{ fontSize: 12, color: "#4338CA", margin: 0, lineHeight: 1.6 }}>
-            They are waiting to pay via escrow. Confirm the item is still with you so they can proceed. If you confirm, you have nothing to do until they pay — then coordinate pickup.
+            They are waiting to complete their order. Confirm the item is still with you so they can proceed. If you confirm, you have nothing to do until they pay — then coordinate pickup.
           </p>
         </div>
 

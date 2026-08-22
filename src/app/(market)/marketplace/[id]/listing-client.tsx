@@ -173,7 +173,6 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
   const [photoIndex,             setPhotoIndex]             = useState(0);
   const [zoomOpen,               setZoomOpen]               = useState(false);
   const [saved,                  setSaved]                  = useState(false);
-  const [savingItem,             setSavingItem]             = useState(false);
   const [showBuyModal,           setShowBuyModal]           = useState(false);
   const [showPhoneVerify,        setShowPhoneVerify]        = useState(false);
   const [showPermissionPrompt,   setShowPermissionPrompt]   = useState(false);
@@ -272,7 +271,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
           clearInterval(poll);
         }
       } catch { /* silent */ }
-    }, 20_000);
+    }, 60_000);
 
     return () => clearInterval(poll);
   }, [offer?.id, offer?.status, offer?.counterCount]);
@@ -311,7 +310,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
           router.refresh();
         }
       } catch { /* silent */ }
-    }, 30_000);
+    }, 60_000);
 
     return () => { clearInterval(tickTimer); clearInterval(pollTimer); };
   }, [availRequest?.id, availRequest?.status]);
@@ -339,7 +338,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
       `💰 Price: ${priceStr}${refLine}${saveLine}\n` +
       `📦 ${condLabel} · ${listing.category}\n` +
       `📍 ${listing.lga}, ${listing.state}${receipt}\n` +
-      `🔒 Buy safely via Escrow on CorperNest\n\n` +
+      `🔒 Buy safely on CorperNest — buyer protected\n\n` +
       `📲 Community: chat.whatsapp.com/GqaBzJjdPdlDMwjvaGQQeJ\n` +
       `Follow us on X: @_Corpernest`;
 
@@ -349,18 +348,6 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
       // Fallback — include URL in text for WhatsApp web
       window.open(`https://wa.me/?text=${encodeURIComponent(text + `\n\n👉 ${url}`)}`, "_blank");
     }
-  }
-
-  // ── Save ──────────────────────────────────────────────────────────────────
-  async function handleSave() {
-    if (!isLoggedIn) { router.push("/signin?redirect=" + encodeURIComponent(window.location.pathname)); return; }
-    setSavingItem(true);
-    try {
-      const res  = await fetch("/api/marketplace/listings/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ listingId: listing.id }) });
-      const data = await res.json();
-      if (res.ok) { setSaved(data.saved); toast(data.saved ? "Saved to bookmarks" : "Removed from bookmarks"); }
-    } catch { toast.error("Could not save. Try again."); }
-    finally { setSavingItem(false); }
   }
 
   // Quantity selector — used when seller has set bulk pricing
@@ -524,12 +511,6 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={handleSave} disabled={savingItem}
-              style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "rgba(0,0,0,0.4)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill={saved ? "white" : "none"}>
-                <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
             <button onClick={handleShare}
               style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "rgba(0,0,0,0.4)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -619,7 +600,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
                 <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                   <button onClick={handleBuy} disabled={buyLoading}
                     style={{ flex: 2, padding: "14px", borderRadius: 14, border: "none", backgroundColor: buyLoading ? "var(--color-border)" : "var(--color-primary)", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: buyLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                    {buyLoading ? <Spinner /> : "🔒 Buy via Escrow"}
+                    {buyLoading ? <Spinner /> : "🔒 Buy Securely"}
                   </button>
                   {(!offer || ["declined", "expired"].includes(offer.status)) && (
                     <button onClick={handleOfferClick}
@@ -664,7 +645,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
               </>
             ) : listing.status === "reserved" ? (
               <button disabled style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", backgroundColor: "#FFF8E1", color: "#92400E", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "not-allowed" }}>
-                ⏳ Payment in Escrow
+               ⏳ Order Processing
               </button>
             ) : listing.status === "sold" ? (
               <button disabled style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", backgroundColor: "var(--color-border)", color: "var(--color-text-muted)", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "not-allowed" }}>
@@ -726,6 +707,10 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
             </button>
           </div>
         </div>
+
+
+
+
 
         {/* Item details */}
         <div style={{ borderRadius: 14, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", overflow: "hidden", marginBottom: 20 }}>
@@ -863,7 +848,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
               )}
 
               <p style={{ fontSize: 10, color: "var(--color-text-muted)", margin: "0 0 8px", lineHeight: 1.5 }}>
-                🔒 No contact details shared until payment confirmed. Each side gets 2 counter attempts.
+                🔒 Contact details shared only after order is confirmed. Each side gets 2 counter attempts.
               </p>
             </div>
 
@@ -949,7 +934,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
                 <span style={{ fontSize: 14, fontWeight: 800, color: "var(--color-primary)" }}>₦{listing.price.toLocaleString("en-NG")}</span>
               </div>
               <div style={{ paddingTop: 8, borderTop: "1px solid var(--color-border)" }}>
-                <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Nothing is charged until you confirm receipt</span>
+                <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>Your order is covered by our buyer protection guarantee</span>
               </div>
             </div>
             <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "0 0 16px", textAlign: "center" }}>
@@ -1021,7 +1006,7 @@ export default function ListingClient({ listing, seller, similar, currentUserId,
                 </div>
                 <button onClick={() => router.push(`/marketplace/${listing.id}/checkout?availability=${availRequest.id}`)}
                   style={{ width: "100%", padding: "16px", borderRadius: 14, border: "none", backgroundColor: "#15803D", color: "#fff", fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 8 }}>
-                  🔒 Pay ₦{listing.price.toLocaleString("en-NG")} via Escrow
+                  🔒 Complete Order — ₦{listing.price.toLocaleString("en-NG")}
                 </button>
                 <button onClick={() => setShowBuyModal(false)}
                   style={{ width: "100%", padding: "12px", borderRadius: 14, border: "none", backgroundColor: "transparent", color: "var(--color-text-muted)", fontSize: 13, cursor: "pointer" }}>

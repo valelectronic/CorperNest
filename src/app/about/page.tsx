@@ -172,6 +172,9 @@ export default function AboutPage() {
             <Link href="/" style={{ padding: "13px 24px", borderRadius: 12, fontSize: 14, fontWeight: 600, background: "var(--color-bg)", color: "var(--color-text-muted)", textDecoration: "none", border: "1px solid var(--color-border)", width: "100%" }}>
               Back to home
             </Link>
+            <Link href="/terms" style={{ padding: "13px 24px", borderRadius: 12, fontSize: 14, fontWeight: 600, background: "var(--color-bg)", color: "var(--color-text-muted)", textDecoration: "none", border: "1px solid var(--color-border)" }}>
+  Terms of Service
+</Link>
           </div>
 
           {/* Social links */}

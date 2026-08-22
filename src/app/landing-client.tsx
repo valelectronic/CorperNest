@@ -245,6 +245,7 @@ export default function LandingClient() {
           <Link href="/home"        style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Housing</Link>
           <Link href="/marketplace" style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Marketplace</Link>
           <Link href="/signin"      style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Sign in</Link>
+          <Link href="/terms" style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Terms</Link>
         </div>
         <p style={{ fontSize: 12, color: "#bbb", margin: 0 }}>
           © {new Date().getFullYear()} Bridgenest Limited · RC 9630078

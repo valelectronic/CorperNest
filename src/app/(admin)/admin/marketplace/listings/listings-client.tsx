@@ -18,8 +18,10 @@ type Listing = {
   state:         string;
   sellerId:      string;
   sellerName:    string | null;
-  sellerPhone:   string | null;
-  createdAt:     Date | string;
+   sellerPhone:     string | null;
+  sellerGovIdUrl:  string | null;
+  sellerGovIdType: string | null;
+  createdAt:       Date | string;
   approvedAt:    Date | string | null;
   reportCount:   number;
   reportReasons: string[];
@@ -149,9 +151,48 @@ export default function AdminMarketListingsClient({ pending, active, flagged, ot
                 </a>
               )}
             </div>
-            <p style={{ fontSize: 10, color: "var(--color-text-muted)", margin: "2px 0 0" }}>
-              {timeAgo(l.createdAt)}
-            </p>
+            
+                        {showApprove && (
+              l.sellerGovIdUrl ? (
+                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                  <a href={l.sellerGovIdUrl} target="_blank" rel="noopener noreferrer">
+                    <img src={l.sellerGovIdUrl} alt="Seller ID"
+                      style={{ width: 48, height: 32, objectFit: "cover", borderRadius: 6, border: "1px solid var(--color-border)" }} />
+                  </a>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-secondary)" }}>
+                    🪪 {l.sellerGovIdType ?? "ID uploaded"}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ marginTop: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#C62828", backgroundColor: "#FEF2F2", padding: "2px 8px", borderRadius: 20 }}>
+                    ⚠️ No ID uploaded
+                  </span>
+                </div>
+              )
+            )}
+
+            {/* Government ID — shown on pending listings only */}
+            {showApprove && (
+              l.sellerGovIdUrl ? (
+                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                  <a href={l.sellerGovIdUrl} target="_blank" rel="noopener noreferrer">
+                    <img src={l.sellerGovIdUrl} alt="Seller ID"
+                      style={{ width: 48, height: 32, objectFit: "cover", borderRadius: 6, border: "1px solid var(--color-border)" }} />
+                  </a>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-secondary)" }}>
+                    🪪 {l.sellerGovIdType ?? "ID uploaded"}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ marginTop: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#C62828", backgroundColor: "#FEF2F2", padding: "2px 8px", borderRadius: 20 }}>
+                    ⚠️ No ID uploaded
+                  </span>
+                </div>
+              )
+            )}
+
             {l.reportCount > 0 && (
               <div style={{ marginTop: 6, padding: "6px 10px", borderRadius: 8, backgroundColor: "#FEF2F2", border: "1px solid #FCA5A5" }}>
                 <p style={{ fontSize: 10, fontWeight: 700, color: "#C62828", margin: "0 0 2px" }}>

@@ -42,6 +42,7 @@ type PendingRequest = {
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   pending:  { label: "Awaiting payment", bg: "#FFF8E1", color: "#92400E" },
   escrow:   { label: "Order Processing",        bg: "#EEF2FF", color: "#4338CA" },
+  buyer_confirmed: { label: "Delivery Confirmed", bg: "#E8F5E9", color: "#2E7D32" },
   released: { label: "Complete",         bg: "#E8F5E9", color: "#2E7D32" },
   disputed: { label: "Dispute raised",   bg: "#FEF2F2", color: "#C62828" },
   refunded: { label: "Refunded",         bg: "#F3F4F6", color: "#6B7280" },

@@ -18,11 +18,13 @@ export async function GET() {
   }
 
   const [u] = await db
-    .select({
+        .select({
       marketSellerVerified: user.marketSellerVerified,
       marketAccountName:    user.marketAccountName,
       marketAccountNumber:  user.marketAccountNumber,
       marketBankCode:       user.marketBankCode,
+      governmentIdUrl:      user.governmentIdUrl,
+      governmentIdType:     user.governmentIdType,
     })
     .from(user)
     .where(eq(user.id, session.user.id));

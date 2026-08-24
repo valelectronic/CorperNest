@@ -128,7 +128,7 @@ export default function TermsPage() {
           <p style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.8, margin: 0 }}>
             For support, disputes, or enquiries, contact us at:<br /><br />
             <strong>BRIDGENEST LIMITED</strong><br />
-            Email: <a href="mailto:corpernestng@gmail.com" style={{ color: "var(--color-primary)" }}>corpernestng@gmail.com</a><br />
+            Email: <a href="mailto:corpernest@bridgenest.com.ng" style={{ color: "var(--color-primary)" }}>corpernest@bridgenest.com.ng</a><br />
             Website: <a href="https://www.corpernest.com.ng" style={{ color: "var(--color-primary)" }}>corpernest.com.ng</a><br />
             RC Number: 9630078<br />
             Address: Eket, Akwa Ibom State, Nigeria

@@ -31,6 +31,9 @@ export const user = pgTable("user", {
   // Marketplace vendor tier: "basic" (default) | "vendor" (KYC approved)
   marketVendorTier:     text("market_vendor_tier").default("basic"),
   fcmToken:         text("fcm_token"),
+  governmentIdUrl:      text("government_id_url"),
+  governmentIdType:     text("government_id_type"),
+  marketRecipientCode:    text("market_recipient_code"),
 });
 
 // ─── SESSION ─────────────────────────────────────────────────────────────────

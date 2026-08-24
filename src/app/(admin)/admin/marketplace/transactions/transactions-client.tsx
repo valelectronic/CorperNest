@@ -26,6 +26,7 @@ type Txn = {
 const STATUS: Record<string, { label: string; bg: string; color: string }> = {
   pending:  { label: "Pending",     bg: "#F3F4F6", color: "#6B7280" },
   escrow:   { label: "In Escrow",   bg: "#EEF2FF", color: "#4338CA" },
+  buyer_confirmed: { label: "Buyer Confirmed", bg: "#E8F5E9", color: "#15803D" },
   released: { label: "Paid out",    bg: "#E8F5E9", color: "#2E7D32" },
   disputed: { label: "Disputed",    bg: "#FEF2F2", color: "#C62828" },
   refunded: { label: "Refunded",    bg: "#F3F4F6", color: "#6B7280" },
@@ -52,8 +53,8 @@ export default function AdminTransactionsClient({ transactions }: { transactions
     finally   { setMarking(null); }
   }
 
-  const needPayout  = transactions.filter((t) => t.status === "escrow" && t.confirmedAt);
-  const inEscrow    = transactions.filter((t) => t.status === "escrow" && !t.confirmedAt);
+  const needPayout  = transactions.filter((t) => t.status === "buyer_confirmed");
+  const inEscrow    = transactions.filter((t) => t.status === "escrow");
   const pending     = transactions.filter((t) => t.status === "pending");
   const released    = transactions.filter((t) => t.status === "released");
   const others      = transactions.filter((t) => !["escrow", "released", "pending"].includes(t.status));
@@ -103,7 +104,7 @@ export default function AdminTransactionsClient({ transactions }: { transactions
           {t.confirmedAt && <p style={{ fontSize: 10, color: "var(--color-text-muted)", margin: "4px 0 0" }}>Buyer confirmed: {fmt(t.confirmedAt)}</p>}
           {t.releasedAt  && <p style={{ fontSize: 10, color: "#15803D", margin: "4px 0 0", fontWeight: 600 }}>Paid out: {fmt(t.releasedAt)}</p>}
         </div>
-        {t.status === "escrow" && t.confirmedAt && (
+        {t.status === "buyer_confirmed" && (
           <div style={{ padding: "0 14px 12px" }}>
             <button onClick={() => markReleased(t.id)} disabled={marking === t.id}
               style={{ width: "100%", padding: "12px", borderRadius: 12, border: "none", backgroundColor: "#15803D", color: "#fff", fontSize: 13, fontWeight: 700, cursor: marking === t.id ? "not-allowed" : "pointer", opacity: marking === t.id ? 0.7 : 1 }}>

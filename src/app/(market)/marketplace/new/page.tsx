@@ -134,6 +134,13 @@ export default function NewListingPage() {
   const [bulkMinQty,   setBulkMinQty]   = useState(5);
   const [bulkPrice,    setBulkPrice]    = useState("");
 
+    // Government ID — required for new sellers, skipped if already uploaded
+  const [govIdUrl,             setGovIdUrl]             = useState("");
+  const [govIdType,            setGovIdType]            = useState("");
+  const [govIdUploading,       setGovIdUploading]       = useState(false);
+  const [govIdAlreadyUploaded, setGovIdAlreadyUploaded] = useState(false);
+  const govIdFileRef = useRef<HTMLInputElement>(null);
+
   // UI state
   const [agreed,               setAgreed]               = useState(false);
   const [submitting,           setSubmitting]           = useState(false);
@@ -200,13 +207,15 @@ export default function NewListingPage() {
     fetch("/api/marketplace/seller-status")
       .then((r) => r.json())
       .then((data) => {
-        if (data.marketSellerVerified && data.marketAccountName) {
+                if (data.marketSellerVerified && data.marketAccountName) {
           setAccountNumber(data.marketAccountNumber ?? "");
           setBankCode(data.marketBankCode ?? "");
           setBankSearch(banks.find((b) => b.code === data.marketBankCode)?.name ?? data.marketBankCode ?? "");
           setAccountName(data.marketAccountName);
           setBankVerified(true);
         }
+        // If ID already uploaded in a previous listing — skip the upload step
+        if (data.governmentIdUrl) setGovIdAlreadyUploaded(true);
       })
       .catch(() => {});
   }, [banks]);
@@ -331,7 +340,23 @@ export default function NewListingPage() {
       });
     } catch { /* silent */ }
   }
-
+  // ── Government ID upload ──────────────────────────────────────────────────
+  async function handleGovIdUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (govIdFileRef.current) govIdFileRef.current.value = "";
+    setGovIdUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res  = await fetch("/api/marketplace/upload-id", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Upload failed"); return; }
+      setGovIdUrl(data.url);
+      toast.success("ID uploaded ✓");
+    } catch { toast.error("Upload failed. Try again."); }
+    finally   { setGovIdUploading(false); }
+  }
   // ── Bank verify ───────────────────────────────────────────────────────────
   async function handleVerifyBank() {
     if (!accountNumber || !bankCode) return;
@@ -386,6 +411,8 @@ export default function NewListingPage() {
     if (!lga)                       { toast.error("Select your LGA.");             return; }
     if (!landmark.trim())           { toast.error("Enter the nearest landmark."); return; }
     if (!images.length)             { toast.error("Upload at least 1 photo.");    return; }
+    if (!govIdAlreadyUploaded && !govIdUrl)   { toast.error("Upload a government-issued ID to continue."); return; }
+    if (!govIdAlreadyUploaded && !govIdType)  { toast.error("Select your ID type.");                       return; }
     if (!bankVerified)              { toast.error("Verify your bank account.");   return; }
     if (!agreed)                    { toast.error("Accept the seller agreement."); return; }
 
@@ -408,6 +435,8 @@ export default function NewListingPage() {
           listingType,
           title:       title.trim(),
           bulkMinQty:  bulkEnabled ? bulkMinQty  : null,
+           governmentIdUrl:  govIdUrl  || null,
+          governmentIdType: govIdType || null,
           bulkPrice:   bulkEnabled ? Math.round(Number(bulkPrice.replace(/,/g, "")) * 100) : null,
           category,
           condition:   isFood(category) ? null : condition,
@@ -1018,6 +1047,82 @@ export default function NewListingPage() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+                    {/* ── GOVERNMENT ID — required for KYC compliance ── */}
+          {category && (
+            <div style={{ padding: "14px", borderRadius: 12, backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)" }}>
+              <p style={{ fontFamily: "var(--font-heading)", fontSize: 13, fontWeight: 700, color: "var(--color-text)", margin: "0 0 4px" }}>
+                Identity Verification
+              </p>
+              <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: "0 0 12px", lineHeight: 1.5 }}>
+                Required by law for all marketplace sellers. Your ID is reviewed by our team and never shared publicly.
+              </p>
+
+              {govIdAlreadyUploaded ? (
+                // Already uploaded in a previous listing — skip
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, backgroundColor: "#E8F5E9", border: "1.5px solid #A5D6A7" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" fill="#2E7D32" />
+                    <path d="M8 12l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#2E7D32", margin: 0 }}>
+                    Identity already verified ✓
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* ID type selector */}
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={labelStyle}>ID type</label>
+                    <select value={govIdType} onChange={(e) => setGovIdType(e.target.value)} style={inputStyle}>
+                      <option value="">Select your ID type</option>
+                      <option value="NIN Slip">NIN Slip</option>
+                      <option value="Voter's Card">Voter&apos;s Card</option>
+                      <option value="Driver's License">Driver&apos;s License</option>
+                      <option value="International Passport">International Passport</option>
+                    </select>
+                  </div>
+
+                  {/* Upload button */}
+                  {govIdUrl ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, backgroundColor: "#E8F5E9", border: "1.5px solid #A5D6A7" }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" fill="#2E7D32" />
+                        <path d="M8 12l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#2E7D32", margin: 0 }}>ID photo uploaded ✓</p>
+                      <button type="button" onClick={() => setGovIdUrl("")}
+                        style={{ marginLeft: "auto", fontSize: 11, color: "#C62828", background: "none", border: "none", cursor: "pointer" }}>
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={() => govIdFileRef.current?.click()}
+                      disabled={govIdUploading}
+                      style={{ width: "100%", padding: "12px", borderRadius: 10, border: "1.5px dashed var(--color-border)", backgroundColor: "var(--color-bg)", cursor: govIdUploading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                      {govIdUploading ? (
+                        <>
+                          <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--color-border)", borderTopColor: "var(--color-primary)", animation: "spin 0.8s linear infinite", display: "inline-block" }} />
+                          <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>Uploading…</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="var(--color-primary)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-primary)" }}>Upload ID photo</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <input ref={govIdFileRef} type="file" accept="image/*" hidden onChange={handleGovIdUpload} />
+                  <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "6px 0 0" }}>
+                    Take a clear photo of your ID. Accepted: NIN slip, Voter&apos;s card, Driver&apos;s license, Passport.
+                  </p>
+                </>
+              )}
             </div>
           )}
 

@@ -27,8 +27,10 @@ export default async function AdminMarketListingsPage() {
       lga:         marketplaceListing.lga,
       state:       marketplaceListing.state,
       sellerId:    marketplaceListing.sellerId,
-      sellerName:  user.name,
-      sellerPhone: user.phoneNumber,
+            sellerName:     user.name,
+      sellerPhone:    user.phoneNumber,
+      sellerGovIdUrl: user.governmentIdUrl,
+      sellerGovIdType: user.governmentIdType,
     })
     .from(marketplaceListing)
     .innerJoin(user, eq(marketplaceListing.sellerId, user.id))
@@ -56,12 +58,14 @@ export default async function AdminMarketListingsPage() {
     reportMap[r.listingId].reasons.push(r.reason ?? "");
   }
 
-  const listings = rows.map((r) => ({
+    const listings = rows.map((r) => ({
     ...r,
-    price:       r.price / 100,
-    images:      r.images ?? [],
-    reportCount: reportMap[r.id]?.count ?? 0,
-    reportReasons: reportMap[r.id]?.reasons ?? [],
+    price:          r.price / 100,
+    images:         r.images ?? [],
+    reportCount:    reportMap[r.id]?.count ?? 0,
+    reportReasons:  reportMap[r.id]?.reasons ?? [],
+    sellerGovIdUrl:  r.sellerGovIdUrl  ?? null,
+    sellerGovIdType: r.sellerGovIdType ?? null,
   }));
 
   const pending  = listings.filter((l) => l.status === "pending");

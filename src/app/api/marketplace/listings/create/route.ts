@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
     refPriceGoogleUrl = null,
     bulkMinQty        = null,
     bulkPrice         = null,
+    governmentIdUrl = null,
+    governmentIdType = null,
   } = body;
 
   // ── Enforce 5-listing limit ────────────────────────────────────────────────
@@ -89,14 +91,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Save verified bank details to user profile for future listings
+        // Save verified bank details + government ID to user profile for future listings
     await db.update(user).set({
       marketAccountNumber:  accountNumber,
       marketBankCode:       bankCode,
       marketAccountName:    accountName,
       marketSellerVerified: true,
+      // Only update ID fields if provided — preserves existing ID if already uploaded
+      ...(governmentIdUrl  ? { governmentIdUrl }  : {}),
+      ...(governmentIdType ? { governmentIdType } : {}),
     }).where(eq(user.id, session.user.id));
-
     const cleanBundleItems = (bundleItems as string[]).map((s) => s.trim()).filter(Boolean);
 
     // expiresAt: 21 days from now (reset to approvedAt + 21 when admin approves)

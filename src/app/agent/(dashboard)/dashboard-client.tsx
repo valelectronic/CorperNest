@@ -93,9 +93,9 @@ const REQUEST_TYPE_LABELS: Record<string, string> = {
 
 // Commission bank account — agents transfer here directly
 const COMMISSION_BANK = {
-  name:    "DIBIAH AMETORTOBARI TOBIN",
-  account: "1468155402",
-  bank:    "Access Bank",
+  name:    "Bridgenest LTD",
+  account: "8254642484",
+  bank:    "Moniepoint MFB",
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────

@@ -40,7 +40,7 @@ export default function AboutPage() {
             We believe housing and commerce should be something you can trust.
           </h1>
           <p style={{ fontSize: 15, color: "rgba(255,255,255,0.7)", lineHeight: 1.8, margin: 0 }}>
-            CorperNest is a verified housing and marketplace platform operating in Eket, Akwa Ibom. We connect renters with real identity-checked agents, and buyers with verified sellers, staying involved in every transaction from start to finish.
+            CorperNest is a verified housing, Park-Out & Earn, and marketplace platform operating in Eket, Akwa Ibom. We connect renters with verified housing opportunities, help outgoing tenants navigate the Park-Out process, and connect buyers with verified sellers.
           </p>
         </div>
       </div>
@@ -55,10 +55,10 @@ export default function AboutPage() {
             End the scam cycle in Nigerian local markets, housing and commerce alike.
           </h2>
           <p style={{ fontSize: 15, color: "var(--color-text-secondary)", lineHeight: 1.8, margin: "0 0 16px" }}>
-            In most Nigerian cities, finding accommodation means scrolling through WhatsApp groups, trusting strangers online, and paying money upfront for properties you've never seen. Buying or selling items carries the same risk, fake buyers, sellers who disappear after payment, and no one to turn to when things go wrong.
+            In most Nigerian cities, finding accommodation means scrolling through WhatsApp groups, trusting strangers online, and paying money upfront for properties you've never seen. Moving out of accommodation can create another problem — finding someone to take over the property while navigating a process that is often handled through informal channels. Buying or selling items carries the same risk, with fake buyers, sellers who disappear after payment, and no one to turn to when things go wrong.
           </p>
           <p style={{ fontSize: 15, color: "var(--color-text-secondary)", lineHeight: 1.8, margin: "0 0 16px" }}>
-  CorperNest was built to fix both problems, starting with Eket. By verifying every agent's identity and reviewing every listing before it goes live, we give renters a foundation of trust they can't get anywhere else. By processing marketplace orders through our verified checkout system, we protect both sides of every sale.
+  CorperNest was built to address these problems, starting with Eket. By verifying identities and reviewing housing and Park-Out listings before they go live, we give users a clearer foundation of trust. Through Park-Out & Earn, outgoing tenants can put available accommodation through a structured process for incoming tenants to explore. By processing marketplace orders through our verified checkout system, we protect both sides of every sale.
 </p>
           <p style={{ fontSize: 15, fontWeight: 600, color: "var(--color-header)", lineHeight: 1.8, margin: 0, padding: "16px", background: "var(--color-light)", borderRadius: 12, borderLeft: "3px solid var(--color-primary)" }}>
             We're not competing with Facebook or WhatsApp. We're solving the problem they created, because posting a listing or selling an item on social media is free, which means anyone can do it, including people with no intention of delivering.
@@ -160,7 +160,7 @@ export default function AboutPage() {
             Ready to get started?
           </h2>
           <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: "0 0 24px", lineHeight: 1.7 }}>
-            Find verified housing, or buy and sell items safely — all in one place.
+            Find verified housing, explore Park-Out & Earn, or buy and sell items safely — all in one place.
           </p>
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
             <Link href="/home" style={{ padding: "13px 24px", borderRadius: 12, fontSize: 14, fontWeight: 700, background: "var(--color-primary)", color: "#fff", textDecoration: "none" }}>
@@ -168,6 +168,9 @@ export default function AboutPage() {
             </Link>
             <Link href="/marketplace" style={{ padding: "13px 24px", borderRadius: 12, fontSize: 14, fontWeight: 700, background: "var(--color-header)", color: "#fff", textDecoration: "none" }}>
               Browse marketplace
+            </Link>
+            <Link href="/parkout" style={{ padding: "13px 24px", borderRadius: 12, fontSize: 14, fontWeight: 700, background: "var(--color-light)", color: "var(--color-header)", textDecoration: "none", border: "1px solid var(--color-border)" }}>
+              Explore Park-Out
             </Link>
             <Link href="/" style={{ padding: "13px 24px", borderRadius: 12, fontSize: 14, fontWeight: 600, background: "var(--color-bg)", color: "var(--color-text-muted)", textDecoration: "none", border: "1px solid var(--color-border)", width: "100%" }}>
               Back to home
@@ -183,6 +186,14 @@ export default function AboutPage() {
               Follow us
             </p>
             <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+              <a href="https://www.facebook.com/corpernestng" target="_blank" rel="noopener noreferrer"
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", textDecoration: "none", color: "var(--color-text)" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14 8h3V4h-3c-3.31 0-5 1.69-5 5v3H6v4h3v4h3v-4h3l1-4h-4V9c0-.67.33-1 1-1Z" />
+                </svg>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Facebook</span>
+              </a>
+
               <a href="https://x.com/_Corpernest" target="_blank" rel="noopener noreferrer"
                 style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: "1px solid var(--color-border)", backgroundColor: "var(--color-card)", textDecoration: "none", color: "var(--color-text)" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

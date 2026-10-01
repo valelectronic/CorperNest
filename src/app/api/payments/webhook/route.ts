@@ -2,9 +2,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
-  inspectionPayment, booking, listing, rentRecord, user,
-  marketplaceTransaction, marketplaceListing, marketplaceAvailabilityRequest,
+  inspectionPayment,
+  booking,
+  listing,
+  rentRecord,
+  user,
+  marketplaceTransaction,
+  marketplaceListing,
+  marketplaceAvailabilityRequest,
+  parkoutAmbassadorApplication,
+  parkoutInspection,
+  parkoutListing,
 } from "@/db/schema";
+
 import { eq, and, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createHmac } from "crypto";
@@ -44,23 +54,30 @@ export async function POST(req: NextRequest) {
       reference: string;
       amount:    number;
       status:    string;
-      metadata?: {
-        type?:        string;
-        rentRecordId?: string;
-        bookingId?:   string;
-        agentId?:     string;
-        agentName?:   string;
-        // Marketplace fields
-        transactionId?:         string;
-        availabilityRequestId?: string;
-        listingId?:             string;
-        sellerId?:              string;
-        buyerName?:             string;
-        listingTitle?:          string;
-        agreedPrice?:           number;
-        commission?:            number;
-        sellerPayout?:          number;
-      };
+     metadata?: {
+  type?:        string;
+  rentRecordId?: string;
+  bookingId?:   string;
+  agentId?:     string;
+  agentName?:   string;
+
+  // Marketplace fields
+  transactionId?:         string;
+  availabilityRequestId?: string;
+  listingId?:             string;
+  sellerId?:              string;
+  buyerName?:             string;
+  listingTitle?:          string;
+  agreedPrice?:           number;
+  commission?:            number;
+  sellerPayout?:          number;
+
+  applicationId?: string;
+  inspectionId?:  string;
+  incomingUserId?: string;
+  userId?:        string;
+  userName?:      string;
+};
       customer: { email: string };
     };
   };
@@ -82,6 +99,14 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Route by metadata type ─────────────────────────────────────────────
+   if (metadata?.type === "parkout_ambassador_vetting") {
+    return handleAmbassadorVettingPayment(reference, metadata);
+  }
+
+  if (metadata?.type === "parkout_inspection_fee") {
+  return handleParkoutInspectionPayment(reference, amount, metadata);
+}
+
   if (metadata?.type === "marketplace") {
     return handleMarketplacePurchase(reference, amount, metadata, event.data.customer.email);
   }
@@ -99,6 +124,320 @@ export async function POST(req: NextRequest) {
   }
 
   return handleInspectionPayment(reference, amount, event.data.customer.email);
+}
+
+
+// ─── PARK-OUT INSPECTION PAYMENT HANDLER ─────────────────────────────────────
+
+async function handleParkoutInspectionPayment(
+  reference: string,
+  amount: number,
+  metadata: {
+    listingId?: string;
+    inspectionId?: string;
+    incomingUserId?: string;
+  }
+) {
+  const { listingId, inspectionId, incomingUserId } = metadata;
+
+  // ── Basic payment validation ─────────────────────────────────────────────
+  if (amount !== 300000) {
+    console.error(
+      `[webhook/parkout] Inspection amount mismatch: expected 300000, got ${amount}`
+    );
+
+    return NextResponse.json({ received: true });
+  }
+
+  // ── Required metadata validation ─────────────────────────────────────────
+  if (!listingId || !inspectionId || !incomingUserId || !reference) {
+    console.error(
+      "[webhook/parkout] Missing inspection payment metadata:",
+      metadata
+    );
+
+    return NextResponse.json({ received: true });
+  }
+
+  // ── Find the Park-Out inspection ─────────────────────────────────────────
+  const [inspection] = await db
+    .select({
+      id: parkoutInspection.id,
+      listingId: parkoutInspection.listingId,
+      incomingUserId: parkoutInspection.incomingUserId,
+      paystackRef: parkoutInspection.paystackRef,
+      paidAt: parkoutInspection.paidAt,
+      status: parkoutInspection.status,
+      lockExpiresAt: parkoutInspection.lockExpiresAt,
+    })
+    .from(parkoutInspection)
+    .where(eq(parkoutInspection.id, inspectionId))
+    .limit(1);
+
+  if (!inspection) {
+    console.error(
+      "[webhook/parkout] Inspection not found:",
+      inspectionId
+    );
+
+    return NextResponse.json({ received: true });
+  }
+
+  // ── Verify metadata matches the inspection ───────────────────────────────
+  if (
+    inspection.listingId !== listingId ||
+    inspection.incomingUserId !== incomingUserId
+  ) {
+    console.error(
+      "[webhook/parkout] Inspection metadata mismatch:",
+      inspectionId
+    );
+
+    return NextResponse.json({ received: true });
+  }
+
+  // ── Paystack reference verification ─────────────────────────────────────
+  if (inspection.paystackRef && inspection.paystackRef !== reference) {
+    console.error(
+      `[webhook/parkout] Paystack reference mismatch: expected ${inspection.paystackRef}, got ${reference}`
+    );
+
+    return NextResponse.json({ received: true });
+  }
+
+  // ── Fetch listing + tenant details ──────────────────────────────────────
+  const [[parkoutListingRow], [incomingUser]] = await Promise.all([
+    db
+      .select({
+        id: parkoutListing.id,
+        title: parkoutListing.title,
+        state: parkoutListing.state,
+        lga: parkoutListing.lga,
+        neighbourhood: parkoutListing.neighbourhood,
+        status: parkoutListing.status,
+      })
+      .from(parkoutListing)
+      .where(eq(parkoutListing.id, listingId))
+      .limit(1),
+
+    db
+      .select({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        phone: user.phone,
+      })
+      .from(user)
+      .where(eq(user.id, incomingUserId))
+      .limit(1),
+  ]);
+
+  if (!parkoutListingRow) {
+    console.error(
+      "[webhook/parkout] Listing not found:",
+      listingId
+    );
+
+    return NextResponse.json({ received: true });
+  }
+
+  const now = new Date();
+  const alreadyPaid = Boolean(inspection.paidAt);
+
+  // ── Confirm new payment ──────────────────────────────────────────────────
+  if (!alreadyPaid) {
+    const lockExpiresAt = new Date(
+      now.getTime() + 48 * 60 * 60 * 1000
+    );
+
+    await db
+      .update(parkoutInspection)
+      .set({
+        paystackRef: reference,
+        paidAt: now,
+        status: "pending",
+        lockExpiresAt,
+        updatedAt: now,
+      })
+      .where(eq(parkoutInspection.id, inspectionId));
+  }
+
+  // ── Lock the Park-Out listing ────────────────────────────────────────────
+  //
+  // The listing carries booking_locked.
+  // The inspection continues to use its own status.
+  await db
+    .update(parkoutListing)
+    .set({
+      status: "booking_locked",
+      updatedAt: now,
+    })
+    .where(eq(parkoutListing.id, listingId));
+
+  // ── Notify incoming tenant ──────────────────────────────────────────────
+  //
+  // Keep the existing tenant notification behaviour.
+  if (!alreadyPaid) {
+    await createNotification({
+      userId: incomingUserId,
+      type: "parkout-inspection-payment-confirmed",
+      title: "Inspection payment confirmed ✓",
+      message:
+        "Your ₦3,000 inspection payment has been confirmed. CorperNest will contact you about the inspection.",
+      link:
+        `/parkout/booking/${encodeURIComponent(listingId)}/success` +
+        `?reference=${encodeURIComponent(reference)}`,
+    }).catch((err) => {
+      console.error(
+        "[webhook/parkout] Tenant notification failed:",
+        err
+      );
+    });
+  }
+
+  // ── Admin email ──────────────────────────────────────────────────────────
+  try {
+    const tenantPhone =
+      incomingUser?.phoneNumber ??
+      incomingUser?.phone ??
+      "Not provided";
+
+    await sendAdminEmail(
+      `Park-Out Inspection Paid — ${parkoutListingRow.title}`,
+      `
+        <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+
+          <h2 style="color:#15803D;margin:0 0 8px">
+            Park-Out Inspection Payment Confirmed
+          </h2>
+
+          <p style="color:#6B7280;font-size:13px;margin:0 0 20px">
+            A tenant has paid the ₦3,000 Park-Out inspection fee.
+            The listing is now locked for the inspection process.
+          </p>
+
+          <table style="width:100%;border-collapse:collapse;font-size:14px">
+
+            <tr>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;color:#6B7280;width:150px">
+                Tenant
+              </td>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;font-weight:600">
+                ${incomingUser?.name ?? "Unknown"}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">
+                Phone
+              </td>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;font-weight:600">
+                ${tenantPhone}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">
+                Email
+              </td>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB">
+                ${incomingUser?.email ?? "Not provided"}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">
+                Property
+              </td>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;font-weight:600">
+                ${parkoutListingRow.title}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">
+                Location
+              </td>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB">
+                ${parkoutListingRow.neighbourhood},
+                ${parkoutListingRow.lga},
+                ${parkoutListingRow.state}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">
+                Amount Paid
+              </td>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;font-weight:700;color:#15803D">
+                ₦3,000
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">
+                Paystack Reference
+              </td>
+              <td style="padding:9px 0;border-bottom:1px solid #E5E7EB;font-family:monospace;font-size:12px">
+                ${reference}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:9px 0;color:#6B7280">
+                Inspection Lock
+              </td>
+              <td style="padding:9px 0">
+                ${
+                  inspection.lockExpiresAt
+                    ? inspection.lockExpiresAt.toLocaleString("en-NG", {
+                        timeZone: "Africa/Lagos",
+                      })
+                    : "48-hour inspection window"
+                }
+              </td>
+            </tr>
+
+          </table>
+
+          <div style="margin-top:24px;padding:16px;background:#E8F5E9;border-radius:10px">
+
+            <strong style="color:#15803D">
+              Action required
+            </strong>
+
+            <p style="margin:6px 0 0;font-size:13px;color:#374151">
+              Contact the tenant and assign an available Park-Out Ambassador
+              from the admin dashboard.
+            </p>
+
+          </div>
+
+          <a
+            href="https://www.corpernest.com.ng/admin/parkout/listings"
+            style="display:inline-block;margin-top:20px;padding:11px 20px;background:#15803D;color:#fff;text-decoration:none;border-radius:8px;font-size:13px;font-weight:600"
+          >
+            Open Park-Out Dashboard →
+          </a>
+
+        </div>
+      `
+    );
+  } catch (err) {
+    console.error(
+      "[webhook/parkout] Admin email failed:",
+      err
+    );
+  }
+
+  console.log(
+    `[webhook/parkout] Inspection payment ${
+      alreadyPaid ? "reconciled" : "confirmed"
+    }: ${inspectionId}`
+  );
+
+  return NextResponse.json({ received: true });
 }
 
 // ─── MARKETPLACE PURCHASE HANDLER ─────────────────────────────────────────────
@@ -497,5 +836,54 @@ async function handleRentRecord(reference: string, amount: number, customerEmail
     console.error("[webhook] Rent record admin email failed:", err);
   }
 
+  return NextResponse.json({ received: true });
+}
+
+// ─── AMBASSADOR VETTING FEE HANDLER ──────────────────────────────────────────
+
+async function handleAmbassadorVettingPayment(
+  reference: string,
+  metadata: { applicationId?: string; userId?: string; userName?: string; }
+) {
+  const { applicationId, userId } = metadata;
+
+  if (!applicationId || !userId) {
+    console.error("[webhook/ambassador] Missing metadata:", metadata);
+    return NextResponse.json({ received: true });
+  }
+
+  const [application] = await db
+    .select({ id: parkoutAmbassadorApplication.id, status: parkoutAmbassadorApplication.status })
+    .from(parkoutAmbassadorApplication)
+    .where(eq(parkoutAmbassadorApplication.id, applicationId))
+    .limit(1);
+
+  if (!application) {
+    console.error("[webhook/ambassador] Application not found:", applicationId);
+    return NextResponse.json({ received: true });
+  }
+
+  if (application.status !== "pending_payment") {
+    return NextResponse.json({ received: true });
+  }
+
+  await db.update(parkoutAmbassadorApplication)
+    .set({
+      vetFeeRef:    reference,
+      vetFeePaidAt: new Date(),
+      status:       "fee_paid",
+      updatedAt:    new Date(),
+    })
+    .where(eq(parkoutAmbassadorApplication.id, applicationId));
+
+  await createNotification({
+    userId,
+    type:    "parkout-ambassador-fee-confirmed",
+    title:   "Payment confirmed ✅",
+    message: "Your ₦2,000 vetting fee has been received. Return to the application page to complete your details.",
+    link:    "/parkout/ambassador/apply",
+  }).catch(() => {});
+
+  console.log(`[webhook/ambassador] Vetting fee confirmed: ${applicationId}`);
   return NextResponse.json({ received: true });
 }

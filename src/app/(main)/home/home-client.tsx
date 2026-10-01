@@ -1,4 +1,7 @@
 // src/app/(main)/home/home-client.tsx
+// Housing listings feed — one job only.
+// Section switching handled globally by SectionSwitcher in layout.tsx.
+// Search, filters, and property listings for Akwa Ibom housing.
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -198,10 +201,11 @@ export default function HomeClient({ userName, initialListings, totalCount, watc
     <div style={{ backgroundColor: "var(--color-bg)", paddingBottom: 32 }}>
 
       {/* ── STICKY HEADER ── */}
+      {/* top: 112px = 56px top nav + ~56px SectionSwitcher height */}
       <div
         className="px-4 py-3"
         style={{
-          position: "sticky", top: 56, zIndex: 30,
+          position: "sticky", top: 112, zIndex: 30,
           backgroundColor: "var(--color-bg)",
           borderBottom: "1px solid var(--color-border)",
         }}
@@ -216,39 +220,7 @@ export default function HomeClient({ userName, initialListings, totalCount, watc
           )}
         </p>
 
-        {/* ── MODE TOGGLE ── */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
-          <div style={{
-            padding: "10px 10px", borderRadius: 14, cursor: "default",
-            backgroundColor: "var(--color-primary)",
-            border: "1.5px solid var(--color-primary)",
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 4 }}>
-              <path d="M3 9.5L12 3L21 9.5V20C21 20.5523 20.5523 21 20 21H15V15H9V21H4C3.44772 21 3 20.5523 3 20V9.5Z"
-                fill="white" stroke="white" strokeWidth="1.8" strokeLinejoin="round" />
-            </svg>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "#fff", margin: "0 0 1px" }}>Find Housing</p>
-            <p style={{ fontSize: 10, color: "rgba(255,255,255,0.75)", margin: 0 }}>Browse properties</p>
-          </div>
-
-          <button onClick={() => router.push("/marketplace")} style={{
-            padding: "10px 10px", borderRadius: 14, textAlign: "left",
-            backgroundColor: "var(--color-bg)",
-            border: "1.5px solid var(--color-border)",
-            cursor: "pointer",
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 4, display: "block" }}>
-              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"
-                stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinejoin="round" />
-              <path d="M3 6h18M16 10a4 4 0 01-8 0"
-                stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-secondary)", margin: "0 0 1px" }}>Marketplace</p>
-            <p style={{ fontSize: 10, color: "var(--color-text-muted)", margin: 0 }}>Buy and sell items</p>
-          </button>
-        </div>
-
-        {/* Search + filter button */}
+        {/* ── SEARCH + FILTER ── */}
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 8, flex: 1,
@@ -354,7 +326,7 @@ export default function HomeClient({ userName, initialListings, totalCount, watc
             : `${displayed.length} propert${displayed.length === 1 ? "y" : "ies"}`}
           {hasSearched && searchInput && (
             <span style={{ color: "var(--color-primary)", marginLeft: 6 }}>
-              for "{searchInput}"
+              for &quot;{searchInput}&quot;
             </span>
           )}
         </p>
@@ -470,48 +442,37 @@ export default function HomeClient({ userName, initialListings, totalCount, watc
       {/* ── MAIN CONTENT ── */}
       <div className="max-w-2xl mx-auto px-4 pt-4 space-y-4">
 
-        {/* ── PROPERTY REQUEST BANNER — prominent, above listings ── */}
+        {/* Property request banner — slim card */}
         <Link href="/request-property" style={{ display: "block", textDecoration: "none" }}>
           <div style={{
-            borderRadius: 16,
-            background: "linear-gradient(135deg, #1B5E20 0%, #2E7D32 50%, #388E3C 100%)",
-            padding: "18px 16px",
+            borderRadius: 14,
+            background: "linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%)",
             border: "none",
-            boxShadow: "0 4px 20px rgba(46,125,50,0.25)",
+            padding: "14px 16px",
+            display: "flex", alignItems: "center", gap: 12,
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-              {/* Icon */}
-              <div style={{
-                width: 48, height: 48, borderRadius: 14,
-                background: "rgba(255,255,255,0.15)",
-                backdropFilter: "blur(4px)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0,
-              }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 9.5L12 3L21 9.5V20C21 20.5523 20.5523 21 20 21H15V15H9V21H4C3.44772 21 3 20.5523 3 20V9.5Z"
-                    fill="rgba(255,255,255,0.3)" stroke="white" strokeWidth="1.8" strokeLinejoin="round" />
-                  <path d="M12 8v5M9.5 11H14.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-              </div>
-
-              {/* Text */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontSize: 15, fontWeight: 800, color: "#fff", margin: "0 0 3px", letterSpacing: "-0.01em" }}>
-                  Can't find the right place?
-                </p>
-                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", margin: "0 0 8px", lineHeight: 1.4 }}>
-                  Tell us what you need — we search on your behalf and find verified options within 24–48 hours.
-                </p>
-                <div style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  borderRadius: 20, padding: "4px 12px",
-                }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>Request a property →</span>
-                </div>
-              </div>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              backgroundColor: "rgba(255,255,255,0.15)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H15V15H9V21H4C3.45 21 3 20.55 3 20V9.5Z"
+                  stroke="white" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M12 8v5M9.5 11H14.5" stroke="white"strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
             </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 13, fontWeight: 700,color: "#fff", margin: "0 0 1px" }}>
+                Can&apos;t find the right place?
+              </p>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", margin: 0 }}>
+                We search on your behalf within 24–48 hrs
+              </p>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M9 18l6-6-6-6" stroke="var(--color-text-muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
         </Link>
 
@@ -576,7 +537,7 @@ export default function HomeClient({ userName, initialListings, totalCount, watc
 
               {!hasMore && displayed.length > 0 && (
                 <p className="text-xs text-center pb-4" style={{ color: "var(--color-text-muted)" }}>
-                  You've seen all available properties
+                  You&apos;ve seen all available properties
                 </p>
               )}
             </div>

@@ -56,13 +56,14 @@ export default function LandingClient() {
           lineHeight: 1.08, letterSpacing: "-0.02em",
         }}>
           Verified housing.<br />
+          Park-Out &amp; Earn.<br />
           Safe marketplace.{" "}
           <span style={{ color: "#43A047", fontStyle: "italic" }}>No scams.</span>
         </h1>
 
-        {/* Changed: "escrow payments" → "secure checkout" */}
+        {/* ── HERO DESCRIPTION ── */}
         <p style={{ fontSize: 15, color: "#444", lineHeight: 1.75, margin: "0 0 28px", maxWidth: 420 }}>
-          CorperNest helps Nigerians relocating to new cities find verified housing and buy or sell items safely, with secure checkout and verified agents protecting every transaction.
+          CorperNest helps Nigerians relocating to new cities find verified housing, navigate Park-Out &amp; Earn, and buy or sell items safely through a more structured and verified process.
         </p>
 
         {/* Stats */}
@@ -73,8 +74,8 @@ export default function LandingClient() {
         }}>
           {[
             { val: "100%", label: "Verified agents"   },
-            { val: "Free", label: "To inspect"        },
-            { val: "0",    label: "Scam reports"      },
+            { val: "₦3k",  label: "Inspection fee" },
+            { val: "10%",  label: "Property facilitation" },
           ].map((s, i) => (
             <div key={s.label} style={{
               textAlign: "center",
@@ -91,7 +92,7 @@ export default function LandingClient() {
         </div>
       </section>
 
-      {/* ── TWO SERVICES ── */}
+      {/* ── THREE SERVICES ── */}
       <section style={{ padding: "0 20px 40px", maxWidth: 540, margin: "0 auto" }}>
         <p style={{ fontSize: 12, fontWeight: 700, color: "#43A047", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 14px" }}>
           What we offer
@@ -114,7 +115,7 @@ export default function LandingClient() {
                 Find Verified Housing
               </p>
               <p style={{ fontSize: 13, color: "#555", margin: 0, lineHeight: 1.65 }}>
-                Every listing is reviewed before going live. Book a free inspection, meet a verified agent, and see all their available properties in one visit. Pay the agent directly, nothing to us before you see the property.
+                Every listing is reviewed before going live. Explore verified properties and follow the inspection process through CorperNest before deciding whether a property is right for you.
               </p>
             </div>
           </div>
@@ -123,14 +124,46 @@ export default function LandingClient() {
             padding: "14px", borderRadius: 12, fontSize: 14, fontWeight: 700,
             background: "#1B5E20", color: "#fff", textDecoration: "none",
           }}>
-            Browse listings — free inspection
+            Browse verified housing
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </Link>
         </div>
 
-        {/* Marketplace card — Changed: "Buy & Sell via Escrow" → "Buy & Sell Securely" */}
+        {/* Park-Out & Earn card */}
+        <div style={{
+          border: "1.5px solid #C8E6C9", borderRadius: 20,
+          padding: "20px", marginBottom: 12, background: "#fff",
+        }}>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 14 }}>
+            <div style={{ width: 48, height: 48, borderRadius: 14, background: "#E8F5E9", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M8 7h12M8 7l3-3M8 7l3 3M16 17H4M16 17l-3-3M16 17l-3 3" stroke="#2E7D32" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div>
+              <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 16, color: "#0D1F0D", margin: "0 0 4px" }}>
+                Park-Out &amp; Earn
+              </p>
+              <p style={{ fontSize: 13, color: "#555", margin: 0, lineHeight: 1.65 }}>
+                Leaving your accommodation? List it through Park-Out &amp; Earn so incoming tenants can explore available opportunities through a structured, reviewed process.
+              </p>
+            </div>
+          </div>
+          <Link href="/parkout" style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "14px", borderRadius: 12, fontSize: 14, fontWeight: 700,
+            background: "#1B5E20", color: "#fff", textDecoration: "none",
+          }}>
+            Explore Park-Out &amp; Earn
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12h14M13 6l6 6-6 6" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        </div>
+
+        {/* Marketplace card */}
         <div style={{
           border: "1.5px solid #E8F0E8", borderRadius: 20,
           padding: "20px", background: "#fff",
@@ -146,9 +179,9 @@ export default function LandingClient() {
               <p style={{ fontFamily: "var(--font-heading)", fontWeight: 800, fontSize: 16, color: "#0D1F0D", margin: "0 0 4px" }}>
                 Buy &amp; Sell Securely
               </p>
-              {/* Changed: "held in escrow" → "buyer protection guarantee" */}
+              {/* ── MARKETPLACE ── */}
               <p style={{ fontSize: 13, color: "#555", margin: 0, lineHeight: 1.65 }}>
-                Selling items before relocating? Buying something locally? Every order is backed by our buyer protection guarantee and verified merchant fulfilment. Safe transactions, zero scams, total peace of mind.
+                Selling items before relocating? Buying something locally? CorperNest provides verified seller information, structured order tracking, and platform support throughout the marketplace process.
               </p>
             </div>
           </div>
@@ -174,9 +207,7 @@ export default function LandingClient() {
           {[
             {
               icon: "🔒",
-              // Changed: "Escrow payments" → "Secure Checkout"
               title: "Secure Checkout",
-              // Changed: "held safely" → "buyer protection and transparent return coverage"
               body:  "For marketplace purchases, all orders are backed by full buyer protection and transparent return coverage for a risk-free experience.",
             },
             {
@@ -185,9 +216,9 @@ export default function LandingClient() {
               body:  "Every agent goes through KYC before listing. Every marketplace seller is a registered user. No anonymous listings.",
             },
             {
-              icon: "🚫",
-              title: "Zero tolerance for scams",
-              body:  "We have had zero scam reports since launch. If anything goes wrong, we step in — refunds for buyers, protection for sellers.",
+              icon: "🔄",
+              title: "Park-Out & Earn",
+              body:  "Leaving your accommodation? Park-Out & Earn gives outgoing tenants a structured way to list available accommodation for incoming tenants to explore, with the process documented through CorperNest.",
             },
             {
               icon: "📍",
@@ -226,7 +257,7 @@ export default function LandingClient() {
             Ready to get started?
           </h2>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", margin: "0 0 20px", lineHeight: 1.6 }}>
-            Create a free account. Browse verified listings. Buy or sell safely. No credit card required.
+            Create a free account. Find verified housing, explore Park-Out &amp; Earn, or buy and sell through the marketplace.
           </p>
           <Link href="/signup" style={{
             display: "inline-flex", alignItems: "center", gap: 8,
@@ -244,6 +275,7 @@ export default function LandingClient() {
           <Link href="/about"       style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>About</Link>
           <Link href="/home"        style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Housing</Link>
           <Link href="/marketplace" style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Marketplace</Link>
+          <Link href="/parkout" style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Park-Out</Link>
           <Link href="/signin"      style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Sign in</Link>
           <Link href="/terms" style={{ fontSize: 13, color: "#888", textDecoration: "none" }}>Terms</Link>
         </div>

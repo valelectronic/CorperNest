@@ -7,7 +7,9 @@ import { authClient } from "@/lib/auth-client";
 import UserAvatar from "@/components/user-avatar";
 import CustomerCare from "@/components/customer-care";
 import PWAInstallBanner from "@/components/pwa-install-banner";
+import SectionSwitcher from "@/components/section-switcher";
 import { useFCM } from "@/hooks/use-fcm";
+
 const ADMIN_EMAIL = "corpernestng@gmail.com";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -22,78 +24,170 @@ interface NotificationItem {
   createdAt: string;
 }
 
-// ─── NAV ITEMS ────────────────────────────────────────────────────────────────
+// ─── CONTEXTUAL BOTTOM NAV ────────────────────────────────────────────────────
+// Changes based on which section the user is in.
+// Section detected from pathname.
+//
+// Housing:     Home | Watchlist | Bookings | Profile
+// Marketplace: Browse | My Listings | Purchases | Profile
+// Park-Out:    Browse | My Listing | Ambassador | Profile
 
-const navItems = [
+type NavItem = {
+  label: string;
+  href:  string;
+  exact?: boolean;
+  icon:  (active: boolean) => React.ReactNode;
+};
+
+const PROFILE_ITEM: NavItem = {
+  label: "Profile",
+  href:  "/profile",
+  icon: (active) => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8" r="4"
+        fill={active ? "var(--color-primary)" : "none"}
+        stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+        strokeWidth="1.8" />
+      <path d="M4 20C4 17.2386 7.58172 15 12 15C16.4183 15 20 17.2386 20 20"
+        stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+        strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ),
+};
+
+const housingNav: NavItem[] = [
   {
-    label: "Home",
-    href: "/home",
-    icon: (active: boolean) => (
+    label: "Home", href: "/home", exact: true,
+    icon: (active) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M3 9.5L12 3L21 9.5V20C21 20.5523 20.5523 21 20 21H15V15H9V21H4C3.44772 21 3 20.5523 3 20V9.5Z"
+        <path d="M3 9.5L12 3L21 9.5V20C21 20.5523 20.5523 21 20 21H15V15H9V21H4C3.44772 21 3 20.5523 3 20V9.5Z"
           fill={active ? "var(--color-primary)" : "none"}
           stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
+          strokeWidth="1.8" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
-    label: "Watchlist",
-    href: "/watchlist",
-    icon: (active: boolean) => (
+    label: "Watchlist", href: "/watchlist",
+    icon: (active) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M12 21.35L10.55 20.03C5.4 15.36 2 12.27 2 8.5C2 5.41 4.42 3 7.5 3C9.24 3 10.91 3.81 12 5.08C13.09 3.81 14.76 3 16.5 3C19.58 3 22 5.41 22 8.5C22 12.27 18.6 15.36 13.45 20.03L12 21.35Z"
-          fill={active ? "#E53935" : "none"}
-          stroke={active ? "#E53935" : "var(--color-text-muted)"}
-          strokeWidth="1.8"
-        />
-      </svg>
-    ),
-  },
-  {
-    label: "Bookings",
-    href: "/bookings",
-    icon: (active: boolean) => (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <rect
-          x="3" y="4" width="18" height="18" rx="2"
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
           fill={active ? "var(--color-primary)" : "none"}
           stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
-          strokeWidth="1.8"
-        />
-        <path
-          d="M16 2V6M8 2V6M3 10H21"
-          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
+          strokeWidth="1.8" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
-    label: "Profile",
-    href: "/profile",
-    icon: (active: boolean) => (
+    label: "Bookings", href: "/bookings",
+    icon: (active) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <circle
-          cx="12" cy="8" r="4"
+        <rect x="3" y="4" width="18" height="18" rx="2"
           fill={active ? "var(--color-primary)" : "none"}
           stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
-          strokeWidth="1.8"
-        />
-        <path
-          d="M4 20C4 17.2386 7.58172 15 12 15C16.4183 15 20 17.2386 20 20"
+          strokeWidth="1.8" />
+        <path d="M16 2V6M8 2V6M3 10H21"
           stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
+          strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     ),
   },
+  PROFILE_ITEM,
+];
+
+const marketplaceNav: NavItem[] = [
+  {
+    label: "Browse", href: "/marketplace", exact: true,
+    icon: (active) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"
+          fill={active ? "var(--color-primary)" : "none"}
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M3 6h18M16 10a4 4 0 01-8 0"
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "My Listings", href: "/marketplace/my-listings",
+    icon: (active) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+          fill={active ? "var(--color-primary)" : "none"}
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M14 2v6h6M9 13h6M9 17h4"
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "Purchases", href: "/marketplace/purchases",
+    icon: (active) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"
+          fill={active ? "var(--color-primary)" : "none"}
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M3 6h18M9 12l2 2 4-4"
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  PROFILE_ITEM,
+];
+
+const parkoutNav: NavItem[] = [
+  {
+    label: "Browse", href: "/parkout", exact: true,
+    icon: (active) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="7"
+          fill={active ? "var(--color-primary)" : "none"}
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" />
+        <path d="M21 21l-4.35-4.35"
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "My Listing", href: "/parkout/my-listing",
+    icon: (active) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M3 9.5L12 3L21 9.5V20C21 20.55 20.55 21 20 21H4C3.45 21 3 20.55 3 20V9.5Z"
+          fill={active ? "var(--color-primary)" : "none"}
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M9 21v-6h6v6"
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    label: "Ambassador", href: "/parkout/ambassador",
+    icon: (active) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="8" r="4"
+          fill={active ? "var(--color-primary)" : "none"}
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" />
+        <path d="M4 20C4 17.2386 7.58172 15 12 15C16.4183 15 20 17.2386 20 20"
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M17 3l1.5 1.5L22 1"
+          stroke={active ? "var(--color-primary)" : "var(--color-text-muted)"}
+          strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  PROFILE_ITEM,
 ];
 
 // ─── NOTIFICATION ICON MAP ────────────────────────────────────────────────────
@@ -149,19 +243,14 @@ function NotifIcon({ type }: { type: string }) {
   };
 
   return (
-    <div style={{
-      width: 36, height: 36, borderRadius: 10,
-      background: icon.bg,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      flexShrink: 0,
-    }}>
+    <div style={{ width: 36, height: 36, borderRadius: 10, background: icon.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
       {icon.svg}
     </div>
   );
 }
 
 function timeAgo(date: string): string {
-  const diff = Date.now() - new Date(date).getTime();
+  const diff  = Date.now() - new Date(date).getTime();
   const mins  = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days  = Math.floor(diff / 86400000);
@@ -178,8 +267,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router   = useRouter();
 
-  const [notifOpen, setNotifOpen]         = useState(false);
-  const [unreadCount, setUnreadCount]     = useState(0);
+  const [notifOpen,     setNotifOpen]     = useState(false);
+  const [unreadCount,   setUnreadCount]   = useState(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
   const intervalRef                       = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -193,9 +282,23 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   const isLoggedIn = !!user;
   useFCM(isLoggedIn);
-  const isAdmin    = user?.email === ADMIN_EMAIL;
+  const isAdmin = user?.email === ADMIN_EMAIL;
   const [isVerifiedAgent, setIsVerifiedAgent] = useState(false);
 
+  // ── Section detection ─────────────────────────────────────────────────────
+  const section = pathname.startsWith("/parkout")
+    ? "parkout"
+    : pathname.startsWith("/marketplace")
+    ? "marketplace"
+    : "housing";
+
+  const activeNav = section === "parkout"
+    ? parkoutNav
+    : section === "marketplace"
+    ? marketplaceNav
+    : housingNav;
+
+  // ── Agent status ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isLoggedIn || user?.role !== "agent") {
       setIsVerifiedAgent(false);
@@ -214,38 +317,26 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       const res  = await fetch("/api/notifications/unread-count");
       const data = await res.json();
       setUnreadCount(data.count ?? 0);
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }, [isLoggedIn]);
 
   useEffect(() => {
     if (!isLoggedIn) { setUnreadCount(0); return; }
-
     fetchUnreadCount();
-
     const startPolling = () => {
       if (intervalRef.current) return;
-      intervalRef.current = setInterval(fetchUnreadCount, 120_000);
+      intervalRef.current = setInterval(fetchUnreadCount, 300_000);
     };
     const stopPolling = () => {
       if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
     };
     const handleVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        stopPolling();
-      } else {
-        fetchUnreadCount();
-        startPolling();
-      }
+      if (document.visibilityState === "hidden") stopPolling();
+      else { fetchUnreadCount(); startPolling(); }
     };
-
     startPolling();
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      stopPolling();
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
+    return () => { stopPolling(); document.removeEventListener("visibilitychange", handleVisibility); };
   }, [isLoggedIn, fetchUnreadCount]);
 
   // ── Notifications ─────────────────────────────────────────────────────────
@@ -258,11 +349,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       const res  = await fetch("/api/notifications/list");
       const data = await res.json();
       setNotifications(data.notifications ?? []);
-    } catch {
-      // silent
-    } finally {
-      setNotifsLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setNotifsLoading(false); }
   }
 
   async function handleCloseNotifications() {
@@ -271,14 +359,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     setUnreadCount(0);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     try {
-      await fetch("/api/notifications/mark-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: "all" }),
-      });
-    } catch {
-      // silent
-    }
+      await fetch("/api/notifications/mark-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: "all" }) });
+    } catch { /* silent */ }
   }
 
   function handleNotifClick(notif: NotificationItem) {
@@ -287,8 +369,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }
 
   function handleListProperty() {
-    if (!user)           { router.push("/signin");    return; }
-    if (isVerifiedAgent) { router.push("/agent");     return; }
+    if (!user)           { router.push("/signin");   return; }
+    if (isVerifiedAgent) { router.push("/agent");    return; }
     router.push("/agent/kyc");
   }
 
@@ -296,77 +378,73 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--color-bg)" }}>
 
       {/* ── TOP NAV ── */}
-      <header
-        className="sticky top-0 z-50 px-4"
-        style={{ backgroundColor: "var(--color-card)", borderBottom: "1px solid var(--color-border)", height: 56, display: "flex", alignItems: "center" }}
-      >
+      <header className="sticky top-0 z-50 px-4"
+        style={{ backgroundColor: "var(--color-card)", borderBottom: "1px solid var(--color-border)", height: 56, display: "flex", alignItems: "center" }}>
         <div className="max-w-6xl mx-auto w-full flex items-center gap-3">
 
-          {/* Logo */}
           <Link href="/home" style={{ textDecoration: "none", flexShrink: 0 }}>
             <img src="/corperNestLogo.png" alt="CorperNest" style={{ height: 32, width: "auto", display: "block" }} />
           </Link>
 
           <div style={{ flex: 1 }} />
 
-          {/* Admin button — desktop only, only for admin */}
+          {/* Admin button — desktop only */}
           {isAdmin && (
-            <Link
-              href="/admin"
-              className="hidden md:flex"
-              style={{
-                alignItems: "center", gap: 6,
-                padding: "6px 12px", borderRadius: 10,
-                background: "var(--color-header)",
-                textDecoration: "none", flexShrink: 0,
-              }}
-            >
+            <Link href="/admin" className="hidden md:flex"
+              style={{ alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, background: "var(--color-header)", textDecoration: "none", flexShrink: 0 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="#fff" strokeWidth="1.8" />
                 <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="#fff" strokeWidth="1.8" />
                 <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="#fff" strokeWidth="1.8" />
                 <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="#fff" strokeWidth="1.8" />
               </svg>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "var(--font-heading)" }}>
-                Admin
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", fontFamily: "var(--font-heading)" }}>Admin</span>
+            </Link>
+          )}
+
+          {/* List Property button — housing section only */}
+          {section === "housing" && (
+            <button onClick={handleListProperty}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 12, backgroundColor: "var(--color-primary)", border: "none", cursor: "pointer", flexShrink: 0 }}>
+              {isVerifiedAgent ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L14.4 8.26L21 9.27L16.5 13.64L17.77 20.23L12 17.27L6.23 20.23L7.5 13.64L3 9.27L9.6 8.26L12 2Z" fill="white" stroke="white" strokeWidth="1.4" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+              )}
+              <span className="hidden xs:inline sm:inline" style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "var(--font-heading)" }}>
+                {isVerifiedAgent ? "My Listings" : "List Property"}
+              </span>
+            </button>
+          )}
+
+          {/* Park-Out list room button */}
+          {section === "parkout" && (
+            <Link href="/parkout/new"
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 12, backgroundColor: "var(--color-primary)", textDecoration: "none", flexShrink: 0 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+              <span className="hidden xs:inline sm:inline" style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "var(--font-heading)" }}>
+                List Room
               </span>
             </Link>
           )}
 
-          {/* List Property button */}
-          <button
-            onClick={handleListProperty}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 12, backgroundColor: "var(--color-primary)", border: "none", cursor: "pointer", flexShrink: 0 }}
-          >
-            {isVerifiedAgent ? (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L14.4 8.26L21 9.27L16.5 13.64L17.77 20.23L12 17.27L6.23 20.23L7.5 13.64L3 9.27L9.6 8.26L12 2Z" fill="white" stroke="white" strokeWidth="1.4" strokeLinejoin="round" />
-              </svg>
-            ) : (
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5V19M5 12H19" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-              </svg>
-            )}
-            <span className="hidden xs:inline sm:inline" style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "var(--font-heading)" }}>
-              {isVerifiedAgent ? "My Listings" : "List Property"}
-            </span>
-          </button>
-
           {/* Bell */}
-          <button
-            onClick={handleOpenNotifications}
+          <button onClick={handleOpenNotifications}
             className="relative flex items-center justify-center rounded-xl"
-            style={{ width: 40, height: 40, backgroundColor: notifOpen ? "var(--color-light)" : "var(--color-bg)", border: "1px solid var(--color-border)", flexShrink: 0, cursor: "pointer" }}
-          >
+            style={{ width: 40, height: 40, backgroundColor: notifOpen ? "var(--color-light)" : "var(--color-bg)", border: "1px solid var(--color-border)", flexShrink: 0, cursor: "pointer" }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"
                 stroke="var(--color-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             {unreadCount > 0 && (
-              <span
-                className="absolute -top-1 -right-1 flex items-center justify-center rounded-full font-bold"
-                style={{ minWidth: unreadCount > 9 ? 18 : 16, height: unreadCount > 9 ? 18 : 16, fontSize: 9, backgroundColor: "#E53935", color: "#fff", padding: "0 3px" }}
-              >
+              <span className="absolute -top-1 -right-1 flex items-center justify-center rounded-full font-bold"
+                style={{ minWidth: unreadCount > 9 ? 18 : 16, height: unreadCount > 9 ? 18 : 16, fontSize: 9, backgroundColor: "#E53935", color: "#fff", padding: "0 3px" }}>
                 {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
@@ -378,7 +456,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-1">
             {[{ label: "Watchlist", href: "/watchlist" }, { label: "Bookings", href: "/bookings" }, { label: "About", href: "/about" }].map((item) => (
-              <Link key={item.href} href={item.href} style={{ padding: "6px 12px", borderRadius: 10, fontSize: 13, fontWeight: pathname === item.href ? 600 : 400, color: pathname === item.href ? "var(--color-primary)" : "var(--color-text-secondary)", textDecoration: "none" }}>
+              <Link key={item.href} href={item.href}
+                style={{ padding: "6px 12px", borderRadius: 10, fontSize: 13, fontWeight: pathname === item.href ? 600 : 400, color: pathname === item.href ? "var(--color-primary)" : "var(--color-text-secondary)", textDecoration: "none" }}>
                 {item.label}
               </Link>
             ))}
@@ -389,28 +468,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {notifOpen && (
           <>
             <div onClick={handleCloseNotifications} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-            <div
-              className="absolute shadow-lg"
-              style={{ top: "calc(100% + 8px)", right: 16, width: "min(360px, calc(100vw - 32px))", backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 18, zIndex: 50, overflow: "hidden" }}
-            >
+            <div className="absolute shadow-lg"
+              style={{ top: "calc(100% + 8px)", right: 16, width: "min(360px, calc(100vw - 32px))", backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: 18, zIndex: 50, overflow: "hidden" }}>
               <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "var(--color-header)", margin: 0 }}>
-                  Notifications
-                </p>
+                <p style={{ fontFamily: "var(--font-heading)", fontWeight: 700, fontSize: 15, color: "var(--color-header)", margin: 0 }}>Notifications</p>
                 {notifications.some((n) => !n.read) && (
-                  <button
-                    onClick={() => {
-                      setUnreadCount(0);
-                      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-                      fetch("/api/notifications/mark-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: "all" }) });
-                    }}
-                    style={{ fontSize: 12, color: "var(--color-primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                  >
+                  <button onClick={() => {
+                    setUnreadCount(0);
+                    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+                    fetch("/api/notifications/mark-read", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: "all" }) });
+                  }} style={{ fontSize: 12, color: "var(--color-primary)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                     Mark all read
                   </button>
                 )}
               </div>
-
               <div style={{ maxHeight: 380, overflowY: "auto" }}>
                 {notifsLoading ? (
                   <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
@@ -438,11 +509,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 ) : (
                   <div>
                     {notifications.map((notif, i) => (
-                      <button
-                        key={notif.id}
-                        onClick={() => handleNotifClick(notif)}
-                        style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 16px", background: notif.read ? "transparent" : "var(--color-light)", borderBottom: i < notifications.length - 1 ? "1px solid var(--color-border)" : "none", border: "none", cursor: notif.link ? "pointer" : "default", textAlign: "left" }}
-                      >
+                      <button key={notif.id} onClick={() => handleNotifClick(notif)}
+                        style={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 16px", background: notif.read ? "transparent" : "var(--color-light)", borderBottom: i < notifications.length - 1 ? "1px solid var(--color-border)" : "none", border: "none", cursor: notif.link ? "pointer" : "default", textAlign: "left" }}>
                         <NotifIcon type={notif.type} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
@@ -464,30 +532,35 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         )}
       </header>
 
+      {/* ── SECTION SWITCHER ── */}
+      <SectionSwitcher />
+
       {/* ── PAGE CONTENT ── */}
       <main className="flex-1 pb-20 md:pb-0">{children}</main>
 
-      {/* ── MOBILE BOTTOM NAV ── */}
-      <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-2 py-2"
-        style={{ backgroundColor: "var(--color-card)", borderTop: "1px solid var(--color-border)" }}
-      >
+      {/* ── MOBILE BOTTOM NAV — contextual per section ── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-2 py-2"
+        style={{ backgroundColor: "var(--color-card)", borderTop: "1px solid var(--color-border)" }}>
         <div className="flex items-center justify-around">
-          {navItems.map((item) => {
-            const active = pathname === item.href;
+          {activeNav.map((item) => {
+            const active = item.exact
+              ? pathname === item.href
+              : pathname.startsWith(item.href);
             return (
-              <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1 px-4 py-1">
+              <Link key={item.href} href={item.href}
+                className="flex flex-col items-center gap-1 px-3 py-1">
                 {item.icon(active)}
-                <span className="text-xs" style={{ color: active ? "var(--color-primary)" : "var(--color-text-muted)", fontFamily: "var(--font-body)", fontWeight: active ? 600 : 400 }}>
+                <span className="text-xs"
+                  style={{ color: active ? "var(--color-primary)" : "var(--color-text-muted)", fontFamily: "var(--font-body)", fontWeight: active ? 600 : 400, fontSize: 10 }}>
                   {item.label}
                 </span>
               </Link>
             );
           })}
 
-          {/* Admin shortcut in mobile bottom nav */}
+          {/* Admin shortcut */}
           {isAdmin && (
-            <Link href="/admin" className="flex flex-col items-center gap-1 px-4 py-1">
+            <Link href="/admin" className="flex flex-col items-center gap-1 px-3 py-1">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                 <rect x="3" y="3" width="7" height="7" rx="1.5"
                   stroke={pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)"}
@@ -502,10 +575,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   stroke={pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)"}
                   strokeWidth="1.8" />
               </svg>
-              <span className="text-xs" style={{
-                color: pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)",
-                fontFamily: "var(--font-body)", fontWeight: pathname.startsWith("/admin") ? 600 : 400,
-              }}>
+              <span className="text-xs"
+                style={{ color: pathname.startsWith("/admin") ? "var(--color-header)" : "var(--color-text-muted)", fontFamily: "var(--font-body)", fontWeight: pathname.startsWith("/admin") ? 600 : 400, fontSize: 10 }}>
                 Admin
               </span>
             </Link>

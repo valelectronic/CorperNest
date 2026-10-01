@@ -3,6 +3,7 @@
 // Bottom nav: Browse | My Listings | My Purchases | Profile
 // Top header: CorperNest logo → /home, bell notifications, Sell Item button
 // Auth is optional — guests can browse, only sellers/buyers need to sign in
+// SectionSwitcher added below header so Market tab stays active on all sub-pages
 
 "use client";
 
@@ -14,7 +15,7 @@ import PWAInstallBanner from "@/components/pwa-install-banner";
 import { authClient } from "@/lib/auth-client";
 import UserAvatar from "@/components/user-avatar";
 import CustomerCare from "@/components/customer-care";
-
+import SectionSwitcher from "@/components/section-switcher";
 
 const ADMIN_EMAIL = "corpernestng@gmail.com";
 
@@ -350,6 +351,9 @@ export default function MarketLayout({ children }: { children: React.ReactNode }
           </>
         )}
       </header>
+
+      {/* ── SECTION SWITCHER — Market tab active on all marketplace pages ── */}
+      <SectionSwitcher />
 
       {/* ── PAGE CONTENT ── */}
       <main className="flex-1 pb-20 md:pb-0">{children}</main>

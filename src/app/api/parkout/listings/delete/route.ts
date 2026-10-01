@@ -1,13 +1,9 @@
 // src/app/api/parkout/listings/delete/route.ts
-
-// Deletes an outgoing user's Park-Out listing and its Cloudinary images.
-//
-// Deletion is allowed only for listings that are:
-// - owned by the authenticated user
-// - pending approval or rejected
-//
-// Active, booking_locked, completed and other progressed listings
-// cannot be deleted through this endpoint.
+// User delete — deletes the user's own Park-Out listing.
+// Cleans up:
+// → Room photos from HOUSING Cloudinary
+// → Occupancy proof from MARKET Cloudinary
+// → Listing row from DB
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -15,102 +11,41 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { parkoutListing } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { v2 as cloudinary } from "cloudinary";
+import { v2 as housingCloudinary } from "cloudinary";
+import { v2 as marketCloudinary } from "cloudinary";
 
 // ── Cloudinary configuration ────────────────────────────────────────────────
 
-const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-const apiKey = process.env.CLOUDINARY_API_KEY;
-const apiSecret = process.env.CLOUDINARY_API_SECRET;
-
-cloudinary.config({
-  cloud_name: cloudName,
-  api_key: apiKey,
-  api_secret: apiSecret,
+housingCloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
+  api_key: process.env.CLOUDINARY_API_KEY!,
+  api_secret: process.env.CLOUDINARY_API_SECRET!,
 });
 
-// ── Cloudinary helpers ──────────────────────────────────────────────────────
+marketCloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME_MARKET!,
+  api_key: process.env.CLOUDINARY_API_KEY_MARKET!,
+  api_secret: process.env.CLOUDINARY_API_SECRET_MARKET!,
+});
 
-function isPlaceholder(value?: string) {
-  if (!value) return true;
+// ── Cloudinary helper ───────────────────────────────────────────────────────
 
-  const normalized = value.trim().replace(/^['"]|['"]$/g, "");
-
-  return (
-    normalized.length === 0 ||
-    normalized.toLowerCase() === "your_value_here" ||
-    normalized.toLowerCase() === "placeholder"
-  );
-}
-
-const hasValidCloudinaryConfig = !(
-  isPlaceholder(cloudName) ||
-  isPlaceholder(apiKey) ||
-  isPlaceholder(apiSecret)
-);
-
-function getCloudinaryPublicId(imageUrl: string): string | null {
+function extractPublicId(url: string): string | null {
   try {
-    const url = new URL(imageUrl);
+    const match = url.match(
+      /\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-z]{2,4})?$/i
+    );
 
-    // Expected Cloudinary path:
-    // /image/upload/v123456789/corpernest/listings/example.jpg
-
-    const uploadIndex = url.pathname.indexOf("/upload/");
-
-    if (uploadIndex === -1) {
-      return null;
-    }
-
-    let path = url.pathname.slice(uploadIndex + "/upload/".length);
-
-    // Remove Cloudinary version segment, e.g. v1759234567/
-    path = path.replace(/^v\d+\//, "");
-
-    // Remove file extension.
-    path = path.replace(/\.[^/.]+$/, "");
-
-    return path || null;
+    return match ? match[1] : null;
   } catch {
     return null;
   }
 }
 
-async function deleteCloudinaryImage(imageUrl: string) {
-  if (!hasValidCloudinaryConfig) {
-    throw new Error(
-      "Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET."
-    );
-  }
-
-  const publicId = getCloudinaryPublicId(imageUrl);
-
-  if (!publicId) {
-    throw new Error(`Could not determine Cloudinary public ID from image URL.`);
-  }
-
-  const result = await cloudinary.uploader.destroy(publicId, {
-    resource_type: "image",
-    invalidate: true,
-  });
-
-  // Cloudinary normally returns:
-  // { result: "ok" }
-  // or { result: "not found" }
-
-  if (result.result !== "ok" && result.result !== "not found") {
-    throw new Error(
-      `Cloudinary could not delete image "${publicId}". Result: ${result.result}`
-    );
-  }
-
-  return result;
-}
-
 // ── DELETE ──────────────────────────────────────────────────────────────────
 
 export async function DELETE(req: NextRequest) {
-  // ── Auth check ────────────────────────────────────────────────────────────
+  // ── Authentication ────────────────────────────────────────────────────────
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -138,18 +73,18 @@ export async function DELETE(req: NextRequest) {
 
   if (!listingId) {
     return NextResponse.json(
-      { error: "Listing ID is required." },
+      { error: "Listing ID required." },
       { status: 400 }
     );
   }
 
-  // ── Find listing ──────────────────────────────────────────────────────────
+  // ── Find user's listing ───────────────────────────────────────────────────
   const [listing] = await db
     .select({
       id: parkoutListing.id,
       outgoingUserId: parkoutListing.outgoingUserId,
-      status: parkoutListing.status,
       images: parkoutListing.images,
+      occupancyProofUrl: parkoutListing.occupancyProofUrl,
     })
     .from(parkoutListing)
     .where(eq(parkoutListing.id, listingId))
@@ -170,54 +105,36 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  // ── Deletion status check ─────────────────────────────────────────────────
-  if (!["pending_approval", "rejected"].includes(listing.status)) {
-    return NextResponse.json(
-      {
-        error:
-          `This listing cannot be deleted because its current status is "${listing.status}".`,
-      },
-      { status: 400 }
+  // ── Delete room photos from HOUSING Cloudinary ────────────────────────────
+  if (listing.images?.length) {
+    await Promise.allSettled(
+      listing.images.map(async (url) => {
+        const publicId = extractPublicId(url);
+
+        if (publicId) {
+          await housingCloudinary.uploader
+            .destroy(publicId)
+            .catch(() => {});
+        }
+      })
     );
   }
 
-  // ── Delete Cloudinary images ──────────────────────────────────────────────
-  const images = Array.isArray(listing.images) ? listing.images : [];
+  // ── Delete occupancy proof from MARKET Cloudinary ─────────────────────────
+  if (listing.occupancyProofUrl) {
+    const publicId = extractPublicId(listing.occupancyProofUrl);
 
-  if (images.length > 0) {
-    try {
-      await Promise.all(
-        images.map((imageUrl) => deleteCloudinaryImage(imageUrl))
-      );
-    } catch (error) {
-      console.error("Park-Out Cloudinary deletion failed:", error);
-
-      return NextResponse.json(
-        {
-          error:
-            "The listing could not be deleted because one or more property images could not be removed. No database record was deleted.",
-        },
-        { status: 500 }
-      );
+    if (publicId) {
+      await marketCloudinary.uploader
+        .destroy(publicId)
+        .catch(() => {});
     }
   }
 
-  // ── Delete database listing ───────────────────────────────────────────────
-  try {
-    await db
-      .delete(parkoutListing)
-      .where(eq(parkoutListing.id, listingId));
-  } catch (error) {
-    console.error("Park-Out listing database deletion failed:", error);
-
-    return NextResponse.json(
-      {
-        error:
-          "The images were removed, but the listing could not be deleted from the database. Please contact support.",
-      },
-      { status: 500 }
-    );
-  }
+  // ── Delete listing from database ──────────────────────────────────────────
+  await db
+    .delete(parkoutListing)
+    .where(eq(parkoutListing.id, listingId));
 
   return NextResponse.json({
     success: true,

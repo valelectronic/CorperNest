@@ -192,25 +192,63 @@ function ListingCard({ listing }: { listing: Listing }) {
           )}
 
           {/* Delete — pending or rejected only */}
-          {(listing.status === "pending_approval" || listing.status === "rejected") && (
-            !showDelete ? (
-              <button onClick={() => setShowDelete(true)}
-                style={{ flex: 1, padding: "11px", borderRadius: 12, border: "1.5px solid #FFCDD2", backgroundColor: "transparent", color: "#C62828", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                Delete
-              </button>
-            ) : (
-              <div style={{ flex: 1, display: "flex", gap: 6 }}>
-                <button onClick={() => setShowDelete(false)}
-                  style={{ flex: 1, padding: "11px", borderRadius: 12, border: "1px solid var(--color-border)", backgroundColor: "var(--color-bg)", color: "var(--color-text-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                  Cancel
-                </button>
-                <button onClick={handleDelete} disabled={deleting}
-                  style={{ flex: 1, padding: "11px", borderRadius: 12, border: "none", backgroundColor: "#C62828", color: "#fff", fontSize: 12, fontWeight: 700, cursor: deleting ? "not-allowed" : "pointer" }}>
-                  {deleting ? "…" : "Confirm"}
-                </button>
-              </div>
-            )
-          )}
+{(listing.status === "pending_approval" || listing.status === "rejected") && (
+  !showDelete ? (
+    <button
+      onClick={() => setShowDelete(true)}
+      style={{
+        flex: 1,
+        padding: "11px",
+        borderRadius: 12,
+        border: "1.5px solid #FFCDD2",
+        backgroundColor: "transparent",
+        color: "#C62828",
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      Delete
+    </button>
+  ) : (
+    <div style={{ flex: 1, display: "flex", gap: 6 }}>
+      <button
+        onClick={() => setShowDelete(false)}
+        style={{
+          flex: 1,
+          padding: "11px",
+          borderRadius: 12,
+          border: "1px solid var(--color-border)",
+          backgroundColor: "var(--color-bg)",
+          color: "var(--color-text-muted)",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        Cancel
+      </button>
+
+      <button
+        onClick={handleDelete}
+        disabled={deleting}
+        style={{
+          flex: 1,
+          padding: "11px",
+          borderRadius: 12,
+          border: "none",
+          backgroundColor: "#C62828",
+          color: "#fff",
+          fontSize: 12,
+          fontWeight: 700,
+          cursor: deleting ? "not-allowed" : "pointer",
+        }}
+      >
+        {deleting ? "…" : "Confirm"}
+      </button>
+    </div>
+  )
+)}
         </div>
       </div>
     </div>

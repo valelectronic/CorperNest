@@ -1,4 +1,5 @@
 // src/app/api/parkout/listings/delete/route.ts
+
 // Deletes an outgoing user's Park-Out listing.
 //
 // Deletion is allowed only for listings that are:
@@ -13,7 +14,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { parkoutListing } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 export async function DELETE(req: NextRequest) {
   // ── Auth check ────────────────────────────────────────────────────────────
@@ -49,30 +50,37 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  // ── Verify ownership and deletion status ──────────────────────────────────
+  // ── Find the user's listing ───────────────────────────────────────────────
   const [listing] = await db
     .select({
       id: parkoutListing.id,
+      outgoingUserId: parkoutListing.outgoingUserId,
       status: parkoutListing.status,
     })
     .from(parkoutListing)
-    .where(
-      and(
-        eq(parkoutListing.id, listingId),
-        eq(parkoutListing.outgoingUserId, session.user.id),
-        inArray(parkoutListing.status, [
-          "pending_approval",
-          "rejected",
-        ])
-      )
-    )
+    .where(eq(parkoutListing.id, listingId))
     .limit(1);
 
   if (!listing) {
     return NextResponse.json(
+      { error: "Listing not found." },
+      { status: 404 }
+    );
+  }
+
+  // ── Ownership check ───────────────────────────────────────────────────────
+  if (listing.outgoingUserId !== session.user.id) {
+    return NextResponse.json(
+      { error: "You can only delete your own listing." },
+      { status: 403 }
+    );
+  }
+
+  // ── Deletion status check ─────────────────────────────────────────────────
+  if (!["pending_approval", "rejected"].includes(listing.status)) {
+    return NextResponse.json(
       {
-        error:
-          "This listing cannot be deleted. It may not belong to you or may have progressed beyond the deletion stage.",
+        error: `This listing cannot be deleted because its current status is "${listing.status}".`,
       },
       { status: 400 }
     );

@@ -1,4 +1,4 @@
-// src/app/api/parkout/booking/[listingId]/initialize/route.ts
+// src/app/api/parkout/booking/[listingid]/initialize/route.ts
 // Initializes the ₦3,000 inspection fee payment via Paystack.
 //
 // The inspection fee belongs entirely to CorperNest.
@@ -34,14 +34,14 @@ const INSPECTION_FEE_KOBO = 300000; // ₦3,000 in kobo
 const INSPECTION_FEE_NAIRA = 3000;
 
 type Props = {
-  params: Promise<{ listingId: string }>;
+  params: Promise<{ listingid: string }>;
 };
 
 export async function POST(
   req: NextRequest,
   { params }: Props
 ) {
-  const { listingId } = await params;
+  const { listingid } = await params;
 
   // ── Auth check ────────────────────────────────────────────────────────────
   const session = await auth.api.getSession({
@@ -81,7 +81,7 @@ export async function POST(
       status: parkoutListing.status,
     })
     .from(parkoutListing)
-    .where(eq(parkoutListing.id, listingId))
+    .where(eq(parkoutListing.id, listingid))
     .limit(1);
 
   if (!listing) {
@@ -131,7 +131,7 @@ export async function POST(
     .from(parkoutInspection)
     .where(
       and(
-        eq(parkoutInspection.listingId, listingId),
+        eq(parkoutInspection.listingId, listingid),
         eq(parkoutInspection.incomingUserId, session.user.id)
       )
     )
@@ -165,7 +165,7 @@ export async function POST(
 
     await db.insert(parkoutInspection).values({
       id: inspectionId,
-      listingId,
+      listingId: listingid,
       incomingUserId: session.user.id,
       slotNumber: 1,
       bookingFee: INSPECTION_FEE_KOBO,
@@ -182,7 +182,7 @@ export async function POST(
   //
   // The complete ₦3,000 inspection payment belongs to CorperNest.
   const callbackUrl =
-    `${appUrl}/parkout/booking/${listingId}/success`;
+    `${appUrl}/parkout/booking/${listingid}/success`;
 
   try {
     const paystackRes = await fetch(
@@ -200,7 +200,7 @@ export async function POST(
           callback_url: callbackUrl,
           metadata: {
             type: "parkout_inspection_fee",
-            listingId,
+            listingId: listingid,
             inspectionId,
             incomingUserId: session.user.id,
             ambassadorId: listing.ambassadorId,
